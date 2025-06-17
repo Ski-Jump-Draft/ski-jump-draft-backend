@@ -1,0 +1,27 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <RootNamespace>Game.Core</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="Domain\SharedTypes.fs" />
+        <Compile Include="Domain\Id.fs" />
+        <Compile Include="Domain\JumperSkills.fs" />
+        <Compile Include="Domain\Jumper.fs" />
+        <Compile Include="Domain\Hill.fs" />
+        <Compile Include="Domain\Conditions.fs" />
+        <Compile Include="Domain\Draft.fs" />
+        <Compile Include="Domain\Competitions\Competition.fs" />
+        <Compile Include="Domain\Competitions\Preset\Classic.fs" />
+        <Compile Include="Domain\Competitions\Preset\Preset.fs" />
+        <Compile Include="Domain\Game.fs"/>
+        <Compile Include="Domain\Server.fs" />
+        <Compile Include="Domain\Simulation.fs" />
+
+        <Folder Include="Application\" />
+    </ItemGroup>
+
+</Project>

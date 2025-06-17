@@ -1,0 +1,23 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# 
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Game.Core", "Game.Core\Game.Core.fsproj", "{69AB9E18-B59F-4D27-86BA-2729DAA625D5}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Game.Core.Tests", "Game.Core.Tests\Game.Core.Tests.fsproj", "{105DD294-4B2C-4451-8D56-A10A5FBBC3C3}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{69AB9E18-B59F-4D27-86BA-2729DAA625D5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{69AB9E18-B59F-4D27-86BA-2729DAA625D5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{69AB9E18-B59F-4D27-86BA-2729DAA625D5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{69AB9E18-B59F-4D27-86BA-2729DAA625D5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{105DD294-4B2C-4451-8D56-A10A5FBBC3C3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{105DD294-4B2C-4451-8D56-A10A5FBBC3C3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{105DD294-4B2C-4451-8D56-A10A5FBBC3C3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{105DD294-4B2C-4451-8D56-A10A5FBBC3C3}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
