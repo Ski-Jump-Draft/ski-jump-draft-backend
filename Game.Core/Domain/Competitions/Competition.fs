@@ -1,18 +1,18 @@
 namespace Game.Core.Domain.Competitions
 
-open Game.Core.Domain
-open Game.Core.Domain.Competitions.Preset
+open Game.Core.Domain.Shared
+open Game.Core.Domain.Shared.Ids
 
 module Competition =
-    type RawRules =
-        | Ok
-    type CompetitionRulesConfig =
-        | RawRules of RawRules: RawRules
-        | Preset of preset: Preset
+    type Settings = { Rules: RulesConfig }
 
-type CompetitionSettings = { Rules: CompetitionRulesConfig }
+    type Definition =
+        { Id: CompetitionId
+          HillId: HillId
+          //InitialWind: WindMap
+          Settings: Settings }
 
-type Competition =
-    { Hill: Hill
-      InitialWind: WindMap
-      CompetitionSettings: CompetitionSettings }
+    let create hillId rulesConfig =
+        { Id = Id.newCompetitionId ()
+          HillId = hillId
+          Settings = { Rules = rulesConfig } }

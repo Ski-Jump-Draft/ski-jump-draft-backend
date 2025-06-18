@@ -5,7 +5,7 @@ open Xunit
 open FsUnit.Xunit
 open Game.Core.Domain
 open Game.Core.Domain.Draft
-open Game.Core.Domain.Ids
+open Game.Core.Domain.Shared.Ids
 
 // --- dane testowe ---
 let playerA, playerB, playerC = PlayerId "A", PlayerId "B", PlayerId "C"

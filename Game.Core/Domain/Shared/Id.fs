@@ -1,6 +1,6 @@
 // module Game.Core.Domain.Id
 
-namespace Game.Core.Domain
+namespace Game.Core.Domain.Shared
 module Ids =
     [<Struct>]
     type ServerId = | ServerId of string    
@@ -15,6 +15,8 @@ module Ids =
     [<Struct>]
     type DraftId  = | DraftId of string
     [<Struct>]
+    type CompetitionId  = | CompetitionId of string
+    [<Struct>]
     type CompetitionRulesPresetId = | CompetitionRulesPresetId of string
 
 open Ids
@@ -28,6 +30,8 @@ module Id =
     let newJumperId () = JumperId(System.Guid.NewGuid().ToString())
     let newHillId   () = HillId(System.Guid.NewGuid().ToString())
     let newDraftId  () = DraftId(System.Guid.NewGuid().ToString())
+    let newCompetitionId  () = CompetitionId(System.Guid.NewGuid().ToString())
+    let newCompetitionRulesPresetId  () = CompetitionRulesPresetId(System.Guid.NewGuid().ToString())
 
     let valueOfServerId (ServerId s) = s
     let valueOfGameId   (GameId s)   = s
@@ -35,4 +39,5 @@ module Id =
     let valueOfJumperId (JumperId s) = s
     let valueOfHillId   (HillId s)   = s
     let valueOfDraftId  (DraftId s)  = s
+    let valueOfCompetitionId (CompetitionId s) = s
     let valueOfCompetitionRulesPresetId (CompetitionRulesPresetId s)  = s

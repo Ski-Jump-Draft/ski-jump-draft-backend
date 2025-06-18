@@ -1,22 +1,29 @@
-namespace Game.Core.Domain.Competitions.Preset
+namespace Game.Core.Domain.Competitions
 
-open Game.Core.Domain.Ids
-open Game.Core.Domain.Competitions.Preset.Classic
+open Game.Core.Domain.Competitions.Preset
+open Game.Core.Domain.Competitions.RawRules
+open Game.Core.Domain.Competitions.SharedTypes
+open Game.Core.Domain.Shared.Ids
 
-type PresetName = private PresetName of string
-module PresetName =
-  let tryCreate s = if s <> "" then Some (PresetName s) else None
-  let value (PresetName s) = s
+module RulesPreset =
+    type Name = private Name of string
 
-type RawRules = { Test: bool }
+    module Name =
+        let tryCreate (s: string) =
+            if s.Length > 0 && s.Length < 40 then Some(Name s) else None
 
-type Variant =
-  | Classic  of ClassicPreset
-  | FullKo
-  | Custom   of RawRules
+        let value (Name s) = s
 
-type Preset = {
-  Id      : CompetitionRulesPresetId
-  Name    : PresetName
-  Variant : Variant
-}
+    type Variant =
+        | Classic of Classic.Definition
+        | OneVsOneKo of OneVsOneKo.Definition
+        | Custom of RawRules.Definition
+    type Type =
+        | Individual
+        | Team of TeamSize
+
+    type Definition =
+        { Id: CompetitionRulesPresetId
+          Name: Name
+          Type: Type
+          Variant: Variant }

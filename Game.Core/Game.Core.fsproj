@@ -7,20 +7,25 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="Domain\SharedTypes.fs" />
-        <Compile Include="Domain\Id.fs" />
-        <Compile Include="Domain\JumperSkills.fs" />
-        <Compile Include="Domain\Jumper.fs" />
-        <Compile Include="Domain\Hill.fs" />
-        <Compile Include="Domain\Conditions.fs" />
-        <Compile Include="Domain\Draft.fs" />
-        <Compile Include="Domain\Competitions\Competition.fs" />
+        <Compile Include="Domain\Shared\SharedTypes.fs" />
+        <Compile Include="Domain\Shared\Id.fs" />
+        <Compile Include="Domain\Strategies\StrategyRef.fs" />
+        <Compile Include="Domain\Competitions\SharedTypes.fs" />
+        <Compile Include="Domain\Competitions\RawRules.fs" />
         <Compile Include="Domain\Competitions\Preset\Classic.fs" />
+        <Compile Include="Domain\Competitions\Preset\OneVsOneKo.fs" />
         <Compile Include="Domain\Competitions\Preset\Preset.fs" />
-        <Compile Include="Domain\Game.fs"/>
-        <Compile Include="Domain\Server.fs" />
-        <Compile Include="Domain\Simulation.fs" />
-
+        <Compile Include="Domain\Competitions\RulesConfig.fs" />
+        <Compile Include="Domain\Competitions\Competition.fs" />
+        <Compile Include="Domain\Competitions\Strategies.fs" />
+        <Compile Include="Domain\Competitions\Conditions\Conditions.fs" />
+        <Compile Include="Domain\GameWorld\JumperSkills.fs" />
+        <Compile Include="Domain\GameWorld\Jumper.fs" />
+        <Compile Include="Domain\GameWorld\Hill.fs" />
+        <Compile Include="Domain\Simulation\Simulation.fs" />
+        <Compile Include="Domain\Draft\Draft.fs" />
+        <Compile Include="Domain\Games\Game.fs" />
+        <Compile Include="Domain\Servers\Server.fs" />
         <Folder Include="Application\" />
     </ItemGroup>
 

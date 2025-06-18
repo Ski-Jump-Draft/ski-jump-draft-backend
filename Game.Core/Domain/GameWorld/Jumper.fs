@@ -1,6 +1,7 @@
-namespace Game.Core.Domain
+namespace Game.Core.Domain.GameWorld
 
-open Ids
+open Game.Core.Domain
+open Game.Core.Domain.Shared.Ids
 
 [<Struct>]
 type JumperName = private JumperName of string
@@ -35,5 +36,4 @@ type Jumper =
     { Id: JumperId
       Name: JumperName
       Surname: JumperSurname
-      JumperSkills: JumperSkills
     }
