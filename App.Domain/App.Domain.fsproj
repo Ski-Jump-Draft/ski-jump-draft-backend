@@ -1,0 +1,37 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <RootNamespace>App.Domain</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="Shared\Id.fs" />
+        <Compile Include="Shared\Utils\Range.fs" />
+        <Compile Include="Shared\Random.fs" />
+        <Compile Include="Time\Clock.fs" />
+        <Compile Include="Player\Player.fs" />
+        <Compile Include="CustomStrategies\CustomStrategy.fs" />
+        <Compile Include="Competition\Shared.fs" />
+        <Compile Include="Competition\Conditions\Conditions.fs" />
+        <Compile Include="Competition\Rules\Raw.fs" />
+        <Compile Include="Competition\Rules\Preset\Classic.fs" />
+        <Compile Include="Competition\Rules\Preset\OneVsOneKo.fs" />
+        <Compile Include="Competition\Rules\Preset\Preset.fs" />
+        <Compile Include="Competition\Rules\Config.fs" />
+        <Compile Include="Competition\Strategies.fs" />
+        <Compile Include="Competition\Competition.fs" />
+        <Compile Include="Draft\Draft.fs" />
+        <Compile Include="GameWorld\Country.fs" />
+        <Compile Include="GameWorld\Hill.fs" />
+        <Compile Include="GameWorld\Jumper.fs" />
+        <Compile Include="GameWorld\JumperSkills.fs" />
+        <Compile Include="Game\Server.fs" />
+        <Compile Include="Game\Game.fs" />
+        <Compile Include="Game\Host.fs" />
+        <Compile Include="Repositories.fs" />
+
+    </ItemGroup>
+
+</Project>
