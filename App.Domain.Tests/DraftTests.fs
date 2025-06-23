@@ -26,7 +26,7 @@ let jumpX = Guid.Parse "00000000-0000-0000-0000-000000000010"
 let jumpY = Guid.Parse "00000000-0000-0000-0000-000000000011"
 let jumpZ = Guid.Parse "00000000-0000-0000-0000-000000000012"
 
-let playerA, playerB, playerC = PlayerId guidA, PlayerId guidB, PlayerId guidC
+let playerA, playerB, playerC = Draft.Player.Id(guidA), Draft.Player.Id(guidB), Draft.Player.Id(guidC)
 
 let jumperX, jumperY, jumperZ = JumperId jumpX, JumperId jumpY, JumperId jumpZ
 

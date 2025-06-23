@@ -1,12 +1,17 @@
 namespace App.Domain.Draft
 
 open System
+open App.Domain
 open App.Domain.Shared
-open App.Domain.Shared.Ids
 open App.Domain.Shared.Random
 open App.Domain.Shared.Utils.Range
 
+// TODO: Osobny player dla draft/competition
+
 module Draft =
+    [<Struct>]
+    type Id = Id of System.Guid
+    
     type Order =
         | Classic
         | Snake
@@ -32,19 +37,39 @@ module Draft =
     type PickTimeout =
         | Unlimited
         | Fixed of PickTimeout.FixedTime
+        
+    module Player =
+        type Id = private Id of Guid
+        module Id =
+            let tryCreate (v: Guid) = Id v
+            let value (Id v) = v
+            
+        type Name = private Name of string
+        module Name =
+            let tryCreate (v: string) =
+                if v.Length >= 3 && v.Length < 25 then
+                    Ok(Name v)
+                else
+                    Error(invalidOp "Name must be 3-24 characters")
+            let value (Name v) = v
+    
+    type Player = {
+        Id: Player.Id
+        Name: Player.Name
+    }
 
     type Settings =
-        { Players: PlayerId list
+        { Players: Player.Id list
           Order: Order
           MaxJumpersPerPlayer: uint
           UniqueJumpers: bool
           PickTimeout: PickTimeout }
 
-    type Choices = Map<PlayerId, JumperId list>
+    type Choices = Map<Player.Id, GameWorld.Jumper.Id list>
 
     type Progress =
         | NotStarted
-        | Running of Turn: PlayerId * Choices
+        | Running of Turn: Player.Id * Choices
         | Done of Choices
 
     type Error =
@@ -87,13 +112,13 @@ module private Internal =
             if idx = edge then players.[idx] else players.[idx + dir]
 
 type Draft =
-    { Id: DraftId
+    { Id: Draft.Id
       Settings: Settings
       Progress: Progress
       Random: IRandom }
 
     static member Create (idGen: IGuid) (settings: Settings) (random: IRandom) : Draft =
-        { Id = Id.newDraftId idGen
+        { Id = Id(idGen.NewGuid())
           Settings = settings
           Progress = Progress.NotStarted
           Random = random }
@@ -109,7 +134,7 @@ type Draft =
             |> Ok
         | _ -> Error AlreadyStarted
 
-    member this.Pick(jumperId: JumperId) : Result<Draft, Error> =
+    member this.Pick(jumperId: GameWorld.Jumper.Id) : Result<Draft, Error> =
         let s = this.Settings
 
         let duplicate jmp choices =

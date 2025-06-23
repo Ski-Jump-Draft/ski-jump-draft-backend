@@ -11,7 +11,10 @@
         <Compile Include="Shared\Utils\Range.fs" />
         <Compile Include="Shared\Random.fs" />
         <Compile Include="Time\Clock.fs" />
-        <Compile Include="Player\Player.fs" />
+        <Compile Include="GameWorld\Country.fs" />
+        <Compile Include="GameWorld\Hill.fs" />
+        <Compile Include="GameWorld\Jumper.fs" />
+        <Compile Include="GameWorld\JumperSkills.fs" />
         <Compile Include="CustomStrategies\CustomStrategy.fs" />
         <Compile Include="Competition\Shared.fs" />
         <Compile Include="Competition\Conditions\Conditions.fs" />
@@ -23,14 +26,11 @@
         <Compile Include="Competition\Strategies.fs" />
         <Compile Include="Competition\Competition.fs" />
         <Compile Include="Draft\Draft.fs" />
-        <Compile Include="GameWorld\Country.fs" />
-        <Compile Include="GameWorld\Hill.fs" />
-        <Compile Include="GameWorld\Jumper.fs" />
-        <Compile Include="GameWorld\JumperSkills.fs" />
         <Compile Include="Game\Server.fs" />
-        <Compile Include="Game\Game.fs" />
-        <Compile Include="Game\Host.fs" />
+        <Compile Include="Game\Hosting\Host.fs" />
+        <Compile Include="Game.fs" />
         <Compile Include="Repositories.fs" />
+        <Compile Include="Profile\User.fs" />
 
     </ItemGroup>
 

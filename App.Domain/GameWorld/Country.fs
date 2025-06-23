@@ -1,8 +1,9 @@
 namespace App.Domain.GameWorld
 
-open App.Domain.Shared.Ids
-
 module Country =
+    [<Struct>]
+    type Id = Id of System.Guid
+    
     [<Struct; StructuralEquality; StructuralComparison>]
     type Code = private Code of string  // ISO 3166‑1 α‑2
 
@@ -17,6 +18,6 @@ module Country =
 open Country
 type Country =
     {
-        Id: CountryId
+        Id: Country.Id
         Code: Code
     }

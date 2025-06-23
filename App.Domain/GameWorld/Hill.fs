@@ -1,8 +1,9 @@
 namespace App.Domain.GameWorld
 
-open App.Domain.Shared.Ids
-
 module Hill =
+    [<Struct>]
+    type Id = Id of System.Guid
+    
     [<Struct>]
     type KPoint = private KPoint of float
 
@@ -83,10 +84,10 @@ module Hill =
 
 open Hill
 type Hill =
-    { Id: HillId
+    { Id: Hill.Id
       Location: Location
       Name: Name
-      CountryId: CountryId
+      CountryId: Country.Id
       KPoint: KPoint
       HSPoint: HSPoint }
 

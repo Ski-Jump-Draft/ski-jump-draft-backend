@@ -1,15 +1,26 @@
 namespace App.Domain.Game
 
-open App.Domain.Shared.Ids
-
 module Server =
-    type Region = private Region of string
+    [<Struct>]
+    type Id = Id of System.Guid
+    
     module Region =
-        let create (s: string) =
-            if s |> System.String.IsNullOrWhiteSpace then
-                failwith "Region empty"
-            else
-                Region s
+        [<Struct>]
+        type Id = Id of System.Guid
+        
+        type Name = private Name of string
+        module Name =
+            let create(s: string)=
+                if s |> System.String.IsNullOrWhiteSpace then
+                    Error "Region.Label empty"
+                elif s.Length > 20 then
+                    Error "Too long"
+                else Ok(Name s)
+                
+    type Region= {
+        Id: Region.Id
+        Name: Region.Name
+    }
 
     type Label = private Label of string
     module Label =
@@ -22,8 +33,8 @@ module Server =
 
 type Server =
     {
-        Id: ServerId
-        Region: Server.Region
+        Id: Server.Id
+        Region: Server.Region.Id
         Label: Server.Label
     }
     

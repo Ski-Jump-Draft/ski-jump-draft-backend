@@ -2,9 +2,7 @@ namespace App.Domain.Game
 
 open System
 open App.Domain
-open App.Domain.Player
 open App.Domain.Shared
-open App.Domain.Shared.Ids
 open App.Domain.Shared.Random
 open App.Domain.Time
 
@@ -13,7 +11,28 @@ open App.Domain.Time
 // TODO: Pre-draft np. kwalifikacje
 
 module Game =
-    // pomocnicze podtypy
+    [<Struct>]
+    type Id = Id of System.Guid
+    
+    module Participant =
+        [<Struct>]
+        type Id = Id of System.Guid
+        
+        type Name = private Name of string
+        module Name =
+            let tryCreate (v: string) =
+                if v.Length >= 3 && v.Length <= 24 then
+                    Ok(Name v)
+                else
+                    Error(invalidOp "Name must be 3-24 characters")
+            let value (Name v) = v
+        
+    type Participant =
+        {
+            Id: Participant.Id
+            Name: Participant.Name
+        }
+    
     [<Struct>]
     type Date = Date of System.DateTimeOffset
 
@@ -33,7 +52,7 @@ module Game =
             let tryCreate (v: int) = if v >= 0 then Some(Points v) else None
             let value (v: Points) = v
 
-        type Ranking = Ranking of Map<PlayerId, Points>
+        type Ranking = Ranking of Map<Participant.Id, Points>
 
     type Phase =
         | SettingUp
@@ -56,6 +75,8 @@ module Game =
         | InvalidPhase of Expected: PhaseTag list * Actual: PhaseTag
         | HostDecisionTimeout of TimeSpan
         | EndingMatchmakingTooFewPlayers of uint
+        | GameRoomFull
+        | PlayerAlreadyJoined of Participant.Id
 
     module Settings =
         type Error =
@@ -147,15 +168,14 @@ module Game =
           StartingSimulatingPolicy: Settings.PhaseTransitionPolicy.StartingSimulating
           EndingSimulationPolicy: Settings.PhaseTransitionPolicy.EndingSimulation }
 
-    type Players = private Players of PlayerId list
+    type Players = private Players of Participant.Id list
 
     module Players =
-        type Error = AlreadyJoined of PlayerId
         let empty = Players []
 
         let add player (Players players) =
             if List.contains player players then
-                Error(AlreadyJoined player)
+                Error(PlayerAlreadyJoined player)
             else
                 Ok(Players(player :: players))
 
@@ -169,8 +189,8 @@ module Game =
 open Game
 
 type Game =
-    { Id: GameId
-      HostId: HostId
+    { Id: Id
+      HostId: Hosting.Host.Id
       Date: Date
       Phase: Phase
       Settings: Settings
@@ -188,7 +208,7 @@ type Game =
         | Ended _ -> EndedTag
 
     static member Create(idGen: IGuid) (hostId, rules, clock: IClock) =
-        { Id = Id.newGameId idGen
+        { Id = Id(idGen.NewGuid())
           HostId = hostId
           Date = Date clock.UtcNow
           Phase = SettingUp
@@ -196,15 +216,21 @@ type Game =
           Players = Players.empty
           IdGen = idGen
           }
-
-    member this.CanJoin(player: Player) =
+        
+    member this.TryJoin(player: Participant.Id) : Result<Game, Error> =
         if this.RoomIsFull then
-            false
+            Error Game.Error.GameRoomFull
         else
             match this.Phase with
-            | Matchmaking -> true
-            | NotStarted -> false // TODO: może last minute?
-            | _ -> false
+            | Matchmaking ->
+                let updatedPlayers = Players.add player this.Players
+                match updatedPlayers with
+                    | Ok updatedPlayers ->
+                        Ok { this with Players = updatedPlayers }
+                    | Error error ->
+                        Error(error)
+            | NotStarted
+            | _ -> Error(InvalidPhase([MatchmakingTag], this.Phase |> Game.TagOfPhase))
 
     // TODO: Wyjątki w CanJoin!!!!!!
     // TODO: jeśli gracz jest zbanowany, false

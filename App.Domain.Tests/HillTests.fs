@@ -19,10 +19,10 @@ let idGen =
   { new IGuid with
       member _.NewGuid() = fixedGuid }
 
-let dummyCountry = Id.newCountryId(idGen)
+let dummyCountry = Country.Id(idGen.NewGuid())
 
 let dummyHill (kVal:float) (hsVal:float) : Hill =
-    { Id        = Id.newHillId(idGen)
+    { Id        = Hill.Id(idGen.NewGuid())
       Name      = Name "Test"
       Location  = Location "Nowhere"
       CountryId = dummyCountry

@@ -5,6 +5,8 @@ using Microsoft.FSharp.Control;
 using App.Domain.Shared;
 using App.Domain.Repositories;
 
+using GameErrors = App.Domain.Game.GameModule.Error; // taki fajny myk
+
 namespace App.Application.CSharp.Game.JoinGame;
 
 public record Command(
@@ -22,12 +24,30 @@ public class Handler(IGameRepository games, IPlayerRepository players)
         var gameId = command.GameId;
         var game = await FSharpAsyncExt.AwaitOrThrow(games.GetById(gameId), ct, new IdNotFoundException(gameId.Item));
 
-        if (!game.CanJoin(player))
+        var joinResult = game.TryJoin(playerId);
+        if (joinResult.IsOk)
         {
-            throw new GameFullException(game);
+            var gameAfterJoin = joinResult.ResultValue;
+            await FSharpAsyncExt.AwaitOrThrow(
+                games.Update(command.GameId, gameAfterJoin), ct,
+                new JoiningGameFailedUnknownException(player, gameAfterJoin)
+            );
         }
-
-        await FSharpAsyncExt.AwaitOrThrow(games.Join(gameId, playerId), ct,
-            new JoiningGameFailedException(player, game));
+        else
+        {
+            var error = joinResult.ErrorValue;
+            
+            switch (error)
+            {
+                case GameErrors.PlayerAlreadyJoined:
+                    throw new GameFullException(game);
+                case GameErrors.EndingMatchmakingTooFewPlayers:
+                    throw new PlayerAlreadyJoinedException(game, player);
+                case GameErrors.InvalidPhase(var excepted, var actual):
+                    throw new JoiningGameInvalidPhaseException(game, actual);
+                default:
+                    throw new JoiningGameFailedUnknownException(player, game);
+            }
+        }
     }
 }

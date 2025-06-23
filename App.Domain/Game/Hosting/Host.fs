@@ -1,20 +1,21 @@
-namespace App.Domain.Game
+namespace App.Domain.Game.Hosting
 
 open App.Domain
 open App.Domain.Shared
-open App.Domain.Shared.Ids
 
 module Host =
+    [<Struct>]
+    type Id = Id of System.Guid
+
     type Permissions =
-        { Region: Server.Region
-          AllowedServers: Server list }
+        { Region: Game.Server.Region.Id
+          AllowedServers: Game.Server list }
 
-open Host
 type Host =
-    { Id: HostId
-      Permissions: Permissions }
+    { Id: Host.Id
+      Permissions: Host.Permissions }
 
-    static member create (idGen: IGuid) (permissions: Permissions) =
+    static member create (idGen: IGuid) (permissions: Host.Permissions) =
         let invalid =
             permissions.AllowedServers
             |> List.filter (fun s -> s.Region <> permissions.Region)
@@ -23,5 +24,5 @@ type Host =
             failwith "One or more allowed servers do not belong to the given region"
 
         else
-            { Id = Id.newHostId (idGen: IGuid)
+            { Id = Host.Id(idGen.NewGuid())
               Permissions = permissions }

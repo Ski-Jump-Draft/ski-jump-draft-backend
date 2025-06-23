@@ -4,45 +4,37 @@ open App.Domain
 open App.Domain.Competition
 open App.Domain.Game
 open App.Domain.GameWorld
-open App.Domain.Player
-open App.Domain.Shared.Ids
 
 type IHillRepository =
-    abstract member GetById: HillId -> Async<Option<Hill>>
+    abstract member GetById: GameWorld.Hill.Id -> Async<Option<Hill>>
 
 type IJumpersRepository =
-    abstract member GetById: JumperId -> Async<Option<Jumper>>
-    abstract member Save: JumperId -> Async<unit>
-    abstract member SaveLiveForm: JumperId * JumperSkills.LiveForm -> Async<Option<unit>>
+    abstract member GetById: GameWorld.Jumper.Id -> Async<Option<Jumper>>
+    abstract member Save: GameWorld.Jumper.Id -> Async<unit>
+    abstract member SaveLiveForm: GameWorld.Jumper.Id * JumperSkills.LiveForm -> Async<Option<unit>>
     abstract member Add: Jumper -> Async<unit>
     
 type ICompetitionRulesPresetRepository =
-    abstract member GetById: CompetitionRulesPresetId -> Async<Option<Competition.Rules.Preset.Preset>>
+    abstract member GetById: Competition.Rules.Preset.Preset.Id -> Async<Option<Competition.Rules.Preset.Preset>>
     abstract member GetAll: Async<Competition.Rules.Preset.Preset list>
     
 type IHostRepository =
-    abstract member GetById: HostId -> Async<Option<Host>>
-    abstract member GetPermissionsById: HostId -> Async<Option<Host>>
+    abstract member GetById: Game.Hosting.Host.Id -> Async<Option<Game.Hosting.Host>>
+    abstract member GetPermissionsById: Game.Hosting.Host.Id -> Async<Option<Game.Hosting.Host>>
     
 type IServerRepository =
-    abstract member GetById: ServerId -> Async<Option<Server>>
+    abstract member GetById: Game.Server.Id -> Async<Option<Server>>
     abstract member GetByRegion: Server.Region -> Async<Server list>
     abstract member GetAvailable: Async<Server list>
-    abstract member IsAvailable: ServerId -> Async<Option<bool>>
+    abstract member IsAvailable: Game.Server.Id -> Async<Option<bool>>
     abstract member Add: Server -> Async<unit>
-    abstract member Remove: ServerId -> Async<unit>
+    abstract member Remove: Game.Server.Id -> Async<unit>
 
 type IRegionRepository =
     abstract member GetAll: Async<Server.Region list>
     
 type IGameRepository =
-    abstract member GetById: GameId -> Async<Option<Game>>
+    abstract member GetById: Game.Game.Id -> Async<Option<Game>>
     abstract member Add: Game -> Async<unit>
+    abstract member Update: Game.Game.Id * Game -> Async<unit>
     abstract member GetByPhase: Game.PhaseTag -> Async<Game list>
-    abstract member Join: gameId: GameId * playerId: PlayerId -> Async<bool>
-    
-type IPlayerRepository =
-    abstract member GetById: PlayerId -> Async<Option<Player>>
-    abstract member Add: Player -> Async<unit>
-    abstract member IsActive: PlayerId -> Async<Option<bool>>
-    abstract member GetActive: Async<Player list>
