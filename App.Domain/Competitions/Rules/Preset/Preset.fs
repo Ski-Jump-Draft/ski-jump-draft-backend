@@ -1,6 +1,6 @@
-namespace App.Domain.Competition.Rules.Preset
+namespace App.Domain.Competitions.Rules.Preset
 
-open App.Domain.Competition
+open App.Domain.Competitions
 
 module Preset =
     [<Struct>]

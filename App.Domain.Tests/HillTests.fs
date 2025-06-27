@@ -1,4 +1,4 @@
-module HillTests
+module HillModuleTests
 
 open System
 open App.Domain.Shared

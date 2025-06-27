@@ -1,4 +1,4 @@
-namespace App.Domain.Competition.Rules
+namespace App.Domain.Competitions.Rules
 
 module Shared =
     type TeamSize = private TeamSize of uint

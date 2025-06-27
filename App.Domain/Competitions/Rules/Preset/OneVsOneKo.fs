@@ -1,4 +1,4 @@
-namespace App.Domain.Competition.Rules.Preset
+namespace App.Domain.Competitions.Rules.Preset
 
 open App.Domain.CustomStrategies
 
