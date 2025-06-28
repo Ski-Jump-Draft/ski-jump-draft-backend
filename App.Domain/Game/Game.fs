@@ -61,8 +61,8 @@ module Game =
         | MatchmakingPhaseEnded of GameId: Id * Timestamp: EventTimestamp // TODO: Matchmaking id
         | PreDraftPhaseStarted of GameId: Id * Timestamp: EventTimestamp * PreDraftId: PreDraft.PreDraft.Id
         | PreDraftPhaseEnded of GameId: Id * Timestamp: EventTimestamp * PreDraftId: PreDraft.PreDraft.Id
-        | DraftPhaseStarted of GameId: Id * Timestamp: EventTimestamp * DraftId: Draft.Draft.Id
-        | DraftPhaseEnded of GameId: Id * Timestamp: EventTimestamp * DraftId: Draft.Draft.Id
+        | DraftPhaseStarted of GameId: Id * Timestamp: EventTimestamp * DraftId: Draft.Id.Id
+        | DraftPhaseEnded of GameId: Id * Timestamp: EventTimestamp * DraftId: Draft.Id.Id
         | CompetitionPhaseStarted of GameId: Id * Timestamp: EventTimestamp * CompetitionId: Game.Competition.Id
         | CompetitionPhaseEnded of GameId: Id * Timestamp: EventTimestamp * CompetitionId: Game.Competition.Id
         | GameEnded of GameId: Id * Timestamp: EventTimestamp * Results: EndedGameResults.Ranking
@@ -71,7 +71,7 @@ module Game =
         | SettingUp
         | Matchmaking
         | PreDraft of PreDraft.PreDraft.Id
-        | Draft of Draft.Draft.Id
+        | Draft of Draft.Id.Id
         | Competition of Game.Competition.Id
         | Ended of EndedGameResults.Ranking
         | Break of Next: PhaseTag
@@ -177,7 +177,7 @@ module Game =
 
     type Settings =
         { PlayerLimit: Settings.PlayerLimit
-          DraftSettings: Draft.Draft.Settings // TODO: MaxJumpersPerPlayer: uint
+          DraftSettings: Draft.Settings.Settings // TODO: MaxJumpersPerPlayer: uint
           StartingMatchmakingPolicy: Settings.PhaseTransitionPolicy.StartingMatchmaking
           EndingMatchmakingPolicy: Settings.PhaseTransitionPolicy.EndingMatchmaking
           StartingDraftPolicy: Settings.PhaseTransitionPolicy.StartingDraft

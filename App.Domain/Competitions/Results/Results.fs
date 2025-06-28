@@ -63,7 +63,6 @@ type Results =
         (individualId: Participant.IndividualId)
         (jumpResult: JumpResult)
         (newTotalPoints: Points)
-        (timestamp: EventTimestamp)
         : Results =
         let exists =
             this.ParticipantResults
@@ -99,7 +98,6 @@ type Results =
         (jumpResult: JumpResult)
         (newIndividualTotal: Points)
         (newTeamTotal: Points)
-        (timestamp: EventTimestamp)
         : Results =
         let hasTeam =
             this.ParticipantResults

@@ -1,103 +1,106 @@
 namespace App.Domain.Draft
 
-open App.Domain.Draft
 open App.Domain.Draft.Event
 open App.Domain.Draft.Picks
-
-type Phase =
-    | NotStarted
-    | Running of Turn: Participant.Id * Picks.Picks
-    | Done of Picks.Picks
+open App.Domain.Draft.Order
+open App.Domain.Draft.Settings
 
 type PhaseTag =
     | NotStartedTag
     | RunningTag
     | DoneTag
 
+type Phase =
+    | NotStarted
+    | Running of CurrentIndex: int * ParticipantOrder: Participant.Id list * Picks: Picks
+    | Done of Picks
+
 type Error =
-    | InvalidPhase of Expected: PhaseTag list * Actual: PhaseTag
+    | InvalidPhase of expected: PhaseTag list * actual: PhaseTag
+    | ParticipantNotAllowedToPick of Participant.Id
     | PickingLimitReached
     | JumperTaken
-    | ParticipantNotAllowedToPick of ParticipantId: Participant.Id
-
 
 type Draft =
     { Id: Id.Id
       Settings: Settings.Settings
       Participants: Participant.Id list
-      Phase: Phase}
+      Seed: uint64
+      Phase: Phase }
 
-    static member TagOfPhase phase =
-        match phase with
+    static member TagOfPhase =
+        function
         | NotStarted -> NotStartedTag
         | Running _ -> RunningTag
         | Done _ -> DoneTag
 
-    static member Create id (settings: Settings.Settings) (participants: Participant.Id list) : Draft =
+    static member Create id settings participants seed =
         { Id = id
           Settings = settings
           Participants = participants
-          Phase = Phase.NotStarted}
+          Seed = seed
+          Phase = NotStarted }
 
-    member this.Start startedDraftEventId timestamp corr caus =
+    member this.Start() =
         match this.Phase with
-        | Phase.NotStarted ->
-            let first = List.head this.Participants
-            let empty = Picks.Empty this.Participants
+        | NotStarted ->
+            let strategy = OrderStrategyFactory.create this.Settings.Order
+            let initialOrd = strategy.ComputeInitialOrder(this.Participants, this.Seed)
 
-            let state =
+            let newState =
                 { this with
-                    Phase = Phase.Running(first, empty) }
+                    Phase = Running(0, initialOrd, Picks.Empty initialOrd) }
 
-            let payload = { DraftId = this.Id; Settings = this.Settings; Participants = this.Participants; Seed = ??? TODO }: DraftStartedV1
-            Ok(state, [ DraftEventPayload.DraftStartedV1 payload ])
-        | _ -> Error(InvalidPhase([ NotStartedTag ], Draft.TagOfPhase(this.Phase)))
+            let payload: DraftStartedV1 =
+                { DraftId = this.Id
+                  Settings = this.Settings
+                  Participants = this.Participants
+                  Seed = this.Seed }
+
+            Ok(newState, [ DraftEventPayload.DraftStartedV1 payload ])
+
+        | _ -> Error(InvalidPhase([ NotStartedTag ], Draft.TagOfPhase this.Phase))
 
     member this.Pick(participantId: Participant.Id, subjectId: Subject.Id) =
-        let settings = this.Settings
-
         match this.Phase with
-        | Phase.Running(currentParticipantId, picks) ->
-            if currentParticipantId <> participantId then
-                Error (ParticipantNotAllowedToPick currentParticipantId)
-            elif picks.PicksNumberOf currentParticipantId >= int settings.MaxJumpersPerPlayer then
+        | Running(currentIdx, order, picks) ->
+            if order.[currentIdx] <> participantId then
+                Error(ParticipantNotAllowedToPick participantId)
+            elif picks.PicksNumberOf participantId >= int this.Settings.MaxJumpersPerPlayer then
                 Error PickingLimitReached
-            elif settings.UniqueJumpers && picks.ContainsSubject(subjectId) then
+            elif this.Settings.UniqueJumpers && picks.ContainsSubject subjectId then
                 Error JumperTaken
             else
-                let picks = picks.AddPick(currentParticipantId, subjectId)
+                let updatedPicks = picks.AddPick(participantId, subjectId)
+                let totalAllowed = int this.Settings.MaxJumpersPerPlayer * List.length order
+                let completedRounds = updatedPicks.Total() / List.length order
 
-                let finishedPicks =
-                    picks.Total() = int settings.MaxJumpersPerPlayer * List.length this.Participants
-
-                let picksCount = picks.PicksNumberOf currentParticipantId
-
-                let pickedPayload =
+                let pickPayload: DraftSubjectPickedV2 =
                     { DraftId = this.Id
-                      ParticipantId = currentParticipantId
+                      ParticipantId = participantId
                       SubjectId = subjectId
-                      PickIndex = uint (picksCount - 1) }
-                    : Event.DraftSubjectPickedV2
+                      PickIndex = uint (updatedPicks.PicksNumberOf participantId - 1) }
 
-                let endedPayload = { DraftId = this.Id }: Event.DraftEndedV1
+                let pickEvent = DraftEventPayload.DraftSubjectPickedV2 pickPayload
 
-                let newProgress =
-                    if finishedPicks then
-                        Phase.Done picks
+                let endEvents =
+                    if updatedPicks.Total() = totalAllowed then
+                        [ DraftEventPayload.DraftEndedV1 { DraftId = this.Id } ]
                     else
-                        let next =
-                            picks.NextParticipant(settings.Order, this.Participants, currentParticipantId, this.Random)
+                        []
 
-                        Phase.Running(next, picks)
+                let strategy = OrderStrategyFactory.create this.Settings.Order
 
-                let events =
-                    if finishedPicks then
-                        [ DraftEventPayload.DraftSubjectPickedV2 pickedPayload
-                          DraftEventPayload.DraftEndedV1 endedPayload ]
+                let (nextOrder, nextIdx) =
+                    strategy.ComputeNextOrder(order, currentIdx, completedRounds, this.Seed)
+
+                let newPhase =
+                    if updatedPicks.Total() = totalAllowed then
+                        Done updatedPicks
                     else
-                        [ DraftEventPayload.DraftSubjectPickedV2 pickedPayload ]
+                        Running(nextIdx, nextOrder, updatedPicks)
 
-                ({ this with Phase = newProgress }, events) |> Ok
+                let newState = { this with Phase = newPhase }
+                Ok(newState, pickEvent :: endEvents)
 
-        | Phase.NotStarted
-        | Phase.Done _ -> Error(InvalidPhase([ RunningTag ], Draft.TagOfPhase(this.Phase)))
+        | _ -> Error(InvalidPhase([ RunningTag ], Draft.TagOfPhase this.Phase))

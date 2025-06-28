@@ -13,6 +13,8 @@
         <Compile Include="Shared\Random.fs" />
         <Compile Include="Shared\CountryCode.fs" />
         <Compile Include="Shared\EventHelpers.fs" />
+        <Compile Include="Shared\EventAbstractions.fs" />
+        <Compile Include="Shared\DomainEventFactory.fs" />
         <Compile Include="GameWorld\Country.fs" />
         <Compile Include="GameWorld\Hill.fs" />
         <Compile Include="GameWorld\Jumper.fs" />
@@ -24,7 +26,6 @@
         <Compile Include="Competitions\Participant.fs" />
         <Compile Include="Competitions\Startlist.fs" />
         <Compile Include="Competitions\Results\Results.fs" />
-        <Compile Include="Competitions\Results\RankedResultsggg.fs" />
         <Compile Include="Competitions\Results\RankedResults.fs" />
         <Compile Include="Competitions\Conditions\Conditions.fs" />
         <Compile Include="Competitions\Rules\Shared.fs" />
@@ -33,16 +34,16 @@
         <Compile Include="Competitions\Rules\Preset\OneVsOneKo.fs" />
         <Compile Include="Competitions\Rules\Preset\Preset.fs" />
         <Compile Include="Competitions\Rules\Rules.fs" />
-        <Compile Include="Competitions\Strategies.fs" />
         <Compile Include="Competitions\Competition.fs" />
         <Compile Include="Draft\Id.fs" />
         <Compile Include="Draft\Subject.fs" />
-        <Compile Include="Draft\Order.fs" />
         <Compile Include="Draft\Participant.fs" />
+        <Compile Include="Draft\Order.fs" />
         <Compile Include="Draft\Picks.fs" />
         <Compile Include="Draft\Settings.fs" />
         <Compile Include="Draft\Event.fs" />
         <Compile Include="Draft\Draft.fs" />
+        <Compile Include="Draft\Rehydrator.fs" />
         <Compile Include="PreDraft\Competition.fs" />
         <Compile Include="PreDraft\Settings.fs" />
         <Compile Include="PreDraft\PreDraft.fs" />

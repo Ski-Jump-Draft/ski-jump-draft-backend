@@ -15,8 +15,8 @@ type IJumpersRepository =
     abstract member Add: Jumper -> Async<unit>
 
 type ICompetitionRulesPresetRepository =
-    abstract member GetById: Competition.Rules.Preset.Preset.Id -> Async<Option<Competition.Rules.Preset.Preset>>
-    abstract member GetAll: Async<Competition.Rules.Preset.Preset list>
+    abstract member GetById: Rules.Preset.Preset.Id -> Async<Option<Rules.Preset.Preset>>
+    abstract member GetAll: Async<Rules.Preset.Preset list>
 
 type IHostRepository =
     abstract member GetById: Game.Hosting.Host.Id -> Async<Option<Game.Hosting.Host>>

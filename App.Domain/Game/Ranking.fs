@@ -4,5 +4,5 @@ open App.Domain
 
 type IRankingCreator =
     abstract member Create:
-        gameId: Game.Game.Id * draftPicks: Draft.Draft.Picks * competitionResults: Competition.Competition.Results ->
+        gameId: Game.Game.Id * draftPicks: Draft.Picks.Picks * competitionResults: Competitions.Results ->
             Game.Game.EndedGameResults.Ranking

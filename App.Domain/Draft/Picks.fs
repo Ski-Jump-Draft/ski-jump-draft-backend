@@ -53,17 +53,17 @@ type Picks private (picksMap: Map<Participant.Id, Subject.Id list>) =
                 | None -> Some [ subjectId ])
         Picks(updatedMap)
 
-    member this.NextParticipant(order: Order.Order, participants: Participant.Id list, turn: Participant.Id, random: IRandom) : Participant.Id =
+    member this.NextParticipant(order: Order.OrderOption, participants: Participant.Id list, turn: Participant.Id, random: IRandom) : Participant.Id =
         let roundIdx = this.CurrentRound(participants)
         let inRound =
             match order with
-            | Order.Order.RandomSeed seed -> random.ShuffleList(seed + roundIdx) participants
+            | Order.OrderOption.RandomSeed seed -> random.ShuffleList(seed + roundIdx) participants
             | _ -> participants
         let idx = inRound |> List.findIndex ((=) turn)
         match order with
-        | Order.Order.Classic
-        | Order.Order.RandomSeed _ -> inRound.[(idx + 1) % inRound.Length]
-        | Order.Order.Snake ->
+        | Order.OrderOption.Classic
+        | Order.OrderOption.RandomSeed _ -> inRound.[(idx + 1) % inRound.Length]
+        | Order.OrderOption.Snake ->
             let picksInRound = participants.Length + 1
             let revRound = this.Total() / picksInRound
             let dir = if revRound % 2 = 0 then 1 else -1

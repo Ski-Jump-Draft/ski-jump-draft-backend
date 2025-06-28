@@ -3,7 +3,7 @@ namespace App.Domain.GameWorld
 module Hill =
     [<Struct>]
     type Id = Id of System.Guid
-    
+
     [<Struct>]
     type KPoint = private KPoint of float
 
@@ -29,6 +29,7 @@ module Hill =
     type Location = Location of string
 
 open Hill
+
 type Hill =
     { Id: Hill.Id
       Location: Location
@@ -36,8 +37,3 @@ type Hill =
       CountryId: Country.Id
       KPoint: KPoint
       HSPoint: HSPoint }
-
-    member this.PointsPerMeter =
-        Hill.PointsForMeter.fromK
-        this.KPoint |> Hill.KPoint.value |> Hill.PointsForMeter.fromK
-        // Hill.PointsForMeter.fromK this.KPoint

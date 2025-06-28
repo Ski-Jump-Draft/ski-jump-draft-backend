@@ -1,6 +1,7 @@
 namespace App.Domain.Competitions
 
-open App.Domain.Competitions.Results
+open System
+open App.Domain.Competitions.RankedResults.Policy
 open App.Domain.Shared.EventHelpers
 open App.Domain
 
@@ -41,7 +42,7 @@ module Competition =
         | CompetitionContinued of CompetitionId: Id * Timestamp: EventTimestamp
         | CompetitionCancelled of CompetitionId: Id * Timestamp: EventTimestamp
         | CompetitionEnded of CompetitionId: Id * Timestamp: EventTimestamp
-        | CompetitionJumpResultRegistered of CompetitionId: Id * Timestamp: EventTimestamp * JumpResultId: JumpResult.Id
+        | CompetitionJumpResultRegistered of CompetitionId: Id * Timestamp: EventTimestamp * JumpResultId: Results.JumpResult.Id
 
 open Competition
 
@@ -79,7 +80,20 @@ type Competition =
                   Settings = { Rules = rules } }
 
     /// TODO, Sprawdź przed dodaniem skoku: Czy w tej serii już skakał? Rzuć error.
-    member this.RegisterJump (participantId: Participant.IndividualId) (jumpResult: JumpResult) timestamp =
+    member this.RegisterJump (participantId: Participant.IndividualId) (jumpResult: Results.JumpResult) =
+        match this.Startlist.Next with
+        | Some nextIndividualParticipant ->
+            match this.Phase with
+            | NotStarted ->
+                let roundIndex = RoundIndex 0u
+                let totalPoints = 500m
+                let competitionType = "team" // TODO
+                match competitionType with
+                | "team" ->
+                    let teamId = Guid.NewGuid // TODO
+                    let newResults = this.Results.RegisterJumpOfTeamParticipant(participantId teamId jumpResult 0 0)
+        | None ->
+            invalidOp "This should not be even raised, lmao"
         match this.Phase with
         | NotStarted ->
             let roundIndex = RoundIndex 0u

@@ -1,5 +1,7 @@
 namespace App.Domain.Competitions.Rules
 
+// TODO: Prefix competitions
+
 module Shared =
     type TeamSize = private TeamSize of uint
 
