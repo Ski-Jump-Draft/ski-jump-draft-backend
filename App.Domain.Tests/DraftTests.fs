@@ -26,7 +26,7 @@ let jumpX = Guid.Parse "00000000-0000-0000-0000-000000000010"
 let jumpY = Guid.Parse "00000000-0000-0000-0000-000000000011"
 let jumpZ = Guid.Parse "00000000-0000-0000-0000-000000000012"
 
-let playerA, playerB, playerC = PlayerId guidA, PlayerId guidB, PlayerId guidC
+let playerA, playerB, playerC = Draft.Participant.Id(guidA), Draft.Participant.Id(guidB), Draft.Participant.Id(guidC)
 
 let jumperX, jumperY, jumperZ = JumperId jumpX, JumperId jumpY, JumperId jumpZ
 
@@ -57,7 +57,7 @@ let ``Classic rota A→B→C→A`` () =
     let after2 = draft.Pick jumperY |> getOk // B
     let after3 = draft.Pick jumperZ |> getOk // C
 
-    match after3.Progress with
+    match after3.Phase with
     | Draft.Running(currentTurn, _) -> currentTurn |> should equal playerA
     | _ -> failwith "nie Running"
 
@@ -73,7 +73,7 @@ let ``Snake odwrotnie w rundzie 2`` () =
     let d2 = d1.Pick jumperY |> getOk // B
     let d3 = d2.Pick jumperZ |> getOk // C
 
-    match d3.Progress with
+    match d3.Phase with
     | Draft.Running(currentTurn, _) -> currentTurn |> should equal playerC
     | _ -> failwith "nie Running"
 
@@ -96,7 +96,7 @@ let ``RandomSeed tasuje kolejkę co rundę`` () =
     let d0 = (Draft.Draft.Create idGen rndSet stubRandom).Start |> getOk
 
     let firstStarter = // gracz rundy 1
-        match d0.Progress with
+        match d0.Phase with
         | Draft.Running(currentTurn, _) -> currentTurn
         | _ -> failwith "!"
 
@@ -110,7 +110,7 @@ let ``RandomSeed tasuje kolejkę co rundę`` () =
     |> pick jumperZ
     |> function
         | Ok d3 ->
-            match d3.Progress with
+            match d3.Phase with
             | Draft.Running(currentTurn, _) ->
                 currentTurn |> should not' (equal firstStarter)
                 currentTurn |> should equal playerB

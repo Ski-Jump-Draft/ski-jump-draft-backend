@@ -1,10 +1,11 @@
 namespace App.Domain.Competition.Rules.Preset
 
 open App.Domain.Competition
-open App.Domain.Shared.Ids
 
 module Preset =
-    open App.Domain.Competition.Rules
+    [<Struct>]
+    type Id = Id of System.Guid
+    
     type Name = private Name of string
 
     module Name =
@@ -17,12 +18,13 @@ module Preset =
         | Classic of Classic
         | OneVsOneKo of OneVsOneKo
         | Custom of Rules.Raw
+        
     type Type =
         | Individual
-        | Team of Shared.TeamSize
+        | Team of Rules.Shared.TeamSize
         
 type Preset =
-    { Id: CompetitionRulesPresetId
+    { Id: Preset.Id
       Name: Preset.Name
       Type: Preset.Type
       Variant: Preset.Variant }

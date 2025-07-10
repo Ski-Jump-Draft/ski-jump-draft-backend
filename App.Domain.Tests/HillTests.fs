@@ -1,4 +1,4 @@
-module HillTests
+module HillModuleTests
 
 open System
 open App.Domain.Shared
@@ -19,10 +19,10 @@ let idGen =
   { new IGuid with
       member _.NewGuid() = fixedGuid }
 
-let dummyCountry = Id.newCountryId(idGen)
+let dummyCountry = Country.Id(idGen.NewGuid())
 
-let dummyHill (kVal:float) (hsVal:float) : Hill =
-    { Id        = Id.newHillId(idGen)
+let dummyHill (kVal:double) (hsVal:double) : Hill =
+    { Id        = Hill.Id(idGen.NewGuid())
       Name      = Name "Test"
       Location  = Location "Nowhere"
       CountryId = dummyCountry
@@ -35,7 +35,7 @@ let dummyHill (kVal:float) (hsVal:float) : Hill =
 // ───────────────────────────────────────────────
 [<Fact>]
 let ``HS -> HillType klasyfikacja`` () =
-    let cases : (float * Type) list = [
+    let cases : (double * Type) list = [
         30.0 , Small
         70.0 , Medium
         100.0, Normal

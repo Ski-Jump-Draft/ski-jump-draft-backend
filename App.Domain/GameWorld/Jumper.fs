@@ -1,9 +1,9 @@
 namespace App.Domain.GameWorld
 
-open App.Domain
-open App.Domain.Shared.Ids
-
 module Jumper =
+    [<Struct>]
+    type Id = Id of System.Guid
+    
     [<Struct>]
     type Name = private Name of string
 
@@ -34,8 +34,8 @@ module Jumper =
         
 
 type Jumper =
-    { Id: JumperId
+    { Id: Jumper.Id
       Name: Jumper.Name
       Surname: Jumper.Surname
-      CountryId: CountryId
+      CountryId: Country.Id
     }
