@@ -4,24 +4,27 @@ namespace App.Application.Game.Exception;
 
 public class JoiningGameInvalidPhaseException : System.Exception
 {
-    public App.Domain.Game.Game Game { get; }
-    public App.Domain.Game.GameModule.Phase Phase { get; }
-    
-    public JoiningGameInvalidPhaseException(Domain.Game.Game game, GameModule.Phase phase)
+    public List<App.Domain.Game.GameModule.PhaseTag> Expected { get; }
+    public App.Domain.Game.GameModule.PhaseTag Actual { get; }
+
+    public JoiningGameInvalidPhaseException(List<App.Domain.Game.GameModule.PhaseTag> expected,
+        GameModule.PhaseTag actual)
     {
-        Game = game;
-        Phase = phase;
+        Expected = expected;
+        Actual = actual;
     }
 
-    public JoiningGameInvalidPhaseException(string message, Domain.Game.Game game, GameModule.Phase phase) : base(message)
+    public JoiningGameInvalidPhaseException(string message, List<App.Domain.Game.GameModule.PhaseTag> expected,
+        GameModule.PhaseTag actual) : base(message)
     {
-        Game = game;
-        Phase = phase;
+        Expected = expected;
+        Actual = actual;
     }
 
-    public JoiningGameInvalidPhaseException(string message, System.Exception inner, Domain.Game.Game game, GameModule.Phase phase) : base(message, inner)
+    public JoiningGameInvalidPhaseException(string message, System.Exception inner,
+        List<App.Domain.Game.GameModule.PhaseTag> expected, GameModule.PhaseTag actual) : base(message, inner)
     {
-        Game = game;
-        Phase = phase;
+        Expected = expected;
+        Actual = actual;
     }
 }

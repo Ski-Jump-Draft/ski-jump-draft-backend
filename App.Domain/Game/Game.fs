@@ -2,37 +2,15 @@ namespace App.Domain.Game
 
 open System
 open App.Domain
-open App.Domain.Shared
-open App.Domain.Shared.EventHelpers
-open App.Domain.Time
+open App.Domain.Game.Event
+open App.Domain.Game.Ranking
+open App.Domain.Shared.AggregateVersion
 
 // TODO: Ustawienia matchmakingu i pokoju gry. Game.Rules/Game.Settings
 // TODO: Może dynamiczny globalny limit graczy na pokój?
 // TODO: Pre-draft np. kwalifikacje
 
 module Game =
-    [<Struct>]
-    type Id = Id of System.Guid
-
-    module Participant =
-        [<Struct>]
-        type Id = Id of System.Guid
-
-        type Name = private Name of string
-
-        module Name =
-            let tryCreate (v: string) =
-                if v.Length >= 3 && v.Length <= 24 then
-                    Ok(Name v)
-                else
-                    Error(invalidOp "Name must be 3-24 characters")
-
-            let value (Name v) = v
-
-    type Participant =
-        { Id: Participant.Id
-          Name: Participant.Name }
-
     [<Struct>]
     type Date = Date of System.DateTimeOffset
 
@@ -45,37 +23,14 @@ module Game =
             else
                 Ok(Date v)
 
-    module EndedGameResults =
-        type Points = private Points of int
-
-        module Points =
-            let tryCreate (v: int) = if v >= 0 then Some(Points v) else None
-            let value (v: Points) = v
-
-        type Ranking = Ranking of Map<Participant.Id, Points>
-        
-    type Event =
-        | PlayerJoined of GameId: Id * Timestamp: EventTimestamp * PlayerId: Participant.Id
-        | PlayerLeft of GameId: Id * Timestamp: EventTimestamp * PlayerId: Participant.Id
-        | MatchmakingPhaseStarted of GameId: Id * Timestamp: EventTimestamp // TODO: Matchmaking id
-        | MatchmakingPhaseEnded of GameId: Id * Timestamp: EventTimestamp // TODO: Matchmaking id
-        | PreDraftPhaseStarted of GameId: Id * Timestamp: EventTimestamp * PreDraftId: PreDraft.PreDraft.Id
-        | PreDraftPhaseEnded of GameId: Id * Timestamp: EventTimestamp * PreDraftId: PreDraft.PreDraft.Id
-        | DraftPhaseStarted of GameId: Id * Timestamp: EventTimestamp * DraftId: Draft.Id.Id
-        | DraftPhaseEnded of GameId: Id * Timestamp: EventTimestamp * DraftId: Draft.Id.Id
-        | CompetitionPhaseStarted of GameId: Id * Timestamp: EventTimestamp * CompetitionId: Game.Competition.Id
-        | CompetitionPhaseEnded of GameId: Id * Timestamp: EventTimestamp * CompetitionId: Game.Competition.Id
-        | GameEnded of GameId: Id * Timestamp: EventTimestamp * Results: EndedGameResults.Ranking
-
     type Phase =
         | SettingUp
         | Matchmaking
-        | PreDraft of PreDraft.PreDraft.Id
+        | PreDraft of PreDraft.Id.Id
         | Draft of Draft.Id.Id
         | Competition of Game.Competition.Id
         | Ended of EndedGameResults.Ranking
         | Break of Next: PhaseTag
-    // Jeśli gracz opuści, to go w 100% wymazujemy z gry
 
     and PhaseTag =
         | SettingUpTag
@@ -93,96 +48,6 @@ module Game =
         | EndingMatchmakingTooManyPlayers of Current: uint * Max: uint
         | GameRoomFull
         | PlayerAlreadyJoined of Participant.Id
-
-    module Settings =
-        type Error =
-            | PlayersLimitTooFew of uint
-            | PlayersLimitTooMany of uint
-
-        type PlayerLimit = private PlayerLimit of uint
-
-        module PlayerLimit =
-            let tryCreate (v: uint) =
-                if v < 2u then Error(PlayersLimitTooFew(2u))
-                elif v > 15u then Error(PlayersLimitTooMany(15u))
-                else Ok(PlayerLimit v)
-
-            let value (PlayerLimit v) = v
-
-            let fits (count: uint) (limit: PlayerLimit) = uint count <= value limit
-
-        module PhaseTransitionPolicy =
-            type Error =
-                | HostDecisionTimeoutTooLong of TimeSpan
-                | AutostartAfterTimeTimeTooLong of TimeSpan
-                | AutostartAfterTimeMinimalPlayersCountTooMany of uint
-
-            type HostDecisionTimeout = private HostDecisionTimeout of TimeSpan
-
-            module HostDecisionTimeout =
-                let tryCreate (v: TimeSpan) =
-                    if v <= TimeSpan.FromSeconds(120L) then
-                        Ok(HostDecisionTimeout v)
-                    else
-                        Error(HostDecisionTimeoutTooLong v)
-
-                let value (v: HostDecisionTimeout) = v
-
-            module AutostartAfterTime =
-                type Time = private Time of TimeSpan
-
-                module Time =
-                    let tryCreate (v: TimeSpan) =
-                        if v <= TimeSpan.FromMinutes(5L) then
-                            Ok v
-                        else
-                            Error(AutostartAfterTimeTimeTooLong v)
-
-                    let value (v: Time) = v
-
-                type MinimalPlayersCount = private MinimalPlayersCount of uint
-
-                module MinimalPlayersCount =
-                    let tryCreate (v: uint) =
-                        if v < 1000u then
-                            Ok v // TODO: GLOBAL_MAX_PLAYERS_IN_GAME / lub nie global, ale wciąż
-                        else
-                            Error(AutostartAfterTimeMinimalPlayersCountTooMany v)
-
-                    let value (v: MinimalPlayersCount) = v
-
-                type FailurePolicy =
-                    | Retry
-                    | DelegateControlToHost
-
-            type StartingMatchmaking = | None // nie ma szczególnych metod na rozpoczęcie matchmakingu. TODO
-
-            type EndingMatchmaking =
-                | HostDecides of HostDecisionTimeout option
-                | AutoAfter of
-                    AutostartAfterTime.Time *
-                    AutostartAfterTime.MinimalPlayersCount *
-                    AutostartAfterTime.FailurePolicy
-                | AutoWhenFull
-
-            type StartingDraft =
-                | HostDecides of HostDecisionTimeout
-                | AutoAfter of TimeSpan
-
-            type StartingSimulating =
-                | HostDecides of HostDecisionTimeout
-                | AutoAfter of TimeSpan
-
-            type EndingSimulation = | None // nie ma szczególnych metod na zakończenie gry. TODO
-
-    type Settings =
-        { PlayerLimit: Settings.PlayerLimit
-          DraftSettings: Draft.Settings.Settings // TODO: MaxJumpersPerPlayer: uint
-          StartingMatchmakingPolicy: Settings.PhaseTransitionPolicy.StartingMatchmaking
-          EndingMatchmakingPolicy: Settings.PhaseTransitionPolicy.EndingMatchmaking
-          StartingDraftPolicy: Settings.PhaseTransitionPolicy.StartingDraft
-          StartingSimulatingPolicy: Settings.PhaseTransitionPolicy.StartingSimulating
-          EndingSimulationPolicy: Settings.PhaseTransitionPolicy.EndingSimulation }
 
     type Participants = private Participants of Participant.Id list
 
@@ -207,13 +72,12 @@ module Game =
 open Game
 
 type Game =
-    { Id: Id
+    { Id: Id.Id
+      Version: AggregateVersion
       HostId: Hosting.Host.Id
-      DateOfStart: Date
       Phase: Phase
-      Settings: Settings
-      Participants: Participants
-      Clock: IClock }
+      Settings: Settings.Settings
+      Participants: Participants }
 
     static member TagOfPhase phase =
         match phase with
@@ -226,24 +90,32 @@ type Game =
         | Break next -> BreakTag next
     //| Break _ -> failwith "No Phase.Break equivalent in PhaseTag"
 
-    static member Create id (hostId, settings, clock: IClock) =
-        { Id = id
-          HostId = hostId
-          DateOfStart = Date clock.UtcNow
-          Phase = SettingUp
-          Settings = settings
-          Participants = Participants.empty
-          Clock = clock }
+    static member Create id version (hostId, settings) : Result<Game * GameEventPayload list, Error> =
+        let state =
+            { Id = id
+              Version = version
+              HostId = hostId
+              Phase = SettingUp
+              Settings = settings
+              Participants = Participants.empty }
 
-    member this.Join(player: Participant.Id) : Result<Game * Event list, Error> =
-        if this.ParticipantIsPresent(player) then
-            Error(Game.Error.PlayerAlreadyJoined player)
+        let event: Event.GameCreatedV1 =
+            { GameId = id
+              HostId = hostId
+              Settings = settings }
+
+
+        Ok(state, [ GameEventPayload.GameCreatedV1 event ])
+
+    member this.Join(playerId: Participant.Id) : Result<Game * GameEventPayload list, Error> =
+        if this.ParticipantIsPresent(playerId) then
+            Error(Game.Error.PlayerAlreadyJoined playerId)
         elif this.RoomIsFull then
             Error Game.Error.GameRoomFull
         else
             match this.Phase with
             | Matchmaking ->
-                let updatedPlayers = Participants.add player this.Participants
+                let updatedPlayers = Participants.add playerId this.Participants
 
                 match updatedPlayers with
                 | Ok updatedPlayers ->
@@ -251,8 +123,11 @@ type Game =
                         { this with
                             Participants = updatedPlayers }
 
-                    let event = Event.PlayerJoined(updatedGame.Id, this.Clock.UtcNow, player)
-                    Ok(updatedGame, [ event ])
+                    let event: ParticipantJoinedV1 =
+                        { GameId = updatedGame.Id
+                          PlayerId = playerId }
+
+                    Ok(updatedGame, [ GameEventPayload.ParticipantJoinedV1 event ])
                 | Error error -> Error(error)
             | _ -> Error(InvalidPhase([ MatchmakingTag ], this.Phase |> Game.TagOfPhase))
 
@@ -269,12 +144,13 @@ type Game =
     member this.ParticipantIsPresent(player: Participant.Id) =
         Participants.contains player this.Participants
 
+    /// Matchmaking ID
     member this.StartMatchmaking =
         match this.Phase with
         | SettingUp ->
             let state = { this with Phase = Phase.Matchmaking }
-            let event = Event.MatchmakingPhaseStarted(this.Id, this.Clock.UtcNow)
-            Ok(state, [ event ])
+            let event: MatchmakingPhaseStartedV1 = { GameId = this.Id }
+            Ok(state, [ GameEventPayload.MatchmakingPhaseStartedV1 event ])
         | _ -> Error(InvalidPhase([ SettingUpTag ], Game.TagOfPhase this.Phase))
 
     member this.EndMatchmaking =
@@ -290,8 +166,9 @@ type Game =
                         { this with
                             Phase = Break(Next = PhaseTag.PreDraftTag) }
 
-                    let event = Event.MatchmakingPhaseEnded(this.Id, this.Clock.UtcNow)
-                    Ok(state, [ event ])
+                    let event: MatchmakingPhaseEndedV1 = { GameId = this.Id }
+
+                    Ok(state, [ GameEventPayload.MatchmakingPhaseEndedV1 event ])
                 else
                     Error(
                         EndingMatchmakingTooManyPlayers(
@@ -310,8 +187,11 @@ type Game =
                 { this with
                     Phase = PreDraft preDraftId } // TODO
 
-            let event = Event.PreDraftPhaseStarted(this.Id, this.Clock.UtcNow, preDraftId)
-            Ok(state, [ event ])
+            let event: PreDraftPhaseStartedV1 =
+                { GameId = this.Id
+                  PreDraftId = preDraftId }
+
+            Ok(state, [ GameEventPayload.PreDraftPhaseStartedV1 event ])
         | _ -> Error(InvalidPhase([ PhaseTag.BreakTag PhaseTag.PreDraftTag ], Game.TagOfPhase(this.Phase)))
 
     member this.EndPreDraft =
@@ -321,8 +201,11 @@ type Game =
                 { this with
                     Phase = Break PhaseTag.PreDraftTag }
 
-            let event = Event.PreDraftPhaseEnded(this.Id, this.Clock.UtcNow, preDraftId)
-            Ok(state, [ event ])
+            let event: PreDraftPhaseEndedV1 =
+                { GameId = this.Id
+                  PreDraftId = preDraftId }
+
+            Ok(state, [ GameEventPayload.PreDraftPhaseEndedV1 event ])
         | _ -> Error(InvalidPhase([ PhaseTag.PreDraftTag ], Game.TagOfPhase(this.Phase)))
 
     member this.StartDraft draftId =
@@ -332,8 +215,8 @@ type Game =
                 { this with
                     Phase = Phase.Draft draftId }
 
-            let event = Event.DraftPhaseStarted(this.Id, this.Clock.UtcNow, draftId)
-            Ok(state, [ event ])
+            let event: DraftPhaseStartedV1 = { GameId = this.Id; DraftId = draftId }
+            Ok(state, [ GameEventPayload.DraftPhaseStartedV1 event ])
         | _ -> Error(InvalidPhase([ BreakTag PhaseTag.DraftTag ], Game.TagOfPhase this.Phase))
 
     member this.EndDraft =
@@ -343,10 +226,10 @@ type Game =
                 { this with
                     Phase = Phase.Break PhaseTag.CompetitionTag }
 
-            let event = Event.DraftPhaseEnded(this.Id, this.Clock.UtcNow, draftId)
-            Ok(state, [ event ])
+            let event: DraftPhaseEndedV1 = { GameId = this.Id; DraftId = draftId }
+            Ok(state, [ GameEventPayload.DraftPhaseEndedV1 event ])
         | _ -> Error(InvalidPhase([ DraftTag ], Game.TagOfPhase this.Phase))
-        
+
     member this.StartCompetition competitionId =
         match this.Phase with
         | Break(Next = PhaseTag.CompetitionTag) ->
@@ -354,8 +237,12 @@ type Game =
                 { this with
                     Phase = Phase.Competition competitionId }
 
-            let event = Event.CompetitionPhaseStarted(this.Id, this.Clock.UtcNow, competitionId)
-            Ok(state, [ event ])
+            let event: CompetitionPhaseStartedV1 =
+                { GameId = this.Id
+                  CompetitionId = competitionId }
+
+            Ok(state, [ GameEventPayload.CompetitionPhaseStartedV1 event ])
+
         | _ -> Error(InvalidPhase([ BreakTag PhaseTag.CompetitionTag ], Game.TagOfPhase this.Phase))
 
     member this.EndCompetition =
@@ -365,14 +252,23 @@ type Game =
                 { this with
                     Phase = Phase.Break PhaseTag.EndedTag }
 
-            let event = Event.CompetitionPhaseEnded(this.Id, this.Clock.UtcNow, competitionId)
-            Ok(state, [ event ])
+            let event: CompetitionPhaseEndedV1 =
+                { GameId = this.Id
+                  CompetitionId = competitionId }
+
+            Ok(state, [ GameEventPayload.CompetitionPhaseEndedV1 event ])
         | _ -> Error(InvalidPhase([ CompetitionTag ], Game.TagOfPhase this.Phase))
-        
+
     member this.EndGame endedGameResults =
         match this.Phase with
         | Break(Next = PhaseTag.EndedTag) ->
-            let state = { this with Phase = Phase.Ended endedGameResults }
-            let event = Event.GameEnded(this.Id, this.Clock.UtcNow, endedGameResults)
-            Ok(state, [event])
+            let state =
+                { this with
+                    Phase = Phase.Ended endedGameResults }
+
+            let event: GameEndedV1 =
+                { GameId = this.Id
+                  Results = endedGameResults }
+
+            Ok(state, [ GameEventPayload.GameEndedV1 event ])
         | _ -> Error(InvalidPhase([ BreakTag PhaseTag.EndedTag ], Game.TagOfPhase this.Phase))

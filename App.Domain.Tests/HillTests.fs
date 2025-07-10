@@ -21,7 +21,7 @@ let idGen =
 
 let dummyCountry = Country.Id(idGen.NewGuid())
 
-let dummyHill (kVal:float) (hsVal:float) : Hill =
+let dummyHill (kVal:double) (hsVal:double) : Hill =
     { Id        = Hill.Id(idGen.NewGuid())
       Name      = Name "Test"
       Location  = Location "Nowhere"
@@ -35,7 +35,7 @@ let dummyHill (kVal:float) (hsVal:float) : Hill =
 // ───────────────────────────────────────────────
 [<Fact>]
 let ``HS -> HillType klasyfikacja`` () =
-    let cases : (float * Type) list = [
+    let cases : (double * Type) list = [
         30.0 , Small
         70.0 , Medium
         100.0, Normal

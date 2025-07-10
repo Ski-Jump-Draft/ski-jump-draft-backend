@@ -3,12 +3,12 @@ namespace App.Domain.GameWorld
 open App.Domain.Shared.Utils.Range
 
 module JumperSkills =
-    type BigSkill = private BigSkill of float
+    type BigSkill = private BigSkill of double
 
     module BigSkill =
-        type Error = OutsideRange of OutsideRangeError<float>
+        type Error = OutsideRange of OutsideRangeError<double>
 
-        let tryCreate (v: float) =
+        let tryCreate (v: double) =
             if v >= 1 && v <= 20 then
                 Ok(BigSkill v)
             else
@@ -40,10 +40,10 @@ module JumperSkills =
 
         let value (v: LandingSkill) = v
 
-    type LiveForm = private LiveForm of float
+    type LiveForm = private LiveForm of double
 
     module LiveForm =
-        type Error = OutsideRange of OutsideRangeError<float>
+        type Error = OutsideRange of OutsideRangeError<double>
 
         let tryCreate (v: int) =
             if v >= 0 && v <= 10 then

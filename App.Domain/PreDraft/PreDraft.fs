@@ -1,50 +1,21 @@
 namespace App.Domain.PreDraft
 
 open App.Domain
-open App.Domain.Shared.EventHelpers
+open App.Domain.PreDraft.Event
+open App.Domain.PreDraft.Id
 open App.Domain.PreDraft.Competitions
 open App.Domain.Time
 
+open App.Domain.PreDraft.Phase
+
 module PreDraft =
-    [<Struct>]
-    type Id = Id of System.Guid
-
-    [<Struct>]
-    type CompetitionIndex = CompetitionIndex of uint
-
-    type Phase =
-        | NotStarted
-        | Competition of Index: CompetitionIndex * CompetitionId: Competition.Id
-        | Break of NextIndex: CompetitionIndex
-        | Ended
-
-    type PhaseTag =
-        | NotStartedTag
-        | CompetitionTag
-        | BreakTag
-        | EndedTag
-
-    type Event =
-        | PreDraftStarted of PreDraftId: Id * Timestamp: EventTimestamp
-        | CompetitionStarted of
-            PreDraftId: Id *
-            Timestamp: EventTimestamp *
-            Index: CompetitionIndex *
-            CompetitionId: Competition.Id
-        | CompetitionEnded of
-            PreDraftId: Id *
-            Timestamp: EventTimestamp *
-            Index: CompetitionIndex *
-            CompetitionId: Competition.Id
-        | PreDraftEnded of PreDraftId: Id * Timestamp: EventTimestamp
-
     type Error = InvalidPhase of Expected: PhaseTag list * Actual: PhaseTag
 
 open PreDraft
 
 type PreDraft =
-    { Id: PreDraft.Id
-      Phase: PreDraft.Phase
+    { Id: Id
+      Phase: Phase
       Settings: PreDraft.Settings.Settings
       Clock: IClock }
 
@@ -57,7 +28,7 @@ type PreDraft =
 
     static member Create id settings clock =
         { Id = id
-          Phase = PreDraft.NotStarted
+          Phase = NotStarted
           Settings = settings
           Clock = clock }
 
@@ -70,21 +41,29 @@ type PreDraft =
                 { this with
                     Phase = Phase.Competition(index, competitionId) }
 
-            let preDraftStartedEvent = Event.PreDraftStarted(this.Id, this.Clock.UtcNow)
+            let preDraftStartedEvent: PreDraftStartedV1 = { PreDraftId = this.Id }
 
-            let competitionStartedEvent =
-                Event.CompetitionStarted(this.Id, this.Clock.UtcNow, index, competitionId)
+            let competitionStartedEvent: CompetitionStartedV1 =
+                { PreDraftId = this.Id
+                  Index = index
+                  CompetitionId = competitionId }
 
-            Ok(state, [ preDraftStartedEvent; competitionStartedEvent ])
+            Ok(
+                state,
+                [ PreDraftEventPayload.PreDraftStartedV1 preDraftStartedEvent
+                  PreDraftEventPayload.CompetitionStartedV1 competitionStartedEvent ]
+            )
         | Break nextCompetitionIndex ->
             let state =
                 { this with
                     Phase = Competition(nextCompetitionIndex, competitionId) }
 
-            let event =
-                Event.CompetitionStarted(this.Id, this.Clock.UtcNow, nextCompetitionIndex, competitionId)
+            let competitionStartedEvent: CompetitionStartedV1 =
+                { PreDraftId = this.Id
+                  Index = nextCompetitionIndex
+                  CompetitionId = competitionId }
 
-            Ok(state, [ event ])
+            Ok(state, [ PreDraftEventPayload.CompetitionStartedV1 competitionStartedEvent ])
         | _ -> Error(InvalidPhase([ PhaseTag.NotStartedTag; PhaseTag.BreakTag ], PreDraft.TagOfPhase(this.Phase)))
 
     member this.EndCurrentCompetition =
@@ -103,16 +82,19 @@ type PreDraft =
 
             let state = { this with Phase = phase }
 
-            let competitionEndedEvent =
-                Event.CompetitionEnded(this.Id, this.Clock.UtcNow, competitionIndex, competitionId)
+            let competitionEndedEvent: CompetitionEndedV1 =
+                { PreDraftId = this.Id
+                  Index = competitionIndex
+                  CompetitionId = competitionId }
 
-            let preDraftEnded = Event.PreDraftEnded(this.Id, this.Clock.UtcNow)
+            let preDraftEnded: PreDraftEndedV1 = { PreDraftId = this.Id }
 
             let events =
                 if shouldEnd then
-                    [ competitionEndedEvent; preDraftEnded ]
+                    [ PreDraftEventPayload.CompetitionEndedV1 competitionEndedEvent
+                      PreDraftEventPayload.PreDraftEndedV1 preDraftEnded ]
                 else
-                    [ competitionEndedEvent ]
+                    [ PreDraftEventPayload.CompetitionEndedV1 competitionEndedEvent ]
 
             Ok(state, events)
         | _ -> Error(InvalidPhase([ PhaseTag.CompetitionTag ], PreDraft.TagOfPhase(this.Phase)))

@@ -5,19 +5,19 @@ module Hill =
     type Id = Id of System.Guid
 
     [<Struct>]
-    type KPoint = private KPoint of float
+    type KPoint = private KPoint of double
 
     module KPoint =
-        let tryCreate (v: float) =
+        let tryCreate (v: double) =
             if v >= 0.0 then Some(KPoint v) else None
 
         let value (KPoint v) = v
 
     [<Struct>]
-    type HSPoint = private HSPoint of float
+    type HSPoint = private HSPoint of double
 
     module HSPoint =
-        let tryCreate (v: float) =
+        let tryCreate (v: double) =
             if v >= 0.0 then Some(HSPoint v) else None
 
         let value (HSPoint v) = v

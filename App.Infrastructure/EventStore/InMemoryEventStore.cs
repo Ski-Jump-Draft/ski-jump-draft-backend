@@ -1,6 +1,5 @@
 using App.Application.Abstractions;
 using App.Domain.Shared;
-using App.Domain.Shared.EventHelpers;
 
 namespace App.Infrastructure.EventStore;
 

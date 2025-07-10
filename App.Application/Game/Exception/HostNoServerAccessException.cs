@@ -1,12 +1,13 @@
 using App.Domain.Game;
+using App.Domain.Game.Hosting;
 
 namespace App.Application.Game.Exception;
 
 public class HostNoServerAccessException : System.Exception
 {
-    public App.Domain.Game.Host Host { get; }
-    public App.Domain.Game.Server Server { get; }
-    
+    public Host Host { get; }
+    public Server Server { get; }
+
     public HostNoServerAccessException(Host host, Server server)
     {
         Server = server;
@@ -19,7 +20,8 @@ public class HostNoServerAccessException : System.Exception
         Host = host;
     }
 
-    public HostNoServerAccessException(string message, System.Exception inner , Host host, Server server) : base(message, inner)
+    public HostNoServerAccessException(string message, System.Exception inner, Host host, Server server) : base(message,
+        inner)
     {
         Server = server;
         Host = host;
