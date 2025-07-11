@@ -9,5 +9,9 @@
     <ItemGroup>
         <ProjectReference Include="..\App.Domain\App.Domain.fsproj" />
     </ItemGroup>
+    
+    <ItemGroup>
+      <Folder Include="UseCase\" />
+    </ItemGroup>
 
 </Project>

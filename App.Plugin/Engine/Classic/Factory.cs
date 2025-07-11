@@ -1,5 +1,5 @@
-using App.Application.Competition.Engine.Creation;
-using App.Application.Competition.Engine.Factory;
+using App.Application.UseCase.Competition.Engine.Creation;
+using App.Application.UseCase.Competition.Engine.Factory;
 using App.Application.Util;
 using App.Domain.Competition;
 using App.Domain.Competition.Results;

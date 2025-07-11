@@ -12,4 +12,4 @@ module EndedGameResults =
     type Ranking = Ranking of Map<Participant.Id, Points>
 
 type IRankingCreator =
-    abstract member Create: gameId: Game.Game.Id -> EndedGameResults.Ranking
+    abstract member Create: gameId: Game.Id.Id -> EndedGameResults.Ranking

@@ -4,6 +4,7 @@ open App.Domain.Draft.Event
 open App.Domain.Draft.Picks
 open App.Domain.Draft.Order
 open App.Domain.Draft.Settings
+open App.Domain.Shared.AggregateVersion
 
 type PhaseTag =
     | NotStartedTag
@@ -23,6 +24,7 @@ type Error =
 
 type Draft =
     { Id: Id.Id
+      Version: AggregateVersion
       Settings: Settings.Settings
       Participants: Participant.Id list
       Seed: uint64
@@ -34,12 +36,22 @@ type Draft =
         | Running _ -> RunningTag
         | Done _ -> DoneTag
 
-    static member Create id settings participants seed =
-        { Id = id
-          Settings = settings
-          Participants = participants
-          Seed = seed
-          Phase = NotStarted }
+    static member Create id version settings participants seed =
+        let state =
+            { Id = id
+              Version = version
+              Settings = settings
+              Participants = participants
+              Seed = seed
+              Phase = NotStarted }
+
+        let event: DraftCreatedV1 =
+            { DraftId = id
+              Settings = settings
+              Participants = participants
+              Seed = seed }
+
+        Ok(state, [ event ])
 
     member this.Start() =
         match this.Phase with
@@ -51,11 +63,7 @@ type Draft =
                 { this with
                     Phase = Running(0, initialOrd, Picks.Empty initialOrd) }
 
-            let payload: DraftStartedV1 =
-                { DraftId = this.Id
-                  Settings = this.Settings
-                  Participants = this.Participants
-                  Seed = this.Seed }
+            let payload: DraftStartedV1 = { DraftId = this.Id }
 
             Ok(newState, [ DraftEventPayload.DraftStartedV1 payload ])
 

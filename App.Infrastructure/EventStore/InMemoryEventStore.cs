@@ -3,26 +3,32 @@ using App.Domain.Shared;
 
 namespace App.Infrastructure.EventStore;
 
-class InMemoryEventStore : IEventStore
+public class InMemoryEventStore<TId, TPayload> : IEventStore<TId, TPayload> where TId : notnull
 {
-    private readonly Dictionary<Guid, List<DomainEvent<object>>> _storage
-        = new Dictionary<Guid, List<DomainEvent<object>>>();
+    private readonly Dictionary<TId, List<DomainEvent<TPayload>>> _store = new();
 
-    public Task<IReadOnlyList<DomainEvent<object>>> LoadAsync(Guid id)
+    public Task AppendAsync(
+        TId id,
+        IReadOnlyList<DomainEvent<TPayload>> events,
+        int expectedVersion,
+        CancellationToken ct)
     {
-        if (!_storage.TryGetValue(id, out var evs))
-            return Task.FromResult((IReadOnlyList<DomainEvent<object>>)Array.Empty<DomainEvent<object>>());
-        return Task.FromResult((IReadOnlyList<DomainEvent<object>>)evs.ToList());
-    }
+        if (!_store.TryGetValue(id, out var stream))
+        {
+            stream = new List<DomainEvent<TPayload>>();
+            _store[id] = stream;
+        }
 
-    public Task AppendAsync(Guid id, IReadOnlyList<DomainEvent<object>> newEvents)
-    {
-        if (!_storage.TryGetValue(id, out var evs))
-            _storage[id] = evs = new List<DomainEvent<object>>();
-        evs.AddRange(newEvents);
+        if (stream.Count != expectedVersion)
+            throw new InvalidOperationException("Wrong expected version");
+
+        stream.AddRange(events);
         return Task.CompletedTask;
     }
 
-    public IReadOnlyList<DomainEvent<object>> AllFor(Guid id)
-        => _storage.TryGetValue(id, out var evs) ? evs : Array.Empty<DomainEvent<object>>();
+    public Task<IReadOnlyList<DomainEvent<TPayload>>> LoadAsync(TId id, CancellationToken ct)
+    {
+        _store.TryGetValue(id, out var events);
+        return Task.FromResult<IReadOnlyList<DomainEvent<TPayload>>>(events ?? []);
+    }
 }

@@ -1,14 +1,16 @@
 module App.Domain.Draft.Event
 
 open App.Domain
-// open App.Domain.Draft
 
 [<Struct; CLIMutable>]
-type DraftStartedV1 =
+type DraftCreatedV1 =
     { DraftId: Draft.Id.Id
       Settings: Draft.Settings.Settings
       Participants: Draft.Participant.Id list
       Seed: uint64 }
+
+[<Struct; CLIMutable>]
+type DraftStartedV1 = { DraftId: Draft.Id.Id }
 
 [<Struct; CLIMutable>]
 type DraftEndedV1 = { DraftId: Draft.Id.Id }
@@ -27,6 +29,7 @@ type DraftSubjectPickedV2 =
       PickIndex: uint }
 
 type DraftEventPayload =
+    | DraftCreatedV1 of DraftCreatedV1
     | DraftSubjectPickedV1 of DraftSubjectPickedV1
     | DraftSubjectPickedV2 of DraftSubjectPickedV2
     | DraftStartedV1 of DraftStartedV1
@@ -35,6 +38,7 @@ type DraftEventPayload =
 module Versioning =
     let schemaVersion =
         function
+        | DraftCreatedV1 _ -> 1us
         | DraftStartedV1 _ -> 1us
         | DraftSubjectPickedV1 _ -> 1us
         | DraftSubjectPickedV2 _ -> 2us

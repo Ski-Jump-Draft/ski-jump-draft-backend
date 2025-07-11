@@ -145,7 +145,7 @@ type Game =
         Participants.contains player this.Participants
 
     /// Matchmaking ID
-    member this.StartMatchmaking =
+    member this.StartMatchmaking() =
         match this.Phase with
         | SettingUp ->
             let state = { this with Phase = Phase.Matchmaking }
@@ -153,7 +153,7 @@ type Game =
             Ok(state, [ GameEventPayload.MatchmakingPhaseStartedV1 event ])
         | _ -> Error(InvalidPhase([ SettingUpTag ], Game.TagOfPhase this.Phase))
 
-    member this.EndMatchmaking =
+    member this.EndMatchmaking() =
         match this.Phase with
         | Matchmaking ->
             let playersCount = Participants.count this.Participants
@@ -194,7 +194,7 @@ type Game =
             Ok(state, [ GameEventPayload.PreDraftPhaseStartedV1 event ])
         | _ -> Error(InvalidPhase([ PhaseTag.BreakTag PhaseTag.PreDraftTag ], Game.TagOfPhase(this.Phase)))
 
-    member this.EndPreDraft =
+    member this.EndPreDraft() =
         match this.Phase with
         | PreDraft preDraftId ->
             let state =
@@ -219,7 +219,7 @@ type Game =
             Ok(state, [ GameEventPayload.DraftPhaseStartedV1 event ])
         | _ -> Error(InvalidPhase([ BreakTag PhaseTag.DraftTag ], Game.TagOfPhase this.Phase))
 
-    member this.EndDraft =
+    member this.EndDraft() =
         match this.Phase with
         | Draft draftId ->
             let state =
@@ -245,7 +245,7 @@ type Game =
 
         | _ -> Error(InvalidPhase([ BreakTag PhaseTag.CompetitionTag ], Game.TagOfPhase this.Phase))
 
-    member this.EndCompetition =
+    member this.EndCompetition() =
         match this.Phase with
         | Competition competitionId ->
             let state =
