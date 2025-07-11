@@ -9,11 +9,8 @@ using App.Domain.Shared;
 namespace App.Application.Saga;
 
 public class DraftSaga(
-    IDraftRepository drafts,
     IDraftToGameMapStore draftToGameMap,
-    IGameRepository games,
-    ICommandBus commands,
-    IGuid guid)
+    ICommandBus commands)
     : IEventHandler<Event.DraftEventPayload>
 {
     public async Task HandleAsync(DomainEvent<Event.DraftEventPayload> @event, CancellationToken ct)

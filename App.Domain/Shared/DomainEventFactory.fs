@@ -7,19 +7,17 @@ open App.Domain.Time
 
 let create<'T>
     (schemaVer: uint16)
-    (clock: IClock)
-    (guid: IGuid)
+    (occuredAt: DateTimeOffset)
+    (id: Guid)
     (correlationId: Guid)
     (causationId: Guid option)
     (payload: 'T)
     : DomainEvent<'T> =
 
     let header =
-        let id = guid.NewGuid()
-
         { EventId = id
           SchemaVer = schemaVer
-          OccurredAt = clock.UtcNow
+          OccurredAt = occuredAt
           CorrelationId = Some correlationId
           CausationId = causationId }
         : EventHeader
