@@ -10,14 +10,15 @@ open App.Domain.Shared.AggregateVersion
 
 
 type IEventSourcedRepository<'TAggregate, 'TId, 'TPayload> =
-    abstract LoadAsync: Id: 'TId -> Async<'TAggregate option>
+    abstract LoadAsync: Id: 'TId * CancellationToken: System.Threading.CancellationToken -> Async<'TAggregate option>
 
     abstract SaveAsync:
         Aggregate: 'TAggregate *
         Events: 'TPayload list *
         ExpectedVersion: AggregateVersion *
         CorrelationId: System.Guid *
-        CausationId: System.Guid ->
+        CausationId: System.Guid *
+        CancellationToken: System.Threading.CancellationToken ->
             Async<unit>
 
     abstract ExistsAsync: Id: 'TId -> Async<bool>

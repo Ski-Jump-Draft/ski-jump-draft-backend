@@ -4,13 +4,25 @@ using App.Domain.Shared.EventHelpers;
 
 namespace App.Infrastructure.EventBus;
 
-class InMemoryEventBus : IEventBus
+public class InMemoryEventBus : IEventBus
 {
-    public readonly List<object> Published = [];
+    private readonly List<object> _handlers = new();
 
-    public Task PublishAsync<T>(DomainEvent<T> ev)
+    public void RegisterHandler<TPayload>(IEventHandler<TPayload> handler)
     {
-        Published.Add(ev);
-        return Task.CompletedTask;
+        _handlers.Add(handler);
+    }
+
+    public async Task PublishAsync<TPayload>(
+        IReadOnlyList<DomainEvent<TPayload>> events,
+        CancellationToken ct)
+    {
+        foreach (var domainEvent in events)
+        {
+            foreach (var handler in _handlers.OfType<IEventHandler<TPayload>>())
+            {
+                await handler.HandleAsync(domainEvent, ct);
+            }
+        }
     }
 }

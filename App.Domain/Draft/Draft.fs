@@ -4,6 +4,7 @@ open App.Domain.Draft.Event
 open App.Domain.Draft.Picks
 open App.Domain.Draft.Order
 open App.Domain.Draft.Settings
+open App.Domain.Shared.AggregateVersion
 
 type PhaseTag =
     | NotStartedTag
@@ -22,11 +23,19 @@ type Error =
     | JumperTaken
 
 type Draft =
-    { Id: Id.Id
-      Settings: Settings.Settings
-      Participants: Participant.Id list
-      Seed: uint64
-      Phase: Phase }
+    private
+        { Id: Id.Id
+          Version: AggregateVersion
+          Settings: Settings.Settings
+          Participants: Participant.Id list
+          Seed: uint64
+          Phase: Phase }
+
+    member this.Phase_ = this.Phase
+    member this.Participants_ = this.Participants
+    member this.Settings_ = this.Settings
+    member this.Version_: AggregateVersion = this.Version
+    member this.Id_ = this.Id
 
     static member TagOfPhase =
         function
@@ -34,12 +43,22 @@ type Draft =
         | Running _ -> RunningTag
         | Done _ -> DoneTag
 
-    static member Create id settings participants seed =
-        { Id = id
-          Settings = settings
-          Participants = participants
-          Seed = seed
-          Phase = NotStarted }
+    static member Create id version settings participants seed : Result<Draft * DraftEventPayload list, Error> =
+        let state =
+            { Id = id
+              Version = version
+              Settings = settings
+              Participants = participants
+              Seed = seed
+              Phase = NotStarted }
+
+        let event: DraftCreatedV1 =
+            { DraftId = id
+              Settings = settings
+              Participants = participants
+              Seed = seed }
+
+        Ok(state, [ DraftEventPayload.DraftCreatedV1 event ])
 
     member this.Start() =
         match this.Phase with
@@ -51,11 +70,7 @@ type Draft =
                 { this with
                     Phase = Running(0, initialOrd, Picks.Empty initialOrd) }
 
-            let payload: DraftStartedV1 =
-                { DraftId = this.Id
-                  Settings = this.Settings
-                  Participants = this.Participants
-                  Seed = this.Seed }
+            let payload: DraftStartedV1 = { DraftId = this.Id }
 
             Ok(newState, [ DraftEventPayload.DraftStartedV1 payload ])
 

@@ -3,7 +3,7 @@ namespace App.Domain.Draft.Order
 open System
 open App.Domain.Draft
 
-type OrderOption =
+type Order =
     | Classic
     | Snake
     | RandomSeed of uint64
@@ -59,8 +59,8 @@ type RandomSeedOrderStrategy(baseSeed: uint64) =
             perm, (posInPerm + 1) % count
 
 module OrderStrategyFactory =
-    let create (order: OrderOption) : IOrderStrategy =
+    let create (order: Order) : IOrderStrategy =
         match order with
-        | OrderOption.Classic -> ClassicOrderStrategy() :> IOrderStrategy
-        | OrderOption.Snake -> SnakeOrderStrategy() :> IOrderStrategy
-        | OrderOption.RandomSeed seed -> RandomSeedOrderStrategy(seed) :> IOrderStrategy
+        | Order.Classic -> ClassicOrderStrategy() :> IOrderStrategy
+        | Order.Snake -> SnakeOrderStrategy() :> IOrderStrategy
+        | Order.RandomSeed seed -> RandomSeedOrderStrategy(seed) :> IOrderStrategy

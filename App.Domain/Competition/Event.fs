@@ -1,6 +1,13 @@
 module App.Domain.Competition.Event
 
 open App.Domain.Competition
+open App.Domain.Competition.Results.ResultObjects
+
+[<Struct; CLIMutable>]
+type CompetitionCreatedV1 =
+    { CompetitionId: Id.Id
+      StartlistId: Startlist.Id
+      ResultsId: ResultsModule.Id }
 
 [<Struct; CLIMutable>]
 type CompetitionStartedV1 = { CompetitionId: Id.Id }
@@ -28,14 +35,16 @@ type CompetitionCancelledV1 = { CompetitionId: Id.Id }
 [<Struct; CLIMutable>]
 type CompetitionEndedV1 = { CompetitionId: Id.Id }
 
+// TODO: Przenieść to!
 [<Struct; CLIMutable>]
 type CompetitionJumpResultRegisteredV1 =
     { CompetitionId: Id.Id
-      JumpResultId: Results.JumpScore.Id }
+      JumpResultId: JumpResult.Id }
 
 // ---------- discriminated union + versioning ----------------------------------
 
 type CompetitionEventPayload =
+    | CompetitionCreatedV1 of CompetitionCreatedV1
     | CompetitionStartedV1 of CompetitionStartedV1
     | CompetitionRoundStartedV1 of CompetitionRoundStartedV1
     | CompetitionRoundEndedV1 of CompetitionRoundEndedV1
@@ -48,6 +57,7 @@ type CompetitionEventPayload =
 module Versioning =
     let schemaVersion =
         function
+        | CompetitionCreatedV1 _ -> 1us
         | CompetitionStartedV1 _ -> 1us
         | CompetitionRoundStartedV1 _ -> 1us
         | CompetitionRoundEndedV1 _ -> 1us

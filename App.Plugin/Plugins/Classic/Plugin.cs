@@ -1,5 +1,5 @@
 using App.Application.Abstractions;
-using App.Application.Competition.Engine.Factory;
+using App.Application.UseCase.Competition.Engine.Factory;
 using App.Domain.Competition;
 using App.Domain.Shared;
 using App.Plugin.Engine.Classic;

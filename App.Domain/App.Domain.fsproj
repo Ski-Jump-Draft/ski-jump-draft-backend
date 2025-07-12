@@ -37,8 +37,7 @@
         <Compile Include="Competition\Jump\Judgement.fs" />
         <Compile Include="Competition\Jump\Jump.fs" />
         <Compile Include="Competition\Jump\Abstractions.fs" />
-        <Compile Include="Competition\Grouping\Group.fs" />
-        <Compile Include="Competition\Grouping\Abstractions.fs" />
+        <Compile Include="Competition\Grouping.fs" />
         <Compile Include="Competition\Results\ResultObjects.fs" />
         <Compile Include="Competition\Results\Results.fs" />
         <Compile Include="Competition\Results\RankedResults.fs" />
@@ -57,7 +56,7 @@
         <Compile Include="Draft\Settings.fs" />
         <Compile Include="Draft\Event.fs" />
         <Compile Include="Draft\Draft.fs" />
-        <Compile Include="Draft\Rehydrator.fs" />
+        <Compile Include="Draft\Evolve.fs" />
         <Compile Include="PreDraft\Id.fs" />
         <Compile Include="PreDraft\Competition.fs" />
         <Compile Include="PreDraft\Settings.fs" />

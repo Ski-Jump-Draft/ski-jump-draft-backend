@@ -9,8 +9,6 @@ module Competition =
 
     type Error = InvalidPhase of Expected: PhaseTag list * Actual: PhaseTag
 
-
-
 open Competition
 
 // type Competition =
@@ -39,9 +37,9 @@ open Internal
 
 type Competition =
     { Id: Id.Id
+      Phase: Phase.Phase
       StartlistId: Competition.Startlist.Id
       //HillId: Competition.Hill.Id
-      Phase: Phase.Phase
       ResultsId: ResultsModule.Id
     //Startlist: Startlist
     //Settings: Settings
@@ -60,10 +58,20 @@ type Competition =
     member this.InvalidPhaseError expected =
         InvalidPhase(expected, Competition.TagOfPhase(this.Phase))
 
-    static member Create id resultsId =
-        { Id = id
-          Phase = NotStarted
-          ResultsId = resultsId }
+    static member Create id startlistId resultsId =
+        let state =
+            { Id = id
+              Phase = NotStarted
+              StartlistId = startlistId
+              ResultsId = resultsId }
+
+        let event =
+            Event.CompetitionCreatedV1
+                { CompetitionId = id
+                  StartlistId = startlistId
+                  ResultsId = resultsId }
+
+        Ok(state, [ event ])
 
 
     // static member Create id resultsId (hillId: Hill.Id) (startlist: Startlist) rules =

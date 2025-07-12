@@ -16,8 +16,7 @@ open PreDraft
 type PreDraft =
     { Id: Id
       Phase: Phase
-      Settings: PreDraft.Settings.Settings
-      Clock: IClock }
+      Settings: PreDraft.Settings.Settings }
 
     static member TagOfPhase phase =
         match phase with
@@ -27,10 +26,14 @@ type PreDraft =
         | Ended -> EndedTag
 
     static member Create id settings clock =
-        { Id = id
-          Phase = NotStarted
-          Settings = settings
-          Clock = clock }
+        let state =
+            { Id = id
+              Phase = NotStarted
+              Settings = settings }
+
+        let event: PreDraftCreatedV1 = { PreDraftId = id; Settings = settings }
+
+        Ok(state, [ event ])
 
     member this.StartCompetition(competitionId: Competition.Id) =
         match this.Phase with

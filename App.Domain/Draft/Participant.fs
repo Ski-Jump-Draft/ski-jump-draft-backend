@@ -14,11 +14,11 @@ module Id =
 type Name = private Name of string
 
 module Name =
-    let tryCreate (v: string) =
+    let tryCreate (v: string) : Result<Name, string> =
         if v.Length >= 3 && v.Length < 25 then
             Ok(Name v)
         else
-            Error(invalidOp "Name must be 3-24 characters")
+            Error("Name must be 3-24 characters")
 
     let value (Name v) = v
 

@@ -1,4 +1,4 @@
-using App.Application.Competition.Engine.Factory;
+using App.Application.UseCase.Competition.Engine.Factory;
 using App.Domain.Competition;
 
 namespace App.Application.Abstractions;

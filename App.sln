@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-#
+# 
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "App.Domain", "App.Domain\App.Domain.fsproj", "{69AB9E18-B59F-4D27-86BA-2729DAA625D5}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "App.Domain.Tests", "App.Domain.Tests\App.Domain.Tests.fsproj", "{105DD294-4B2C-4451-8D56-A10A5FBBC3C3}"
@@ -10,6 +10,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "App.Infrastructure", "App.Infrastructure\App.Infrastructure.csproj", "{90E20417-36BD-47D5-A51F-CE5507057ED6}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "App.Plugin", "App.Plugin\App.Plugin.csproj", "{11B7568F-4276-47BD-9A40-E416B2ACBF6E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "App.Tests", "App.Tests\App.Tests.csproj", "{543E5EEC-2B76-4A87-A8A2-18E34E884800}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -37,6 +39,10 @@ Global
 		{11B7568F-4276-47BD-9A40-E416B2ACBF6E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{11B7568F-4276-47BD-9A40-E416B2ACBF6E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{11B7568F-4276-47BD-9A40-E416B2ACBF6E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{543E5EEC-2B76-4A87-A8A2-18E34E884800}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{543E5EEC-2B76-4A87-A8A2-18E34E884800}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{543E5EEC-2B76-4A87-A8A2-18E34E884800}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{543E5EEC-2B76-4A87-A8A2-18E34E884800}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 	EndGlobalSection
