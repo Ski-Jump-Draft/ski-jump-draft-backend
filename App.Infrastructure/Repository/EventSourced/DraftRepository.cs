@@ -14,15 +14,17 @@ namespace App.Infrastructure.Repository.EventSourced;
 public class DraftRepository : IDraftRepository
 {
     private readonly IEventStore<App.Domain.Draft.Id.Id, Event.DraftEventPayload> _store;
+    private readonly IEventBus _eventBus;
     private readonly IClock _clock;
     private readonly IGuid _guid;
 
     public DraftRepository(IEventStore<App.Domain.Draft.Id.Id, Event.DraftEventPayload> store, IClock clock,
-        IGuid guid)
+        IGuid guid, IEventBus eventBus)
     {
         _store = store;
         _clock = clock;
         _guid = guid;
+        _eventBus = eventBus;
     }
 
     public FSharpAsync<FSharpOption<App.Domain.Draft.Draft>> LoadAsync(Id.Id id, CancellationToken ct)
@@ -70,11 +72,12 @@ public class DraftRepository : IDraftRepository
                     p)).ToList();
 
             await _store.AppendAsync(
-                    aggregate.Id,
+                    aggregate.Id_,
                     domainEvents,
                     (int)expectedVersion.Item, // uint32 -> int
                     ct)
                 .ConfigureAwait(false);
+            await _eventBus.PublishAsync(domainEvents, ct);
         }
     }
 

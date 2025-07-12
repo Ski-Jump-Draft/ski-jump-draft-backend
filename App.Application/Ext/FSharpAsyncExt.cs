@@ -49,5 +49,8 @@ public static class FSharpAsyncExt
             throw error;
         }
     }
+    
+    public static FSharpAsync<T> Return<T>(T value) =>
+        FSharpAsync.AwaitTask(Task.FromResult(value));
 
 }

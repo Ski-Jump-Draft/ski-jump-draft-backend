@@ -40,7 +40,7 @@ public class Handler(
         {
             var (state, eventPayloads) = draftResult.ResultValue;
 
-            var expectedVersion = draft.Version;
+            var expectedVersion = draft.Version_;
             var correlationId = guid.NewGuid();
             var causationId = correlationId;
 
@@ -49,7 +49,7 @@ public class Handler(
         }
         else
         {
-            throw new DraftPickFailedException(draft, participant, subject);
+            throw new DraftPickFailedException(draft, participant, subject, draftResult.ErrorValue);
         }
     }
 }

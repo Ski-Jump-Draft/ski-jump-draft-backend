@@ -23,12 +23,19 @@ type Error =
     | JumperTaken
 
 type Draft =
-    { Id: Id.Id
-      Version: AggregateVersion
-      Settings: Settings.Settings
-      Participants: Participant.Id list
-      Seed: uint64
-      Phase: Phase }
+    private
+        { Id: Id.Id
+          Version: AggregateVersion
+          Settings: Settings.Settings
+          Participants: Participant.Id list
+          Seed: uint64
+          Phase: Phase }
+
+    member this.Phase_ = this.Phase
+    member this.Participants_ = this.Participants
+    member this.Settings_ = this.Settings
+    member this.Version_: AggregateVersion = this.Version
+    member this.Id_ = this.Id
 
     static member TagOfPhase =
         function
@@ -36,7 +43,7 @@ type Draft =
         | Running _ -> RunningTag
         | Done _ -> DoneTag
 
-    static member Create id version settings participants seed =
+    static member Create id version settings participants seed : Result<Draft * DraftEventPayload list, Error> =
         let state =
             { Id = id
               Version = version
@@ -51,7 +58,7 @@ type Draft =
               Participants = participants
               Seed = seed }
 
-        Ok(state, [ event ])
+        Ok(state, [ DraftEventPayload.DraftCreatedV1 event ])
 
     member this.Start() =
         match this.Phase with
