@@ -12,6 +12,7 @@
     
     <ItemGroup>
       <Folder Include="UseCase\" />
+      <Folder Include="UseCase\Game\JoinQuickGame\" />
     </ItemGroup>
 
 </Project>

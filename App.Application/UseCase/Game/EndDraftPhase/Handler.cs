@@ -1,3 +1,4 @@
+using App.Application.Abstractions;
 using App.Application.Exception;
 using App.Application.Ext;
 using App.Domain.Game;
@@ -6,7 +7,7 @@ using App.Domain.Shared;
 
 namespace App.Application.UseCase.Game.EndDraftPhase;
 
-public record Command(Id.Id GameId);
+public record Command(Id.Id GameId) : ICommand;
 
 public class Handler(IGameRepository games, IGuid guid) : IApplicationHandler<Command>
 {
@@ -21,7 +22,7 @@ public class Handler(IGameRepository games, IGuid guid) : IApplicationHandler<Co
 
             var correlationId = guid.NewGuid();
             var causationId = correlationId;
-            var expectedVersion = game.Version;
+            var expectedVersion = game.Version_;
 
             games.SaveAsync(state, events, expectedVersion, correlationId, causationId, ct);
         }

@@ -47,6 +47,8 @@ type IRegionRepository =
 
 type IGameParticipantRepository =
     abstract member GetByIdAsync: Game.Participant.Id -> Async<Option<Game.Participant.Participant>>
+    abstract member RemoveAsync: Game.Participant.Id -> Async<unit>
+    abstract member SaveAsync: Game.Participant.Participant -> Async<unit>
 
 type IGameCompetitionRepository =
     abstract member GetById: Game.Competition.Id -> Async<Option<Game.Competition>>

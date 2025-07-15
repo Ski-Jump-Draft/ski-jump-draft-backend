@@ -6,17 +6,17 @@ type Error =
     | PlayersLimitTooFew of uint
     | PlayersLimitTooMany of uint
 
-type PlayerLimit = private PlayerLimit of uint
+type ParticipantLimit = private ParticipantLimit of uint
 
-module PlayerLimit =
+module ParticipantLimit =
     let tryCreate (v: uint) =
         if v < 2u then Error(PlayersLimitTooFew(2u))
         elif v > 15u then Error(PlayersLimitTooMany(15u))
-        else Ok(PlayerLimit v)
+        else Ok(ParticipantLimit v)
 
-    let value (PlayerLimit v) = v
+    let value (ParticipantLimit v) = v
 
-    let fits (count: uint) (limit: PlayerLimit) = uint count <= value limit
+    let fits (count: uint) (limit: ParticipantLimit) = uint count <= value limit
 
 module PhaseTransitionPolicy =
     type Error =
@@ -83,7 +83,7 @@ module PhaseTransitionPolicy =
     type EndingSimulation = | None // nie ma szczególnych metod na zakończenie gry. TODO
 
 type Settings =
-    { PlayerLimit: PlayerLimit
+    { ParticipantLimit: ParticipantLimit
       PreDraftSettings: App.Domain.PreDraft.Settings.Settings
       DraftSettings: App.Domain.Draft.Settings.Settings
       CompetitionSettings: App.Domain.Game.Competition.Settings

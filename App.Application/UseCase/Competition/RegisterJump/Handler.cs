@@ -1,3 +1,4 @@
+using App.Application.Abstractions;
 using App.Application.UseCase.Competition.Exception;
 using App.Application.Exception;
 using App.Application.Ext;
@@ -10,7 +11,7 @@ using Microsoft.FSharp.Control;
 
 namespace App.Application.UseCase.Competition.RegisterJump;
 
-public record Command(Domain.Game.Id.Id GameId, Domain.Competition.Jump.Jump Jump);
+public record Command(Domain.Game.Id.Id GameId, Domain.Competition.Jump.Jump Jump) : ICommand;
 
 public class Handler(
     Domain.Competition.Engine.IEngine competitionEngine,
@@ -21,9 +22,7 @@ public class Handler(
     ICompetitionResultsRepository competitionResultsRepository,
     ICompetitionStartlistRepository competitionStartlists,
     IPreDraftRepository preDrafts,
-    ICompetitionEngineSnapshotRepository competitionEnginesSnapshot,
-    IClock clock,
-    IGuid guid) : IApplicationHandler<Command>
+    ICompetitionEngineSnapshotRepository competitionEnginesSnapshot) : IApplicationHandler<Command>
 {
     public async Task HandleAsync(Command command, CancellationToken ct)
     {
@@ -32,7 +31,7 @@ public class Handler(
         var game = await FSharpAsyncExt.AwaitOrThrow(games.LoadAsync(command.GameId, ct),
             new IdNotFoundException(command.GameId.Item), ct);
         var competitionId =
-            await TryExtractCompetitionIdFromGamePhase(game.Phase, gameCompetitions, preDraftCompetitions, preDrafts,
+            await TryExtractCompetitionIdFromGamePhase(game.Phase_, gameCompetitions, preDraftCompetitions, preDrafts,
                 ct);
         var competition = await FSharpAsyncExt.AwaitOrThrow(competitions.LoadAsync(competitionId, ct),
             new IdNotFoundException(competitionId.Item), ct);

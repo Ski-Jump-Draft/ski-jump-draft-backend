@@ -1,5 +1,5 @@
 using App.Application.Abstractions;
-using App.Domain.Draft;
+using App.Domain.Game;
 using App.Domain.Repository;
 using App.Domain.Shared;
 using App.Domain.Shared.EventHelpers;
@@ -8,39 +8,42 @@ using Microsoft.FSharp.Collections;
 using Microsoft.FSharp.Control;
 using Microsoft.FSharp.Core;
 using static Microsoft.FSharp.Collections.ListModule;
+using Event = App.Domain.Game.Event;
+using Id = App.Domain.Game.Id;
 
 namespace App.Infrastructure.Repository.EventSourced;
 
-public class DraftRepository(
-    IEventStore<App.Domain.Draft.Id.Id, Event.DraftEventPayload> store,
+public class GameRepository(
+    IEventStore<Id.Id, Event.GameEventPayload> store,
     IClock clock,
     IGuid guid,
     IEventBus eventBus)
-    : IDraftRepository
+    : IGameRepository
 {
-    public FSharpAsync<FSharpOption<App.Domain.Draft.Draft>> LoadAsync(Id.Id id, CancellationToken ct)
+    public FSharpAsync<FSharpOption<Game>> LoadAsync(Id.Id id, CancellationToken ct)
     {
         return FSharpAsync.AwaitTask(Impl());
 
-        async Task<FSharpOption<App.Domain.Draft.Draft>> Impl()
+        async Task<FSharpOption<Game>> Impl()
         {
             var events = await store.LoadAsync(id, ct).ConfigureAwait(false);
 
             if (events.Count == 0)
-                return FSharpOption<App.Domain.Draft.Draft>.None;
+                return FSharpOption<Game>.None;
 
+            // TODO: Game.Evolve
             var state = Evolve.evolveFromEvents(OfSeq(events));
-            return FSharpOption<App.Domain.Draft.Draft>.Some(state);
+            return FSharpOption<Game>.Some(state);
         }
     }
 
     FSharpAsync<Unit>
         IEventSourcedRepository<
-            Domain.Draft.Draft,
+            Game,
             Id.Id,
-            Event.DraftEventPayload>.SaveAsync(
-            Domain.Draft.Draft aggregate,
-            FSharpList<Event.DraftEventPayload> payloads,
+            Event.GameEventPayload>.SaveAsync(
+            Game aggregate,
+            FSharpList<Event.GameEventPayload> payloads,
             AggregateVersion.AggregateVersion expectedVersion,
             System.Guid correlationId,
             System.Guid causationId,
@@ -51,7 +54,7 @@ public class DraftRepository(
         async Task Impl()
         {
             var domainEvents =
-                payloads.Select(p => new DomainEvent<Event.DraftEventPayload>(
+                payloads.Select(p => new DomainEvent<Event.GameEventPayload>(
                     new EventHeader
                     {
                         EventId = guid.NewGuid(),
@@ -96,11 +99,11 @@ public class DraftRepository(
         }
     }
 
-    public FSharpAsync<FSharpList<Event.DraftEventPayload>> LoadHistoryAsync(Id.Id id)
+    public FSharpAsync<FSharpList<Event.GameEventPayload>> LoadHistoryAsync(Id.Id id)
     {
         return FSharpAsync.AwaitTask(Impl());
 
-        async Task<FSharpList<Event.DraftEventPayload>> Impl()
+        async Task<FSharpList<Event.GameEventPayload>> Impl()
         {
             var events = await store.LoadAsync(id, CancellationToken.None)
                 .ConfigureAwait(false);

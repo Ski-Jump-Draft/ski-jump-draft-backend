@@ -13,12 +13,12 @@ type GameCreatedV1 =
 [<Struct; CLIMutable>]
 type ParticipantJoinedV1 =
     { GameId: Game.Id.Id
-      PlayerId: Participant.Id }
+      ParticipantId: Participant.Id }
 
 [<Struct; CLIMutable>]
 type ParticipantLeftV1 =
     { GameId: Game.Id.Id
-      PlayerId: Participant.Id }
+      ParticipantId: Participant.Id }
 
 [<Struct; CLIMutable>]
 type MatchmakingPhaseStartedV1 = { GameId: Game.Id.Id }
@@ -64,7 +64,7 @@ type GameEndedV1 =
 type GameEventPayload =
     | GameCreatedV1 of GameCreatedV1
     | ParticipantJoinedV1 of ParticipantJoinedV1
-    | PlayerLeftV1 of ParticipantLeftV1
+    | ParticipantLeftV1 of ParticipantLeftV1
     | MatchmakingPhaseStartedV1 of MatchmakingPhaseStartedV1
     | MatchmakingPhaseEndedV1 of MatchmakingPhaseEndedV1
     | PreDraftPhaseStartedV1 of PreDraftPhaseStartedV1
@@ -80,7 +80,7 @@ module Versioning =
         function
         | GameCreatedV1 _ -> 1us
         | ParticipantJoinedV1 _ -> 1us
-        | PlayerLeftV1 _ -> 1us
+        | ParticipantLeftV1 _ -> 1us
         | MatchmakingPhaseStartedV1 _ -> 1us
         | MatchmakingPhaseEndedV1 _ -> 1us
         | PreDraftPhaseStartedV1 _ -> 1us

@@ -13,26 +13,25 @@ namespace App.Application.UseCase.Game.JoinGame;
 public record Command(
     App.Domain.Profile.User.Id UserId,
     App.Domain.Game.Id.Id GameId
-);
+) : ICommand;
 
 public class Handler(
     IGameRepository games,
-    IUserRepository users,
     IUserTranslator<Participant.Participant> translateUserToGameParticipant,
     IGuid guid
-)
+) : IApplicationHandler<Command>
 {
     public async Task HandleAsync(Command command, CancellationToken ct)
     {
         var userId = command.UserId;
-        var newGameParticipant = await translateUserToGameParticipant.CreateTranslatedAsync(userId);
+        var gameParticipant = await translateUserToGameParticipant.CreateTranslatedAsync(userId);
 
         var gameId = command.GameId;
 
         var game = await FSharpAsyncExt.AwaitOrThrow(games.LoadAsync(gameId, ct), new IdNotFoundException(gameId.Item),
             ct);
 
-        var joinResult = game.Join(newGameParticipant.Id);
+        var joinResult = game.Join(gameParticipant.Id);
 
         if (joinResult.IsOk)
         {
@@ -40,7 +39,7 @@ public class Handler(
 
             var correlationId = guid.NewGuid();
             var causationId = correlationId;
-            var expectedVersion = game.Version;
+            var expectedVersion = game.Version_;
 
             await FSharpAsyncExt.AwaitOrThrow(
                 games.SaveAsync(gameAndEvents.Item1, gameAndEvents.Item2, expectedVersion, correlationId, causationId,
@@ -55,8 +54,8 @@ public class Handler(
 
             throw error switch
             {
-                GameErrors.PlayerAlreadyJoined => new GameFullException(game),
-                GameErrors.EndingMatchmakingTooFewPlayers => new PlayerAlreadyJoinedException(game, userId),
+                GameErrors.ParticipantAlreadyJoined => new GameFullException(game),
+                GameErrors.EndingMatchmakingTooFewParticipants => new ParticipantAlreadyJoinedException(game, gameParticipant.Id),
                 GameErrors.InvalidPhase invalidPhaseError => new JoiningGameInvalidPhaseException(
                     invalidPhaseError.Expected.ToList(), invalidPhaseError.Actual),
                 _ => new JoiningGameFailedUnknownException(userId, game)

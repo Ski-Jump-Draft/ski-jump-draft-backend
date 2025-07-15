@@ -15,7 +15,7 @@ public abstract record GameCompetitionType
     public sealed record PreDraft(int Index) : GameCompetitionType;
 }
 
-public record Command(Domain.Game.Id.Id GameId, GameCompetitionType GameCompetitionType);
+public record Command(Domain.Game.Id.Id GameId, GameCompetitionType GameCompetitionType) : ICommand<Domain.Competition.Engine.Id>;
 
 public class Handler(
     IGameRepository games,
@@ -30,14 +30,15 @@ public class Handler(
         ct.ThrowIfCancellationRequested();
         var game = await FSharpAsyncExt.AwaitOrThrow(games.LoadAsync(command.GameId, ct),
             new IdNotFoundException(command.GameId.Item), ct);
+        var settings = game.Settings_;
 
-        var engineRawOptions = game.Settings.CompetitionSettings.EngineRawOptions.ToDictionary();
+        var engineRawOptions = settings.CompetitionSettings.EngineRawOptions.ToDictionary();
 
         var competitionEnginePluginId = command.GameCompetitionType switch
         {
-            GameCompetitionType.PreDraft preDraft => game.Settings.PreDraftSettings.Competitions[preDraft.Index]
+            GameCompetitionType.PreDraft preDraft => settings.PreDraftSettings.Competitions[preDraft.Index]
                 .CompetitionEnginePluginId,
-            GameCompetitionType.PostDraftCompetition _ => game.Settings.CompetitionSettings
+            GameCompetitionType.PostDraftCompetition _ => settings.CompetitionSettings
                 .CompetitionEnginePluginId,
             _ => throw new ArgumentOutOfRangeException(),
         };
@@ -45,7 +46,7 @@ public class Handler(
         var plugin = await competitionEnginePlugins.GetByIdAsync(competitionEnginePluginId, ct);
         var factory = plugin.Factory;
 
-        var gameHillId = game.Settings.HillId;
+        var gameHillId = settings.HillId;
         var competitionHill = gameHillIdToCompetitionHill(gameHillId.Item);
 
         var creationContext = new Context(guid, engineRawOptions, competitionHill);

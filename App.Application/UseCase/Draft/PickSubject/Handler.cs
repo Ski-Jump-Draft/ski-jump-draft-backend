@@ -16,13 +16,13 @@ public record Command(
     App.Domain.Draft.Id.Id DraftId,
     App.Domain.Draft.Participant.Id ParticipantId,
     App.Domain.Draft.Subject.Id SubjectId
-);
+) : ICommand;
 
 public class Handler(
     IDraftRepository drafts,
     IDraftParticipantRepository draftParticipants,
     IDraftSubjectRepository draftSubjects,
-    IGuid guid)
+    IGuid guid) : IApplicationHandler<Command>
 {
     public async Task HandleAsync(Command command, CancellationToken ct)
     {

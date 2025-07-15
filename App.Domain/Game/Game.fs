@@ -44,40 +44,48 @@ module Game =
     type Error =
         | InvalidPhase of Expected: PhaseTag list * Actual: PhaseTag
         | HostDecisionTimeout of TimeSpan
-        | EndingMatchmakingTooFewPlayers of Current: uint * Min: uint
-        | EndingMatchmakingTooManyPlayers of Current: uint * Max: uint
+        | EndingMatchmakingTooFewParticipants of Current: uint * Min: uint
+        | EndingMatchmakingTooManyParticipants of Current: uint * Max: uint
         | GameRoomFull
-        | PlayerAlreadyJoined of Participant.Id
+        | ParticipantAlreadyJoined of Participant.Id
+        | ParticipantNotInGame of Participant.Id
 
     type Participants = private Participants of Participant.Id list
 
     module Participants =
         let empty = Participants []
 
-        let add player (Participants players) =
-            if List.contains player players then
-                Error(PlayerAlreadyJoined player)
+        let add participant (Participants participants) =
+            if List.contains participant participants then
+                Error(ParticipantAlreadyJoined participant)
             else
-                Ok(Participants(player :: players))
+                Ok(Participants(participant :: participants))
 
-        let remove player (Participants players) =
-            Participants(List.filter ((<>) player) players)
+        let remove participant (Participants participants) =
+            Participants(List.filter ((<>) participant) participants)
 
-        let contains player (Participants players) = List.contains player players
+        let contains participant (Participants participants) = List.contains participant participants
 
-        let count (Participants players) : uint = uint (List.length players)
-        let value (Participants players) = players
+        let count (Participants participants) : uint = uint (List.length participants)
+        let value (Participants participants) = participants
 
 
 open Game
 
 type Game =
-    { Id: Id.Id
-      Version: AggregateVersion
-      HostId: Hosting.Host.Id
-      Phase: Phase
-      Settings: Settings.Settings
-      Participants: Participants }
+    private
+        { Id: Id.Id
+          Version: AggregateVersion
+          HostId: Hosting.Host.Id
+          Phase: Phase
+          Settings: Settings.Settings
+          Participants: Participants }
+
+    member this.Phase_ = this.Phase
+    member this.Participants_ = this.Participants
+    member this.Settings_ = this.Settings
+    member this.Version_: AggregateVersion = this.Version
+    member this.Id_ = this.Id
 
     static member TagOfPhase phase =
         match phase with
@@ -107,29 +115,65 @@ type Game =
 
         Ok(state, [ GameEventPayload.GameCreatedV1 event ])
 
-    member this.Join(playerId: Participant.Id) : Result<Game * GameEventPayload list, Error> =
-        if this.ParticipantIsPresent(playerId) then
-            Error(Game.Error.PlayerAlreadyJoined playerId)
+    member this.Join(participantId: Participant.Id) : Result<Game * GameEventPayload list, Error> =
+        if this.ParticipantIsPresent(participantId) then
+            Error(Game.Error.ParticipantAlreadyJoined participantId)
         elif this.RoomIsFull then
             Error Game.Error.GameRoomFull
         else
             match this.Phase with
             | Matchmaking ->
-                let updatedPlayers = Participants.add playerId this.Participants
+                let updatedParticipants = Participants.add participantId this.Participants
 
-                match updatedPlayers with
-                | Ok updatedPlayers ->
+                match updatedParticipants with
+                | Ok updatedParticipants ->
                     let updatedGame =
                         { this with
-                            Participants = updatedPlayers }
+                            Participants = updatedParticipants }
 
                     let event: ParticipantJoinedV1 =
                         { GameId = updatedGame.Id
-                          PlayerId = playerId }
+                          ParticipantId = participantId }
 
                     Ok(updatedGame, [ GameEventPayload.ParticipantJoinedV1 event ])
                 | Error error -> Error(error)
             | _ -> Error(InvalidPhase([ MatchmakingTag ], this.Phase |> Game.TagOfPhase))
+
+    member this.Leave(participantId: Participant.Id) : Result<Game * GameEventPayload list, Error> =
+        if not (this.ParticipantIsPresent(participantId)) then
+            Error(Game.Error.ParticipantNotInGame participantId)
+        else
+            match this.Phase with
+            | Matchmaking
+            | Break _
+            | Draft _
+            | Competition _
+            | PreDraft _ ->
+                let updatedParticipants = Participants.remove participantId this.Participants
+
+                let updatedGame =
+                    { this with
+                        Participants = updatedParticipants }
+
+                let event: ParticipantLeftV1 =
+                    { GameId = updatedGame.Id
+                      ParticipantId = participantId }
+
+                Ok(updatedGame, [ GameEventPayload.ParticipantLeftV1 event ])
+            | _ ->
+                Error(
+                    InvalidPhase(
+                        [ PhaseTag.MatchmakingTag
+                          (PhaseTag.BreakTag PhaseTag.CompetitionTag)
+                          (PhaseTag.BreakTag PhaseTag.DraftTag)
+                          (PhaseTag.BreakTag PhaseTag.PreDraftTag)
+                          PhaseTag.DraftTag
+                          PhaseTag.CompetitionTag
+                          PhaseTag.PreDraftTag ],
+                        this.Phase |> Game.TagOfPhase
+                    )
+                )
+
 
     // TODO: Wyjątki w CanJoin!!!!!!
     // TODO: jeśli gracz jest zbanowany, false
@@ -137,12 +181,15 @@ type Game =
     // TODO: jeśli trzeba czekać na potwierdzenie, NIE WIEM CO
 
     member this.RoomIsFull =
-        let currentPlayersCount = Participants.count this.Participants
-        let playersLimit = Settings.PlayerLimit.value this.Settings.PlayerLimit
-        currentPlayersCount >= playersLimit
+        let currentParticipantsCount = Participants.count this.Participants
 
-    member this.ParticipantIsPresent(player: Participant.Id) =
-        Participants.contains player this.Participants
+        let participantsLimit =
+            Settings.ParticipantLimit.value this.Settings.ParticipantLimit
+
+        currentParticipantsCount >= participantsLimit
+
+    member this.ParticipantIsPresent(participant: Participant.Id) =
+        Participants.contains participant this.Participants
 
     /// Matchmaking ID
     member this.StartMatchmaking() =
@@ -156,12 +203,14 @@ type Game =
     member this.EndMatchmaking() =
         match this.Phase with
         | Matchmaking ->
-            let playersCount = Participants.count this.Participants
-            let playersLimit = this.Settings.PlayerLimit
-            let playersCountFitsLimit = Settings.PlayerLimit.fits playersCount playersLimit
+            let participantsCount = Participants.count this.Participants
+            let participantsLimit = this.Settings.ParticipantLimit
 
-            if playersCount >= 2u then
-                if playersCountFitsLimit then
+            let participantsCountFitsLimit =
+                Settings.ParticipantLimit.fits participantsCount participantsLimit
+
+            if participantsCount >= 2u then
+                if participantsCountFitsLimit then
                     let state =
                         { this with
                             Phase = Break(Next = PhaseTag.PreDraftTag) }
@@ -171,13 +220,13 @@ type Game =
                     Ok(state, [ GameEventPayload.MatchmakingPhaseEndedV1 event ])
                 else
                     Error(
-                        EndingMatchmakingTooManyPlayers(
+                        EndingMatchmakingTooManyParticipants(
                             Participants.count this.Participants,
-                            Settings.PlayerLimit.value playersLimit
+                            Settings.ParticipantLimit.value participantsLimit
                         )
                     )
             else
-                Error(EndingMatchmakingTooFewPlayers(Participants.count this.Participants, 2u))
+                Error(EndingMatchmakingTooFewParticipants(Participants.count this.Participants, 2u))
         | _ -> Error(InvalidPhase([ MatchmakingTag ], Game.TagOfPhase this.Phase))
 
     member this.StartPreDraft(preDraftId) =

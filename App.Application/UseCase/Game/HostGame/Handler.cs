@@ -1,3 +1,4 @@
+using App.Application.Abstractions;
 using App.Application.Exception;
 using App.Application.Ext;
 using App.Application.UseCase.Game.Exception;
@@ -12,9 +13,9 @@ using App.Domain.Time;
 
 namespace App.Application.UseCase.Game.HostGame;
 
-public record Command(HostModule.Id HostId, ServerModule.Id ServerId, App.Domain.Game.Settings.Settings Settings);
+public record Command(HostModule.Id HostId, ServerModule.Id ServerId, App.Domain.Game.Settings.Settings Settings) : ICommand<App.Domain.Game.Id.Id>;
 
-public class Handler(IGuid guid, IHostRepository hosts, IServerRepository servers, IGameRepository games, IClock clock)
+public class Handler(IGuid guid, IHostRepository hosts, IServerRepository servers, IGameRepository games) : IApplicationHandler<App.Domain.Game.Id.Id, Command>
 {
     public async Task<App.Domain.Game.Id.Id> HandleAsync(Command command, CancellationToken ct)
     {
@@ -49,7 +50,7 @@ public class Handler(IGuid guid, IHostRepository hosts, IServerRepository server
 
         var correlationId = guid.NewGuid();
         var causationId = correlationId;
-        var expectedVersion = game.Version;
+        var expectedVersion = game.Version_;
 
         await FSharpAsyncExt.AwaitOrThrow(
             games.SaveAsync(game, events, expectedVersion, correlationId, causationId, ct),
@@ -57,6 +58,6 @@ public class Handler(IGuid guid, IHostRepository hosts, IServerRepository server
             ct
         );
 
-        return game.Id;
+        return game.Id_;
     }
 }

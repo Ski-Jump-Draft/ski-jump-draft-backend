@@ -73,6 +73,7 @@
         <Compile Include="Game\Ranking.fs" />
         <Compile Include="Game\Event.fs" />
         <Compile Include="Game\Game.fs" />
+        <Compile Include="Game\Evolve.fs" />
         <Compile Include="Profile\User.fs" />
         <Compile Include="CrudRepositories.fs" />
         <Compile Include="EventSourcedRepositories.fs" />
