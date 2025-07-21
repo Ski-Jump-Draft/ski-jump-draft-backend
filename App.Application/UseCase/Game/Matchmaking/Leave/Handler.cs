@@ -22,13 +22,12 @@ public class Handler(
     public async Task<App.Domain.Matchmaking.ParticipantModule.Id> HandleAsync(Command command, CancellationToken ct)
     {
         var matchmakingId = command.MatchmakingId;
-        var matchmaking = await FSharpAsyncExt.AwaitOrThrow(matchmakings.LoadAsync(matchmakingId, ct),
-            new IdNotFoundException<Guid>(matchmakingId.Item), ct);
+        var matchmaking = await matchmakings.LoadAsync(matchmakingId, ct)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(matchmakingId.Item));
 
         var matchmakingParticipantId = command.MatchmakingParticipantId;
-        var matchmakingParticipant = await FSharpAsyncExt.AwaitOrThrow(
-            matchmakingParticipants.GetByIdAsync(matchmakingParticipantId),
-            new IdNotFoundException<Guid>(matchmakingId.Item), ct);
+        var matchmakingParticipant = await matchmakingParticipants.GetByIdAsync(matchmakingParticipantId)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(matchmakingId.Item));
 
         var leaveResult = matchmaking.Leave(matchmakingParticipant.Id);
 
@@ -40,13 +39,10 @@ public class Handler(
             var causationId = correlationId;
             var expectedVersion = aggregate.Version_;
 
-            await FSharpAsyncExt.AwaitOrThrow(
-                matchmakings.SaveAsync(aggregate, events, expectedVersion, correlationId, causationId,
-                    ct),
-                new LeavingMatchmakingFailedException(matchmaking, matchmakingParticipant,
-                    LeavingMatchmakingFailReason.ErrorDuringUpdatingMatchmaking),
-                ct
-            );
+            await
+                matchmakings.SaveAsync(aggregate, events, expectedVersion, correlationId, causationId, ct).AwaitOrWrap(_ =>
+                    new LeavingMatchmakingFailedException(matchmaking, matchmakingParticipant,
+                        LeavingMatchmakingFailReason.ErrorDuringUpdatingMatchmaking));
             // TODO
             //
             // await FSharpAsyncExt.AwaitOrThrow(matchmakingParticipants.RemoveAsync(matchmakingParticipant.Id),

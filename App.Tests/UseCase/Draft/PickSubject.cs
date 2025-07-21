@@ -1,13 +1,11 @@
-using App.Application.Ext;
 using App.Application.UseCase.Draft.PickSubject;
 using App.Domain.Draft;
 using App.Domain.Draft.Order;
 using App.Domain.Repositories;
 using App.Domain.Shared;
-using App.Infrastructure.Guid;
+using App.Infrastructure.GuidAdapters;
 using App.Tests.Fakes.Factory;
 using Microsoft.FSharp.Collections;
-using Microsoft.FSharp.Control;
 using Microsoft.FSharp.Core;
 using Moq;
 
@@ -32,20 +30,20 @@ public class PickSubjectHandlerTests
 
         var draftRepo = new Mock<IDraftRepository>();
         draftRepo.Setup(x => x.LoadAsync(draftId, It.IsAny<CancellationToken>()))
-            .Returns(FSharpAsyncExt.Return(FSharpOption<App.Domain.Draft.Draft>.Some(draft)));
+            .Returns(Task.FromResult(FSharpOption<App.Domain.Draft.Draft>.Some(draft)));
         draftRepo.Setup(x => x.SaveAsync(It.IsAny<App.Domain.Draft.Draft>(),
                 It.IsAny<FSharpList<Event.DraftEventPayload>>(),
                 It.IsAny<AggregateVersion.AggregateVersion>(), It.IsAny<Guid>(), It.IsAny<Guid>(),
                 It.IsAny<CancellationToken>()))
-            .Returns(FSharpAsync.AwaitTask(Task.CompletedTask));
+            .Returns(Task.CompletedTask);
 
         var draftParticipantRepo = new Mock<IDraftParticipantRepository>();
         draftParticipantRepo.Setup(x => x.GetByIdAsync(participantId))
-            .Returns(FSharpAsyncExt.Return(FSharpOption<Participant.Participant>.Some(participant)));
+            .Returns(Task.FromResult(FSharpOption<Participant.Participant>.Some(participant)));
 
         var draftSubjectRepo = new Mock<IDraftSubjectRepository>();
         draftSubjectRepo.Setup(x => x.GetByIdAsync(subjectId))
-            .Returns(FSharpAsyncExt.Return(FSharpOption<Subject.Subject>.Some(subject)));
+            .Returns(Task.FromResult(FSharpOption<Subject.Subject>.Some(subject)));
 
         var handler = new Handler(draftRepo.Object, draftParticipantRepo.Object, draftSubjectRepo.Object,
             new SystemGuid());

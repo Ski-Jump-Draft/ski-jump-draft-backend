@@ -13,7 +13,7 @@ public static class PluginsDependencyInjection
     {
         services
             .AddSingleton<ICompetitionEnginePluginRepository,
-                Infrastructure.DomainRepository.Crud.CompetitionEnginePlugin.InMemory>();
+                Infrastructure.ApplicationRepository.CompetitionEnginePlugin.InMemory>();
 
         services.AddHostedService<PluginRegistrationService>();
 

@@ -15,12 +15,14 @@ public static class DomainRepositoriesDependencyInjection
                 Infrastructure.DomainRepository.Crud.CompetitionEngineSnapshot.InMemory>();
         services
             .AddSingleton<ICompetitionEnginePluginRepository,
-                Infrastructure.DomainRepository.Crud.CompetitionEnginePlugin.InMemory>();
+                Infrastructure.ApplicationRepository.CompetitionEnginePlugin.InMemory>();
         services
             .AddSingleton<IGameParticipantRepository, Infrastructure.DomainRepository.Crud.GameParticipant.InMemory>();
         services
             .AddSingleton<IMatchmakingParticipantRepository,
                 Infrastructure.DomainRepository.Crud.MatchmakingParticipant.InMemory>();
+
+        services.AddSingleton<IGameWorldHillRepository, Infrastructure.DomainRepository.Crud.GameWorldHill.InMemory>();
         services.AddSingleton<IGameHillRepository, Infrastructure.DomainRepository.Crud.GameHill.InMemory>();
 
         // Event-Sourced

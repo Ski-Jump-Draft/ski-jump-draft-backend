@@ -22,4 +22,8 @@
       <PackageReference Include="StackExchange.Redis" Version="2.8.41" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="ApplicationRepository\" />
+    </ItemGroup>
+
 </Project>

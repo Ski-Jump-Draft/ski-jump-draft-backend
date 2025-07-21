@@ -16,6 +16,8 @@ type Startlist =
     private
         { Id: Startlist.Id
           NextEntities: List<Startlist.Entity> }
+        
+    member this.Id_ = this.Id
 
     static member Create id (nextEntities: Startlist.Entity list) =
         Ok { Id = id; NextEntities = nextEntities }

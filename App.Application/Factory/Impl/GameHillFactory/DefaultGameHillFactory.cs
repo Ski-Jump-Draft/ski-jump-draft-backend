@@ -16,8 +16,8 @@ public class DefaultGameHillFactory(
     {
         if (gameHillMapping.TryMap(gameWorldHill.Id, out var gameHillId))
         {
-            return await FSharpAsyncExt.AwaitOrThrow(gameHills.GetByIdAsync(gameHillId, ct),
-                new IdNotFoundException<Guid>(gameHillId.Item), ct);
+            return await gameHills.GetByIdAsync(gameHillId)
+                .AwaitOrWrap(_ => new IdNotFoundException<Guid>(gameHillId.Item));
         }
 
         var newGameHillId = Domain.Game.Hill.Id.NewId(guid.NewGuid());

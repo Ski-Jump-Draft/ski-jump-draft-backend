@@ -58,4 +58,17 @@ public static class FSharpAsyncExt
 
     public static FSharpAsync<T> Return<T>(T value) =>
         FSharpAsync.AwaitTask(Task.FromResult(value));
+
+    public static async Task<T> AwaitOrWrap<T>(this Task<FSharpOption<T>> task,
+        Func<System.Exception, System.Exception> wrap)
+    {
+        try
+        {
+            return (await task).Value;
+        }
+        catch (System.Exception ex)
+        {
+            throw wrap(ex);
+        }
+    }
 }

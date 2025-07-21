@@ -1,6 +1,7 @@
 using App.Application.Abstractions;
 using App.Application.Exception;
 using App.Application.Ext;
+using App.Application.ReadModel.ReadRepository;
 using App.Application.UseCase.Game.Exception;
 using App.Domain.Matchmaking;
 using App.Domain.Shared;
@@ -14,15 +15,15 @@ public record Command(
 ) : ICommand<App.Domain.GameWorld.HillModule.Id>;
 
 public class Handler(
-    IGameWorldHillRepository gameWorldHills,
+    IGameWorldHillReadRepository gameWorldHills,
     Random.IRandom random
 ) : ICommandHandler<Command, App.Domain.GameWorld.HillModule.Id>
 {
     public async Task<App.Domain.GameWorld.HillModule.Id> HandleAsync(Command command, CancellationToken ct)
     {
-        var hills = await FSharpAsyncExt.Await(gameWorldHills.GetAllAsync(), ct);
+        var hills = (await gameWorldHills.GetAllAsync()).ToArray();
         var randomIndex = random.RandomInt(0, hills.Length - 1);
         var hill = hills[randomIndex];
-        return hill.Id;
+        return App.Domain.GameWorld.HillModule.Id.NewId(hill.Id);
     }
 }

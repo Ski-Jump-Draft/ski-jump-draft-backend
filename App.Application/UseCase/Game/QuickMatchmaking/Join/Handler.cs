@@ -25,8 +25,8 @@ public class Handler(
     public async Task<App.Domain.Matchmaking.ParticipantModule.Id> HandleAsync(Command command, CancellationToken ct)
     {
         var matchmakingId = Domain.Matchmaking.Id.NewId(command.MatchmakingId);
-        var matchmaking = await FSharpAsyncExt.AwaitOrThrow(matchmakings.LoadAsync(matchmakingId, ct),
-            new IdNotFoundException<Guid>(matchmakingId.Item), ct);
+        var matchmaking = await matchmakings.LoadAsync(matchmakingId, ct)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(matchmakingId.Item));
 
         var matchmakingParticipant = translateNickToGameParticipant(command.Nick);
         var joinResult = matchmaking.Join(matchmakingParticipant.Id);
@@ -39,26 +39,30 @@ public class Handler(
             var causationId = correlationId;
             var expectedVersion = aggregate.Version_;
 
-            await FSharpAsyncExt.AwaitOrThrow(
-                matchmakings.SaveAsync(aggregate, events, expectedVersion, correlationId, causationId,
-                    ct),
-                new JoiningQuickMatchmakingFailedException(command.Nick, JoiningQuickMatchmakingFailReason.Unknown),
-                ct
-            );
-            await FSharpAsyncExt.AwaitOrThrow(matchmakingParticipants.SaveAsync(matchmakingParticipant),
-                new JoiningQuickMatchmakingFailedException(command.Nick, JoiningQuickMatchmakingFailReason.ErrorDuringPreservingParticipant), ct);
+            await
+                matchmakings.SaveAsync(aggregate, events, expectedVersion, correlationId, causationId, ct).AwaitOrWrap(_ =>
+                    new JoiningQuickMatchmakingFailedException(command.Nick,
+                        JoiningQuickMatchmakingFailReason.Unknown));
+
+            await matchmakingParticipants.SaveAsync(matchmakingParticipant.Id, matchmakingParticipant).AwaitOrWrap(_ =>
+                new JoiningQuickMatchmakingFailedException(command.Nick,
+                    JoiningQuickMatchmakingFailReason.ErrorDuringPreservingParticipant));
             return matchmakingParticipant.Id;
         }
 
         var error = joinResult.ErrorValue;
 
         throw error switch
-        { 
-            Error.PlayerAlreadyJoined => new MatchmakingParticipantAlreadyJoinedException(matchmaking, matchmakingParticipant),
-            Error.PlayerNotJoined => new MatchmakingParticipantNotInMatchmakingException(matchmaking, matchmakingParticipant),
+        {
+            Error.PlayerAlreadyJoined => new MatchmakingParticipantAlreadyJoinedException(matchmaking,
+                matchmakingParticipant),
+            Error.PlayerNotJoined => new MatchmakingParticipantNotInMatchmakingException(matchmaking,
+                matchmakingParticipant),
             Error.RoomFull => new MatchmakingRoomFullException(matchmaking),
-            Error.InvalidPhase invalidPhaseError => new JoiningMatchmakingInvalidPhaseException(invalidPhaseError.Expected.ToList(), invalidPhaseError.Actual),
-            _ => new JoiningQuickMatchmakingFailedException(command.Nick, JoiningQuickMatchmakingFailReason.NoServerAvailable)
+            Error.InvalidPhase invalidPhaseError => new JoiningMatchmakingInvalidPhaseException(
+                invalidPhaseError.Expected.ToList(), invalidPhaseError.Actual),
+            _ => new JoiningQuickMatchmakingFailedException(command.Nick,
+                JoiningQuickMatchmakingFailReason.NoServerAvailable)
         };
     }
 }

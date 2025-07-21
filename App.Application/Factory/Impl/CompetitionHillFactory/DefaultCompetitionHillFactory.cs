@@ -17,17 +17,15 @@ public class DefaultCompetitionHillFactory(
     {
         if (competitionHillMapping.TryMap(gameHill.Id, out var competitionHillId))
         {
-            return await FSharpAsyncExt.AwaitOrThrow(
-                competitionHills.GetByIdAsync(competitionHillId, ct),
-                new IdNotFoundException<Guid>(competitionHillId.Item), ct);
+            return await competitionHills.GetByIdAsync(competitionHillId)
+                .AwaitOrWrap(_ => new IdNotFoundException<Guid>(competitionHillId.Item));
         }
 
         if (!gameHillMapping.TryMapBackward(gameHill.Id, out var gameWorldHillId))
             throw new KeyNotFoundException("No existing competition hill or no related game world hill");
 
-        var gameWorldHill = await FSharpAsyncExt.AwaitOrThrow(
-            gameWorldHills.GetByIdAsync(gameWorldHillId, ct),
-            new IdNotFoundException<Guid>(gameWorldHillId.Item), ct);
+        var gameWorldHill = await gameWorldHills.GetByIdAsync(gameWorldHillId)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(gameWorldHillId.Item));
         var newCompetitionHillId = Domain.Competition.HillModule.Id.NewId(guid.NewGuid());
         var kPoint = Domain.Competition.HillModule.KPointModule
             .tryCreate(Domain.GameWorld.HillModule.KPointModule.value(gameWorldHill.KPoint)).Value;

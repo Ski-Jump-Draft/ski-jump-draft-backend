@@ -1,6 +1,6 @@
 using App.Domain.Shared;
 
-namespace App.Infrastructure.Guid;
+namespace App.Infrastructure.GuidAdapters;
 
 public class SystemGuid : IGuid
 {

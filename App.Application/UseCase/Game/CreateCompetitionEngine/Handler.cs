@@ -1,9 +1,7 @@
 using App.Application.Abstractions;
-using App.Application.Abstractions.Mappers;
 using App.Application.Exception;
 using App.Application.Ext;
 using App.Application.Factory;
-using App.Domain.Competition;
 using App.Domain.Repositories;
 using App.Domain.Shared;
 
@@ -31,8 +29,8 @@ public class Handler(
     public async Task<Domain.Competition.Engine.Id> HandleAsync(Command command, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var game = await FSharpAsyncExt.AwaitOrThrow(games.LoadAsync(command.GameId, ct),
-            new IdNotFoundException<Guid>(command.GameId.Item), ct);
+        var game = await games.LoadAsync(command.GameId, ct)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(command.GameId.Item));
         var settings = game.Settings_;
 
         var engineRawOptions = settings.CompetitionSettings.EngineRawOptions.ToDictionary();
@@ -51,8 +49,8 @@ public class Handler(
         var factory = plugin.Factory;
 
         var gameHillId = settings.HillId;
-        var gameHill = await FSharpAsyncExt.AwaitOrThrow(gameHills.GetByIdAsync(gameHillId, ct),
-            new IdNotFoundException<Guid>(gameHillId.Item), ct);
+        var gameHill = await gameHills.GetByIdAsync(gameHillId)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(gameHillId.Item));
 
         var competitionHill = await competitionHillFactory.CreateAsync(gameHill, ct);
 
@@ -62,8 +60,8 @@ public class Handler(
 
         var engine = factory.Create(creationContext);
 
-        await FSharpAsyncExt.AwaitOrThrow(competitionEngineSnapshots.SaveByIdAsync(engine.Id, engine.ToSnapshot()),
-            new IdNotFoundException<Guid>(command.GameId.Item), ct);
+        await competitionEngineSnapshots.SaveAsync(engine.Id, engine.ToSnapshot())
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(command.GameId.Item));
 
         return engine.Id;
     }

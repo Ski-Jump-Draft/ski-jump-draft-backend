@@ -62,12 +62,10 @@ public class Handler(
                 var correlationId = guid.NewGuid();
                 var causationId = correlationId;
                 var expectedVersion = matchmakingAggregate.Version_;
-                await FSharpAsyncExt.AwaitOrThrow(
-                    matchmakings.SaveAsync(matchmakingAggregate, events, expectedVersion, correlationId, causationId,
-                        ct),
-                    new JoiningQuickMatchmakingFailedException(command.Nick,
-                        JoiningQuickMatchmakingFailReason.ErrorDuringSettingUp),
-                    ct);
+                await
+                    matchmakings.SaveAsync(matchmakingAggregate, events, expectedVersion, correlationId, causationId, ct)
+                        .AwaitOrWrap(_ => new JoiningQuickMatchmakingFailedException(command.Nick,
+                            JoiningQuickMatchmakingFailReason.ErrorDuringSettingUp));
                 return matchmakingId.Item;
             }
         }

@@ -26,12 +26,12 @@ public class Handler(
     public async Task HandleAsync(Command command, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var draft = await FSharpAsyncExt.AwaitOrThrow(drafts.LoadAsync(command.DraftId, ct),
-            new IdNotFoundException<Guid>(command.DraftId.Item), ct);
-        var participant = await FSharpAsyncExt.AwaitOrThrow(draftParticipants.GetByIdAsync(command.ParticipantId),
-            new IdNotFoundException<Guid>(command.ParticipantId.Item), ct);
-        var subject = await FSharpAsyncExt.AwaitOrThrow(draftSubjects.GetByIdAsync(command.SubjectId),
-            new IdNotFoundException<Guid>(command.SubjectId.Item), ct);
+        var draft = await drafts.LoadAsync(command.DraftId, ct)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(command.DraftId.Item));
+        var participant = await draftParticipants.GetByIdAsync(command.ParticipantId)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(command.ParticipantId.Item));
+        var subject = await draftSubjects.GetByIdAsync(command.SubjectId)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(command.SubjectId.Item));
 
         var draftResult = draft.Pick(command.ParticipantId, command.SubjectId);
 
@@ -43,8 +43,8 @@ public class Handler(
             var correlationId = guid.NewGuid();
             var causationId = correlationId;
 
-            await FSharpAsyncExt.AwaitOrThrow(drafts.SaveAsync(state, eventPayloads, expectedVersion, correlationId,
-                causationId, ct), new DraftPickFailedException(draft, participant, subject), ct);
+            await drafts.SaveAsync(state, eventPayloads, expectedVersion, correlationId,
+                causationId, ct).AwaitOrWrap(_ => new DraftPickFailedException(draft, participant, subject));
         }
         else
         {

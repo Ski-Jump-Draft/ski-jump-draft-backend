@@ -32,8 +32,8 @@ public class Handler(
     public async Task<App.Domain.Game.Game> HandleAsync(Command command, CancellationToken ct)
     {
         var matchmakingId = Domain.Matchmaking.Id.NewId(command.MatchmakingId);
-        var matchmaking = await FSharpAsyncExt.AwaitOrThrow(matchmakings.LoadAsync(matchmakingId, ct),
-            new IdNotFoundException<Guid>(matchmakingId.Item), ct);
+        var matchmaking = await matchmakings.LoadAsync(matchmakingId, ct)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(matchmakingId.Item));
 
         var matchmakingParticipantDtos =
             (await matchmakingParticipantsProjection.GetParticipantsByMatchmakingIdAsync(matchmakingId)).ToArray();
@@ -54,14 +54,15 @@ public class Handler(
             var correlationId = guid.NewGuid();
             var causationId = correlationId;
             var expectedVersion = gameAggregate.Version_;
-            await FSharpAsyncExt.AwaitOrThrow(
-                games.SaveAsync(gameAggregate, events, expectedVersion, correlationId, causationId,
-                    ct),
-                new CreatingQuickGameFailedException(matchmaking),
-                ct
+            await games.SaveAsync(gameAggregate, events, expectedVersion, correlationId, causationId, ct)
+                .AwaitOrWrap(_ => new CreatingQuickGameFailedException(matchmaking));
+            await Task.WhenAll(
+                gameParticipants
+                    .Select(gp =>
+                        gameParticipantsRepository.SaveAsync(gp.Id, gp)
+                            .AwaitOrWrap(_ => new CreatingQuickGameFailedException(matchmaking)))
             );
-            await FSharpAsyncExt.AwaitOrThrow(gameParticipantsRepository.SaveAsync(ListModule.OfSeq(gameParticipants)),
-                new CreatingQuickGameFailedException(matchmaking), ct);
+
             return gameAggregate;
         }
 

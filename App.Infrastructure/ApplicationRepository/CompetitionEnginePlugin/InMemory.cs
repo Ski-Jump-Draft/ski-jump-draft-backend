@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using App.Application.Abstractions;
 
-namespace App.Infrastructure.DomainRepository.Crud.CompetitionEnginePlugin;
+namespace App.Infrastructure.ApplicationRepository.CompetitionEnginePlugin;
 
 public class InMemory : ICompetitionEnginePluginRepository
 {

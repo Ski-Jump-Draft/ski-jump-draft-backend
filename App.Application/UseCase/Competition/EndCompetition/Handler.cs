@@ -27,13 +27,13 @@ public class Handler(
     {
         ct.ThrowIfCancellationRequested();
 
-        var game = await FSharpAsyncExt.AwaitOrThrow(games.LoadAsync(command.GameId, ct),
-            new IdNotFoundException<Guid>(command.GameId.Item), ct);
+        var game = await games.LoadAsync(command.GameId, ct)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(command.GameId.Item));
         var competitionId =
             await TryExtractCompetitionIdFromGamePhase(game.Phase_, gameCompetitions, preDraftCompetitions, preDrafts,
                 ct);
-        var competition = await FSharpAsyncExt.AwaitOrThrow(competitions.LoadAsync(competitionId, ct),
-            new IdNotFoundException<Guid>(competitionId.Item), ct);
+        var competition = await competitions.LoadAsync(competitionId, ct)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(competitionId.Item));
 
         var engineSnapshot = competitionEngine.RegisterJump(command.Jump);
 
@@ -46,20 +46,19 @@ public class Handler(
         // {
         var results = ResultsModule.Results.FromState(competition.ResultsId, competitionEngine.ResultsState)
             .ResultValue; // TODO: Niebezpieczny fragment
-        await FSharpAsync.StartAsTask(competitionResultsRepository.UpdateAsync(results), null, null);
+        await competitionResultsRepository.SaveAsync(results.Id, results);
 
-        var existingStartlist = await FSharpAsyncExt.AwaitOrThrow(
-            competitionStartlists.GetByIdAsync(competition.StartlistId),
-            new IdNotFoundException<Guid>(competition.StartlistId.Item), ct);
+        var existingStartlist = await competitionStartlists.GetByIdAsync(competition.StartlistId)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(competition.StartlistId.Item));
         var newStartlist = existingStartlist.RemoveFirst();
-        await FSharpAsync.StartAsTask(competitionStartlists.UpdateAsync(newStartlist), null, null);
+        await competitionStartlists.SaveAsync(newStartlist.Id_, newStartlist);
 
         // TODO kiedyś tam:   CompetitionOrder.addForRound(roundIndex, jump/participant)
 
         // }
-        await FSharpAsyncExt.AwaitOrThrow(
-            competitionEnginesSnapshot.SaveByIdAsync(competitionEngine.Id, engineSnapshot),
-            new EngineSnapshotSavingFailedException(), ct);
+        await
+            competitionEnginesSnapshot.SaveAsync(competitionEngine.Id, engineSnapshot)
+                .AwaitOrWrap(_ => new EngineSnapshotSavingFailedException());
     }
 
     private static async Task<Domain.Competition.Id.Id> TryExtractCompetitionIdFromGamePhase(
@@ -84,8 +83,8 @@ public class Handler(
         Domain.Game.CompetitionModule.Id id,
         CancellationToken ct)
     {
-        var gameCompetition = await FSharpAsyncExt.AwaitOrThrow(repo.GetByIdAsync(id),
-            new IdNotFoundException<Guid>(id.Item), ct);
+        var gameCompetition = await repo.GetByIdAsync(id)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(id.Item));
         return gameCompetition.CompetitionId;
     }
 
@@ -95,16 +94,15 @@ public class Handler(
         Domain.PreDraft.Id.Id id,
         CancellationToken ct)
     {
-        var preDraft = await FSharpAsyncExt.AwaitOrThrow(preDrafts.LoadAsync(id, ct),
-            new IdNotFoundException<Guid>(id.Item), ct);
+        var preDraft = await preDrafts.LoadAsync(id, ct)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(id.Item));
 
         if (!preDraft.Phase.IsCompetition)
             throw new InvalidOperationException("PreDraft is not in Competition phase");
 
         var compPhase = (Domain.PreDraft.Phase.Phase.Competition)preDraft.Phase;
-        var preDraftCompetition = await FSharpAsyncExt.AwaitOrThrow(
-            preDraftCompetitions.GetByIdAsync(compPhase.CompetitionId),
-            new IdNotFoundException<Guid>(compPhase.CompetitionId.Item), ct);
+        var preDraftCompetition = await preDraftCompetitions.GetByIdAsync(compPhase.CompetitionId)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(compPhase.CompetitionId.Item));
 
         return preDraftCompetition.CompetitionId;
     }

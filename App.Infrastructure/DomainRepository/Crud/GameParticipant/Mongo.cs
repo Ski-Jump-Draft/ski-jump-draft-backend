@@ -23,35 +23,34 @@ namespace App.Infrastructure.DomainRepository.Crud.GameParticipant
             _col = db.GetCollection<Participant.Participant>(colName);
         }
 
-        public FSharpAsync<FSharpOption<Participant.Participant>> GetByIdAsync(Participant.Id id)
+        public Task<FSharpOption<Participant.Participant>> GetByIdAsync(Participant.Id id)
         {
             var filter = Builders<Participant.Participant>
                 .Filter.Eq(p => p.Id.Item, id.Item);
             var findTask = _col.Find(filter).FirstOrDefaultAsync();
 
-            // Project Task<Participant> -> Task<FSharpOption<Participant>>
             var optTask = findTask.ContinueWith(t =>
-                t.Result is { }
+                t.Result is not null
                     ? FSharpOption<Participant.Participant>.Some(t.Result)
                     : FSharpOption<Participant.Participant>.None
             );
 
-            return FSharpAsync.AwaitTask(optTask);
+            return optTask;
         }
 
-        public FSharpAsync<Unit> SaveAsync(Participant.Participant participant)
+
+        public Task SaveAsync(Participant.Id id, Participant.Participant participant)
         {
             var filter = Builders<Participant.Participant>
-                .Filter.Eq(p => p.Id.Item, participant.Id.Item);
+                .Filter.Eq(participant1 => participant1.Id.Item, id.Item);
             var options = new ReplaceOptions { IsUpsert = true };
             var upsert = _col.ReplaceOneAsync(filter, participant, options);
 
-            // Project Task<ReplaceOneResult> -> Task<Unit>
-            var unitTask = upsert.ContinueWith(_ => default(Unit));
-            return FSharpAsync.Ignore(FSharpAsync.AwaitTask(unitTask));
+            upsert.ContinueWith(_ => default(Unit));
+            return Task.CompletedTask;
         }
 
-        public FSharpAsync<Unit> SaveAsync(FSharpList<Participant.Participant> participants)
+        public Task SaveAsync(FSharpList<Participant.Participant> participants)
         {
             var tasks = participants
                 .Select(participant =>
@@ -62,20 +61,19 @@ namespace App.Infrastructure.DomainRepository.Crud.GameParticipant
                     return _col.ReplaceOneAsync(filter, participant, options);
                 });
 
-            var combined = Task.WhenAll(tasks).ContinueWith(_ => default(Unit));
-            return FSharpAsync.Ignore(FSharpAsync.AwaitTask(combined));
+            Task.WhenAll(tasks).ContinueWith(_ => default(Unit));
+            return Task.CompletedTask;
         }
 
 
-        public FSharpAsync<Unit> RemoveAsync(Participant.Id id)
+        public Task RemoveAsync(Participant.Id id)
         {
             var filter = Builders<Participant.Participant>
                 .Filter.Eq(p => p.Id.Item, id.Item);
             var deleteOp = _col.DeleteOneAsync(filter);
 
-            // Project Task<DeleteResult> -> Task<Unit>
-            var unitTask = deleteOp.ContinueWith(_ => default(Unit));
-            return FSharpAsync.Ignore(FSharpAsync.AwaitTask(unitTask));
+            deleteOp.ContinueWith(_ => default(Unit));
+            return Task.CompletedTask;
         }
     }
 }

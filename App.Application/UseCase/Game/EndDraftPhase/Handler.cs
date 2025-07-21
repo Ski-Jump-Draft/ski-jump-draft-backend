@@ -13,8 +13,8 @@ public class Handler(IGameRepository games, IGuid guid) : ICommandHandler<Comman
 {
     public async Task HandleAsync(Command command, CancellationToken ct)
     {
-        var game = await FSharpAsyncExt.AwaitOrThrow(games.LoadAsync(command.GameId, ct),
-            new IdNotFoundException<Guid>(command.GameId.Item), ct);
+        var game = await games.LoadAsync(command.GameId, ct)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(command.GameId.Item));
         var newGameResult = game.EndDraft();
         if (newGameResult.IsOk)
         {
@@ -24,7 +24,7 @@ public class Handler(IGameRepository games, IGuid guid) : ICommandHandler<Comman
             var causationId = correlationId;
             var expectedVersion = game.Version_;
 
-            games.SaveAsync(state, events, expectedVersion, correlationId, causationId, ct);
+            await games.SaveAsync(state, events, expectedVersion, correlationId, causationId, ct);
         }
     }
 }

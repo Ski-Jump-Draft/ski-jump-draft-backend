@@ -1,17 +1,17 @@
 namespace App.Domain.Repositories
 
+open System.Threading
+open System.Threading.Tasks
 open App.Domain
 open App.Domain.Competition
 open App.Domain.Draft
 open App.Domain.Game
-open App.Domain.Matchmaking
 open App.Domain.PreDraft
-open App.Domain.Shared
 open App.Domain.Shared.AggregateVersion
 
 
 type IEventSourcedRepository<'TAggregate, 'TId, 'TPayload> =
-    abstract LoadAsync: Id: 'TId * CancellationToken: System.Threading.CancellationToken -> Async<'TAggregate option>
+    abstract LoadAsync: Id: 'TId * Ct: CancellationToken -> Task<'TAggregate option>
 
     abstract SaveAsync:
         Aggregate: 'TAggregate *
@@ -19,14 +19,14 @@ type IEventSourcedRepository<'TAggregate, 'TId, 'TPayload> =
         ExpectedVersion: AggregateVersion *
         CorrelationId: System.Guid *
         CausationId: System.Guid *
-        CancellationToken: System.Threading.CancellationToken ->
-            Async<unit>
+        Ct: CancellationToken ->
+            Task
 
-    abstract ExistsAsync: Id: 'TId -> Async<bool>
+    abstract ExistsAsync: Id: 'TId * Ct: CancellationToken -> Task<bool>
 
-    abstract GetVersionAsync: Id: 'TId -> Async<AggregateVersion>
+    abstract GetVersionAsync: Id: 'TId * Ct: CancellationToken -> Task<AggregateVersion>
 
-    abstract LoadHistoryAsync: Id: 'TId -> Async<'TPayload list>
+    abstract LoadHistoryAsync: Id: 'TId * Ct: CancellationToken -> Task<'TPayload list>
 
 type ICompetitionRepository =
     inherit IEventSourcedRepository<
