@@ -14,7 +14,7 @@ public class DefaultGameHillFactory(
 {
     public async Task<Domain.Game.Hill.Hill> CreateAsync(Domain.GameWorld.Hill gameWorldHill, CancellationToken ct)
     {
-        if (gameHillMapping.TryMap(gameWorldHill.Id, out var gameHillId))
+        if (gameHillMapping.TryMap(gameWorldHill.Id_, out var gameHillId))
         {
             return await gameHills.GetByIdAsync(gameHillId)
                 .AwaitOrWrap(_ => new IdNotFoundException<Guid>(gameHillId.Item));

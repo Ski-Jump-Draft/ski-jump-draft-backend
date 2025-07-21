@@ -7,7 +7,7 @@ module Competition =
     type Id = Id of System.Guid
 
     type Settings =
-        { HillId: Hill.Id
+        { HillId: HillId
           CompetitionEnginePluginId: string //Engine.Template.Id
           EngineRawOptions: Map<string, obj> }
 

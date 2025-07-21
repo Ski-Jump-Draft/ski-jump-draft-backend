@@ -1,6 +1,6 @@
-namespace App.Application.ReadModel.ReadRepository;
+namespace App.Application.ReadModel.Projection;
 
-public interface IGameWorldHillReadRepository
+public interface IGameWorldHillProjection
 {
     Task<IEnumerable<GameWorldHillDto>> GetAllAsync();
 }

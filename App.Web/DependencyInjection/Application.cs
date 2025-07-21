@@ -21,7 +21,7 @@ public static class ApplicationDependencyInjection
                 Application.UseCase.Game.EndDraftPhase.Handler>();
         services
             .AddScoped<ICommandHandler<Application.UseCase.Game.ChooseQuickGameHill.Command,
-                Domain.GameWorld.HillModule.Id>, Application.UseCase.Game.ChooseQuickGameHill.Handler>();
+                Domain.GameWorld.HillId>, Application.UseCase.Game.ChooseQuickGameHill.Handler>();
         services
             .AddScoped<ICommandHandler<Application.UseCase.Game.QuickMatchmaking.FindOrCreate.Command, Guid>,
                 Application.UseCase.Game.QuickMatchmaking.FindOrCreate.Handler>();

@@ -28,9 +28,9 @@ public class DefaultCompetitionHillFactory(
             .AwaitOrWrap(_ => new IdNotFoundException<Guid>(gameWorldHillId.Item));
         var newCompetitionHillId = Domain.Competition.HillModule.Id.NewId(guid.NewGuid());
         var kPoint = Domain.Competition.HillModule.KPointModule
-            .tryCreate(Domain.GameWorld.HillModule.KPointModule.value(gameWorldHill.KPoint)).Value;
+            .tryCreate(Domain.GameWorld.HillModule.KPointModule.value(gameWorldHill.KPoint_)).Value;
         var hsPoint = Domain.Competition.HillModule.HSPointModule
-            .tryCreate(Domain.GameWorld.HillModule.HSPointModule.value(gameWorldHill.HSPoint)).Value;
+            .tryCreate(Domain.GameWorld.HillModule.HSPointModule.value(gameWorldHill.HSPoint_)).Value;
         var newCompetitionHill = new Domain.Competition.Hill(newCompetitionHillId, kPoint, hsPoint);
         return newCompetitionHill;
     }

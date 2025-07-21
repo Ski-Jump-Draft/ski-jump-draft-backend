@@ -12,7 +12,7 @@ type public IUserRepository =
 
 // --- GameWorld ---
 type public IGameWorldHillRepository =
-    inherit IDomainCrudRepository<Domain.GameWorld.Hill.Id, Domain.GameWorld.Hill>
+    inherit IDomainCrudRepository<Domain.GameWorld.HillId, Domain.GameWorld.Hill>
 
 type public IGameWorldJumperRepository =
     inherit IDomainCrudRepository<Domain.GameWorld.Jumper.Id, Domain.GameWorld.Jumper>

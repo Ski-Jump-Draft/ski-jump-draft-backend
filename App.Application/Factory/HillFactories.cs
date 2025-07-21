@@ -12,7 +12,7 @@ public interface ICompetitionHillFactory
     Task<Domain.Competition.Hill> CreateAsync(Domain.Game.Hill.Hill gameHill, CancellationToken ct);
 }
 
-public interface IGameHillMapping : IBiDirectionalIdMap<Domain.GameWorld.HillModule.Id, Domain.Game.Hill.Id>;
+public interface IGameHillMapping : IBiDirectionalIdMap<Domain.GameWorld.HillId, Domain.Game.Hill.Id>;
 
 public interface
     ICompetitionHillMapping : IBiDirectionalIdMap<Domain.Game.Hill.Id, Domain.Competition.HillModule.Id>;

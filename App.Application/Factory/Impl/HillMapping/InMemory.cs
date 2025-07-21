@@ -5,7 +5,7 @@ using App.Application.Util;
 namespace App.Application.Factory.Impl.HillMapping;
 
 public class
-    InMemoryGameHillMapping : InMemoryBiDirectionalIdMap<Domain.GameWorld.HillModule.Id, Domain.Game.Hill.Id>,
+    InMemoryGameHillMapping : InMemoryBiDirectionalIdMap<Domain.GameWorld.HillId, Domain.Game.Hill.Id>,
     IGameHillMapping;
 
 public class
