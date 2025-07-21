@@ -19,12 +19,12 @@ type ParticipantJoinedV1 =
 type ParticipantLeftV1 =
     { GameId: Game.Id.Id
       ParticipantId: Participant.Id }
-
-[<Struct; CLIMutable>]
-type MatchmakingPhaseStartedV1 = { GameId: Game.Id.Id }
-
-[<Struct; CLIMutable>]
-type MatchmakingPhaseEndedV1 = { GameId: Game.Id.Id }
+//
+// [<Struct; CLIMutable>]
+// type MatchmakingPhaseStartedV1 = { GameId: Game.Id.Id }
+//
+// [<Struct; CLIMutable>]
+// type MatchmakingPhaseEndedV1 = { GameId: Game.Id.Id }
 
 [<Struct; CLIMutable>]
 type PreDraftPhaseStartedV1 =
@@ -65,8 +65,6 @@ type GameEventPayload =
     | GameCreatedV1 of GameCreatedV1
     | ParticipantJoinedV1 of ParticipantJoinedV1
     | ParticipantLeftV1 of ParticipantLeftV1
-    | MatchmakingPhaseStartedV1 of MatchmakingPhaseStartedV1
-    | MatchmakingPhaseEndedV1 of MatchmakingPhaseEndedV1
     | PreDraftPhaseStartedV1 of PreDraftPhaseStartedV1
     | PreDraftPhaseEndedV1 of PreDraftPhaseEndedV1
     | DraftPhaseStartedV1 of DraftPhaseStartedV1
@@ -81,8 +79,6 @@ module Versioning =
         | GameCreatedV1 _ -> 1us
         | ParticipantJoinedV1 _ -> 1us
         | ParticipantLeftV1 _ -> 1us
-        | MatchmakingPhaseStartedV1 _ -> 1us
-        | MatchmakingPhaseEndedV1 _ -> 1us
         | PreDraftPhaseStartedV1 _ -> 1us
         | PreDraftPhaseEndedV1 _ -> 1us
         | DraftPhaseStartedV1 _ -> 1us

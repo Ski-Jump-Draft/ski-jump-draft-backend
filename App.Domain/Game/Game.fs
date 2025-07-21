@@ -3,6 +3,7 @@ namespace App.Domain.Game
 open System
 open App.Domain
 open App.Domain.Game.Event
+open App.Domain.Game.Participant
 open App.Domain.Game.Ranking
 open App.Domain.Shared.AggregateVersion
 
@@ -12,20 +13,18 @@ open App.Domain.Shared.AggregateVersion
 
 module Game =
     [<Struct>]
-    type Date = Date of System.DateTimeOffset
+    type Date = Date of DateTimeOffset
 
     module Date =
         type Error = CannotBeInFuture of DateTimeOffset
 
-        let create (v: System.DateTimeOffset, clock: Time.IClock) =
-            if v > clock.UtcNow then
+        let create (v: DateTimeOffset, clock: Time.IClock) =
+            if v > clock.Now then
                 Error(CannotBeInFuture v)
             else
                 Ok(Date v)
 
     type Phase =
-        | SettingUp
-        | Matchmaking
         | PreDraft of PreDraft.Id.Id
         | Draft of Draft.Id.Id
         | Competition of Game.Competition.Id
@@ -33,8 +32,6 @@ module Game =
         | Break of Next: PhaseTag
 
     and PhaseTag =
-        | SettingUpTag
-        | MatchmakingTag
         | PreDraftTag
         | DraftTag
         | CompetitionTag
@@ -44,8 +41,6 @@ module Game =
     type Error =
         | InvalidPhase of Expected: PhaseTag list * Actual: PhaseTag
         | HostDecisionTimeout of TimeSpan
-        | EndingMatchmakingTooFewParticipants of Current: uint * Min: uint
-        | EndingMatchmakingTooManyParticipants of Current: uint * Max: uint
         | GameRoomFull
         | ParticipantAlreadyJoined of Participant.Id
         | ParticipantNotInGame of Participant.Id
@@ -53,6 +48,7 @@ module Game =
     type Participants = private Participants of Participant.Id list
 
     module Participants =
+        let from (participants: Participant.Id list) = Participants participants
         let empty = Participants []
 
         let add participant (Participants participants) =
@@ -89,8 +85,8 @@ type Game =
 
     static member TagOfPhase phase =
         match phase with
-        | SettingUp -> SettingUpTag
-        | Matchmaking -> MatchmakingTag
+        // | NotStarted -> NotStartedTag
+        // | Matchmaking -> MatchmakingTag
         | PreDraft _ -> PreDraftTag
         | Draft _ -> DraftTag
         | Competition _ -> CompetitionTag
@@ -98,14 +94,20 @@ type Game =
         | Break next -> BreakTag next
     //| Break _ -> failwith "No Phase.Break equivalent in PhaseTag"
 
-    static member Create id version (hostId, settings) : Result<Game * GameEventPayload list, Error> =
+    static member Create
+        id
+        version
+        (participantsList: Participant.Id list, hostId, settings)
+        : Result<Game * GameEventPayload list, Error> =
+        let participants = Participants.from participantsList
+
         let state =
             { Id = id
               Version = version
               HostId = hostId
-              Phase = SettingUp
+              Phase = Break PreDraftTag
               Settings = settings
-              Participants = Participants.empty }
+              Participants = participants }
 
         let event: Event.GameCreatedV1 =
             { GameId = id
@@ -115,36 +117,38 @@ type Game =
 
         Ok(state, [ GameEventPayload.GameCreatedV1 event ])
 
-    member this.Join(participantId: Participant.Id) : Result<Game * GameEventPayload list, Error> =
-        if this.ParticipantIsPresent(participantId) then
-            Error(Game.Error.ParticipantAlreadyJoined participantId)
-        elif this.RoomIsFull then
-            Error Game.Error.GameRoomFull
-        else
-            match this.Phase with
-            | Matchmaking ->
-                let updatedParticipants = Participants.add participantId this.Participants
-
-                match updatedParticipants with
-                | Ok updatedParticipants ->
-                    let updatedGame =
-                        { this with
-                            Participants = updatedParticipants }
-
-                    let event: ParticipantJoinedV1 =
-                        { GameId = updatedGame.Id
-                          ParticipantId = participantId }
-
-                    Ok(updatedGame, [ GameEventPayload.ParticipantJoinedV1 event ])
-                | Error error -> Error(error)
-            | _ -> Error(InvalidPhase([ MatchmakingTag ], this.Phase |> Game.TagOfPhase))
+    // TODO: Dołączanie do gry
+    //
+    // member this.Join(participantId: Participant.Id) : Result<Game * GameEventPayload list, Error> =
+    //     if this.ParticipantIsPresent(participantId) then
+    //         Error(Game.Error.ParticipantAlreadyJoined participantId)
+    //     elif this.RoomIsFull then
+    //         Error Game.Error.GameRoomFull
+    //     else
+    //         match this.Phase with
+    //         | Matchmaking ->
+    //             let updatedParticipants = Participants.add participantId this.Participants
+    //
+    //             match updatedParticipants with
+    //             | Ok updatedParticipants ->
+    //                 let updatedGame =
+    //                     { this with
+    //                         Participants = updatedParticipants }
+    //
+    //                 let event: ParticipantJoinedV1 =
+    //                     { GameId = updatedGame.Id
+    //                       ParticipantId = participantId }
+    //
+    //                 Ok(updatedGame, [ GameEventPayload.ParticipantJoinedV1 event ])
+    //             | Error error -> Error(error)
+    //         | _ -> Error(InvalidPhase([ MatchmakingTag ], this.Phase |> Game.TagOfPhase))
 
     member this.Leave(participantId: Participant.Id) : Result<Game * GameEventPayload list, Error> =
         if not (this.ParticipantIsPresent(participantId)) then
             Error(Game.Error.ParticipantNotInGame participantId)
         else
             match this.Phase with
-            | Matchmaking
+            //| Matchmaking
             | Break _
             | Draft _
             | Competition _
@@ -163,8 +167,7 @@ type Game =
             | _ ->
                 Error(
                     InvalidPhase(
-                        [ PhaseTag.MatchmakingTag
-                          (PhaseTag.BreakTag PhaseTag.CompetitionTag)
+                        [ (PhaseTag.BreakTag PhaseTag.CompetitionTag)
                           (PhaseTag.BreakTag PhaseTag.DraftTag)
                           (PhaseTag.BreakTag PhaseTag.PreDraftTag)
                           PhaseTag.DraftTag
@@ -191,43 +194,43 @@ type Game =
     member this.ParticipantIsPresent(participant: Participant.Id) =
         Participants.contains participant this.Participants
 
-    /// Matchmaking ID
-    member this.StartMatchmaking() =
-        match this.Phase with
-        | SettingUp ->
-            let state = { this with Phase = Phase.Matchmaking }
-            let event: MatchmakingPhaseStartedV1 = { GameId = this.Id }
-            Ok(state, [ GameEventPayload.MatchmakingPhaseStartedV1 event ])
-        | _ -> Error(InvalidPhase([ SettingUpTag ], Game.TagOfPhase this.Phase))
-
-    member this.EndMatchmaking() =
-        match this.Phase with
-        | Matchmaking ->
-            let participantsCount = Participants.count this.Participants
-            let participantsLimit = this.Settings.ParticipantLimit
-
-            let participantsCountFitsLimit =
-                Settings.ParticipantLimit.fits participantsCount participantsLimit
-
-            if participantsCount >= 2u then
-                if participantsCountFitsLimit then
-                    let state =
-                        { this with
-                            Phase = Break(Next = PhaseTag.PreDraftTag) }
-
-                    let event: MatchmakingPhaseEndedV1 = { GameId = this.Id }
-
-                    Ok(state, [ GameEventPayload.MatchmakingPhaseEndedV1 event ])
-                else
-                    Error(
-                        EndingMatchmakingTooManyParticipants(
-                            Participants.count this.Participants,
-                            Settings.ParticipantLimit.value participantsLimit
-                        )
-                    )
-            else
-                Error(EndingMatchmakingTooFewParticipants(Participants.count this.Participants, 2u))
-        | _ -> Error(InvalidPhase([ MatchmakingTag ], Game.TagOfPhase this.Phase))
+    // /// Matchmaking ID
+    // member this.StartMatchmaking() =
+    //     match this.Phase with
+    //     | NotStarted ->
+    //         let state = { this with Phase = Phase.Matchmaking }
+    //         let event: MatchmakingPhaseStartedV1 = { GameId = this.Id }
+    //         Ok(state, [ GameEventPayload.MatchmakingPhaseStartedV1 event ])
+    //     | _ -> Error(InvalidPhase([ NotStartedTag ], Game.TagOfPhase this.Phase))
+    //
+    // member this.EndMatchmaking() =
+    //     match this.Phase with
+    //     | Matchmaking ->
+    //         let participantsCount = Participants.count this.Participants
+    //         let participantsLimit = this.Settings.ParticipantLimit
+    //
+    //         let participantsCountFitsLimit =
+    //             Settings.ParticipantLimit.fits participantsCount participantsLimit
+    //
+    //         if participantsCount >= 2u then
+    //             if participantsCountFitsLimit then
+    //                 let state =
+    //                     { this with
+    //                         Phase = Break(Next = PhaseTag.PreDraftTag) }
+    //
+    //                 let event: MatchmakingPhaseEndedV1 = { GameId = this.Id }
+    //
+    //                 Ok(state, [ GameEventPayload.MatchmakingPhaseEndedV1 event ])
+    //             else
+    //                 Error(
+    //                     EndingMatchmakingTooManyParticipants(
+    //                         Participants.count this.Participants,
+    //                         Settings.ParticipantLimit.value participantsLimit
+    //                     )
+    //                 )
+    //         else
+    //             Error(EndingMatchmakingTooFewParticipants(Participants.count this.Participants, 2u))
+    //     | _ -> Error(InvalidPhase([ MatchmakingTag ], Game.TagOfPhase this.Phase))
 
     member this.StartPreDraft(preDraftId) =
         match this.Phase with

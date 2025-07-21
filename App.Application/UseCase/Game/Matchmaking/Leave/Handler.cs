@@ -1,0 +1,68 @@
+using App.Application.Abstractions;
+using App.Application.Exception;
+using App.Application.Ext;
+using App.Application.UseCase.Game.Exception;
+using App.Domain.Matchmaking;
+using App.Domain.Shared;
+using App.Domain.Repositories;
+
+namespace App.Application.UseCase.Game.Matchmaking.Leave;
+
+public record Command(
+    App.Domain.Matchmaking.Id MatchmakingId,
+    ParticipantModule.Id MatchmakingParticipantId
+) : ICommand<App.Domain.Matchmaking.ParticipantModule.Id>;
+
+public class Handler(
+    IMatchmakingRepository matchmakings,
+    IMatchmakingParticipantRepository matchmakingParticipants,
+    IGuid guid
+) : ICommandHandler<Command, App.Domain.Matchmaking.ParticipantModule.Id>
+{
+    public async Task<App.Domain.Matchmaking.ParticipantModule.Id> HandleAsync(Command command, CancellationToken ct)
+    {
+        var matchmakingId = command.MatchmakingId;
+        var matchmaking = await FSharpAsyncExt.AwaitOrThrow(matchmakings.LoadAsync(matchmakingId, ct),
+            new IdNotFoundException<Guid>(matchmakingId.Item), ct);
+
+        var matchmakingParticipantId = command.MatchmakingParticipantId;
+        var matchmakingParticipant = await FSharpAsyncExt.AwaitOrThrow(
+            matchmakingParticipants.GetByIdAsync(matchmakingParticipantId),
+            new IdNotFoundException<Guid>(matchmakingId.Item), ct);
+
+        var leaveResult = matchmaking.Leave(matchmakingParticipant.Id);
+
+        if (leaveResult.IsOk)
+        {
+            var (aggregate, events) = leaveResult.ResultValue;
+
+            var correlationId = guid.NewGuid();
+            var causationId = correlationId;
+            var expectedVersion = aggregate.Version_;
+
+            await FSharpAsyncExt.AwaitOrThrow(
+                matchmakings.SaveAsync(aggregate, events, expectedVersion, correlationId, causationId,
+                    ct),
+                new LeavingMatchmakingFailedException(matchmaking, matchmakingParticipant,
+                    LeavingMatchmakingFailReason.ErrorDuringUpdatingMatchmaking),
+                ct
+            );
+            // TODO
+            //
+            // await FSharpAsyncExt.AwaitOrThrow(matchmakingParticipants.RemoveAsync(matchmakingParticipant.Id),
+            //     new LeavingMatchmakingFailedException(matchmaking, matchmakingParticipant,
+            //         LeavingMatchmakingFailReason.ErrorDuringUpdatingMatchmaking), ct);
+            return matchmakingParticipant.Id;
+        }
+
+        var error = leaveResult.ErrorValue;
+
+        throw error switch
+        {
+            Error.PlayerNotJoined => new MatchmakingParticipantNotInMatchmakingException(matchmaking,
+                matchmakingParticipant),
+            _ => new LeavingMatchmakingFailedException(matchmaking, matchmakingParticipant,
+                LeavingMatchmakingFailReason.Unknown)
+        };
+    }
+}

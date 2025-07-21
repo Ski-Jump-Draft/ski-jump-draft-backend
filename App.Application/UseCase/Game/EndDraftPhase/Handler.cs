@@ -2,19 +2,19 @@ using App.Application.Abstractions;
 using App.Application.Exception;
 using App.Application.Ext;
 using App.Domain.Game;
-using App.Domain.Repository;
+using App.Domain.Repositories;
 using App.Domain.Shared;
 
 namespace App.Application.UseCase.Game.EndDraftPhase;
 
 public record Command(Id.Id GameId) : ICommand;
 
-public class Handler(IGameRepository games, IGuid guid) : IApplicationHandler<Command>
+public class Handler(IGameRepository games, IGuid guid) : ICommandHandler<Command>
 {
     public async Task HandleAsync(Command command, CancellationToken ct)
     {
         var game = await FSharpAsyncExt.AwaitOrThrow(games.LoadAsync(command.GameId, ct),
-            new IdNotFoundException(command.GameId.Item), ct);
+            new IdNotFoundException<Guid>(command.GameId.Item), ct);
         var newGameResult = game.EndDraft();
         if (newGameResult.IsOk)
         {

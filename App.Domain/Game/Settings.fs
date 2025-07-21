@@ -62,15 +62,17 @@ module PhaseTransitionPolicy =
             | Retry
             | DelegateControlToHost
 
-    type StartingMatchmaking = | None // nie ma szczególnych metod na rozpoczęcie matchmakingu. TODO
+    // type EndingMatchmaking =
+    //     | HostDecides of HostDecisionTimeout option
+    //     | AutoAfter of
+    //         AutostartAfterTime.Time *
+    //         AutostartAfterTime.MinimalPlayersCount *
+    //         AutostartAfterTime.FailurePolicy
+    //     | AutoWhenFull
 
-    type EndingMatchmaking =
-        | HostDecides of HostDecisionTimeout option
-        | AutoAfter of
-            AutostartAfterTime.Time *
-            AutostartAfterTime.MinimalPlayersCount *
-            AutostartAfterTime.FailurePolicy
-        | AutoWhenFull
+    type StartingPreDraft =
+        | HostDecides of HostDecisionTimeout
+        | AutoAfter of TimeSpan
 
     type StartingDraft =
         | HostDecides of HostDecisionTimeout
@@ -80,16 +82,17 @@ module PhaseTransitionPolicy =
         | HostDecides of HostDecisionTimeout
         | AutoAfter of TimeSpan
 
-    type EndingSimulation = | None // nie ma szczególnych metod na zakończenie gry. TODO
+    type EndingGame =
+        | HostDecides of HostDecisionTimeout
+        | AutoAfter of TimeSpan
 
 type Settings =
     { ParticipantLimit: ParticipantLimit
       PreDraftSettings: App.Domain.PreDraft.Settings.Settings
       DraftSettings: App.Domain.Draft.Settings.Settings
       CompetitionSettings: App.Domain.Game.Competition.Settings
-      StartingMatchmakingPolicy: PhaseTransitionPolicy.StartingMatchmaking
-      EndingMatchmakingPolicy: PhaseTransitionPolicy.EndingMatchmaking
+      StartingPreDraftPolicy: PhaseTransitionPolicy.StartingPreDraft
       StartingDraftPolicy: PhaseTransitionPolicy.StartingDraft
       StartingCompetitionPolicy: PhaseTransitionPolicy.StartingSimulating
-      EndingSimulationPolicy: PhaseTransitionPolicy.EndingSimulation
+      EndingGamePolicy: PhaseTransitionPolicy.EndingGame
       HillId: Hill.Id }

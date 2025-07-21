@@ -3,7 +3,6 @@ using App.Application.UseCase.Draft.PickSubject;
 using App.Domain.Draft;
 using App.Domain.Draft.Order;
 using App.Domain.Repositories;
-using App.Domain.Repository;
 using App.Domain.Shared;
 using App.Infrastructure.Guid;
 using App.Tests.Fakes.Factory;
@@ -41,11 +40,11 @@ public class PickSubjectHandlerTests
             .Returns(FSharpAsync.AwaitTask(Task.CompletedTask));
 
         var draftParticipantRepo = new Mock<IDraftParticipantRepository>();
-        draftParticipantRepo.Setup(x => x.GetById(participantId))
+        draftParticipantRepo.Setup(x => x.GetByIdAsync(participantId))
             .Returns(FSharpAsyncExt.Return(FSharpOption<Participant.Participant>.Some(participant)));
 
         var draftSubjectRepo = new Mock<IDraftSubjectRepository>();
-        draftSubjectRepo.Setup(x => x.GetById(subjectId))
+        draftSubjectRepo.Setup(x => x.GetByIdAsync(subjectId))
             .Returns(FSharpAsyncExt.Return(FSharpOption<Subject.Subject>.Some(subject)));
 
         var handler = new Handler(draftRepo.Object, draftParticipantRepo.Object, draftSubjectRepo.Object,

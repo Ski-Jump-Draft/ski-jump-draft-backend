@@ -1,5 +1,6 @@
 namespace App.Domain.Repositories
 
+open System.Threading
 open App.Domain
 open App.Domain.Competition
 open App.Domain.Competition.Engine
@@ -8,77 +9,102 @@ open App.Domain.GameWorld
 open App.Domain.Profile
 open App.Domain.Profile.User
 
+// --- Identity ---
+
 type IUserRepository =
-    abstract member GetByIdAsync: User.Id -> Async<Option<User>>
+    abstract member GetByIdAsync: Id: User.Id -> Async<Option<User>>
 
-type IHillRepository =
-    abstract member GetById: GameWorld.Hill.Id -> Async<Option<Hill>>
+// --- GameWorld ---
 
-type IJumpersRepository =
-    abstract member GetById: GameWorld.Jumper.Id -> Async<Option<Jumper>>
-    abstract member Save: GameWorld.Jumper.Id -> Async<unit>
-    abstract member SaveLiveForm: GameWorld.Jumper.Id * JumperSkills.LiveForm -> Async<Option<unit>>
-    abstract member Add: Jumper -> Async<unit>
+type IGameWorldHillRepository =
+    abstract member GetByIdAsync: Id: GameWorld.Hill.Id * ct: CancellationToken -> Async<Option<Hill>>
+    abstract member GetAllAsync: unit -> Async<Hill list>
 
-type ICompetitionRulesPresetRepository =
-    abstract member GetById: Rules.Preset.Preset.Id -> Async<Option<Rules.Preset.Preset>>
-    abstract member GetAll: Async<Rules.Preset.Preset list>
+type IGameWorldJumperRepository =
+    abstract member GetByIdAsync: Id: GameWorld.Jumper.Id -> Async<Option<Jumper>>
+    abstract member SaveAsync: Id: GameWorld.Jumper -> Async<unit>
+// abstract member SaveLiveForm: Id: GameWorld.Jumper.Id * LiveForm: JumperSkills.LiveForm -> Async<Option<unit>> TODO ReadModel
+
+// type ICompetitionRulesPresetRepository =
+//     abstract member GetByIdAsync: Id: Rules.Preset.Preset.Id -> Async<Option<Rules.Preset.Preset>>
+// //abstract member GetAll: Async<Rules.Preset.Preset list> TODO: Read model
+
+// --- Hosting ---
 
 type IHostRepository =
-    abstract member GetById: Game.Hosting.Host.Id -> Async<Option<Game.Hosting.Host>>
-    abstract member GetPermissionsById: Game.Hosting.Host.Id -> Async<Option<Game.Hosting.Host>>
+    abstract member GetByIdAsync: Id: Game.Hosting.Host.Id -> Async<Option<Game.Hosting.Host>>
+    abstract member GetPermissionsById: Id: Game.Hosting.Host.Id -> Async<Option<Game.Hosting.Host>>
 
+// TODO: Przenieść do projekcji/read repository
 type IServerRepository =
-    abstract member GetById: Game.Server.Id -> Async<Option<Server>>
-    abstract member GetByRegion: Server.Region -> Async<Server list>
-    abstract member GetAvailable: Async<Server list>
-    abstract member IsAvailable: Game.Server.Id -> Async<Option<bool>>
-    abstract member Add: Server -> Async<unit>
-    abstract member Remove: Game.Server.Id -> Async<unit>
+    abstract member GetByIdAsync: Id: Game.Server.Id -> Async<Option<Server>>
+    // abstract member GetByRegion: Server.Region -> Async<Server list>
+    // abstract member GetAvailable: Async<Server list>
+    // abstract member IsAvailable: Id: Game.Server.Id -> Async<Option<bool>>
+    abstract member AddAsync: Server: Server -> Async<unit>
+    abstract member RemoveAsync: Id: Game.Server.Id -> Async<unit>
 
-type IRegionRepository =
-    abstract member GetAll: Async<Server.Region list>
+//type IRegionRepository =
+// abstract member GetAll: Async<Server.Region list> TODO: Read model
 
-// type IGameRepository =
-//     abstract member GetByIdAsync: Game.Game.Id -> Async<Option<Game>>
-//     abstract member Add: Game -> Async<unit>
-//     abstract member Update: Game.Game.Id * Game -> Async<unit>
-//     abstract member GetByPhase: Game.PhaseTag -> Async<Game list>
+// --- Game ---
+
+type IGameHillRepository =
+    abstract member GetByIdAsync: Id: App.Domain.Game.Hill.Id * ct: CancellationToken -> Async<Option<App.Domain.Game.Hill.Hill>>
+    abstract member SaveAsync: Hill: App.Domain.Game.Hill.Hill -> Async<unit>
 
 type IGameParticipantRepository =
-    abstract member GetByIdAsync: Game.Participant.Id -> Async<Option<Game.Participant.Participant>>
-    abstract member RemoveAsync: Game.Participant.Id -> Async<unit>
-    abstract member SaveAsync: Game.Participant.Participant -> Async<unit>
+    abstract member GetByIdAsync: Id: Game.Participant.Id -> Async<Option<Game.Participant.Participant>>
+    abstract member RemoveAsync: Id: Game.Participant.Id -> Async<unit>
+    abstract member SaveAsync: Participant: Game.Participant.Participant -> Async<unit>
+    abstract member SaveAsync: Participants: Game.Participant.Participant list -> Async<unit>
 
 type IGameCompetitionRepository =
-    abstract member GetById: Game.Competition.Id -> Async<Option<Game.Competition>>
+    abstract member GetByIdAsync: Id: Game.Competition.Id -> Async<Option<Game.Competition>>
+
+// --- Matchmaking ---
+
+type IMatchmakingParticipantRepository =
+    abstract member GetByIdAsync: Id: Matchmaking.Participant.Id -> Async<Option<Matchmaking.Participant>>
+    abstract member RemoveAsync: Id: Matchmaking.Participant.Id -> Async<unit>
+    abstract member SaveAsync: Participant: Matchmaking.Participant -> Async<unit>
+
+// --- Pre Draft ---
 
 type IPreDraftCompetitionRepository =
-    abstract member GetById: PreDraft.Competitions.Competition.Id -> Async<Option<PreDraft.Competitions.Competition>>
+    abstract member GetByIdAsync:
+        Id: PreDraft.Competitions.Competition.Id -> Async<Option<PreDraft.Competitions.Competition>>
+
+// --- Competition ---
+
+type ICompetitionHillRepository =
+    abstract member GetByIdAsync:
+        Id: App.Domain.Competition.Hill.Id * ct: CancellationToken -> Async<Option<App.Domain.Competition.Hill>>
+
+    abstract member SaveAsync: Hill: App.Domain.Competition.Hill -> Async<unit>
 
 type ICompetitionResultsRepository =
-    abstract member GetById: Competition.ResultsModule.Id -> Async<Option<Competition.ResultsModule.Results>>
-    abstract member Save: Competition.ResultsModule.Results -> Async<unit>
-    abstract member Update: Competition.ResultsModule.Results -> Async<unit>
+    abstract member GetByIdAsync: Id: Competition.ResultsModule.Id -> Async<Option<Competition.ResultsModule.Results>>
+    abstract member SaveAsync: Results: Competition.ResultsModule.Results -> Async<unit>
+    abstract member UpdateAsync: Results: Competition.ResultsModule.Results -> Async<unit>
 
 type ICompetitionStartlistRepository =
-    abstract member GetById: Competition.Startlist.Id -> Async<Option<Competition.Startlist>>
-    abstract member Save: Competition.Startlist -> Async<unit>
-    abstract member Update: Competition.Startlist -> Async<unit>
+    abstract member GetByIdAsync: Id: Competition.Startlist.Id -> Async<Option<Competition.Startlist>>
+    abstract member SaveAsync: Startlist: Competition.Startlist -> Async<unit>
+    abstract member UpdateAsync: Startlist: Competition.Startlist -> Async<unit>
 
-// type IDraftRepository =
-//     abstract member GetById: Draft.Id.Id -> Async<Option<Draft.Draft>>
-//     abstract member Add: Draft.Draft -> Async<unit>
-//     abstract member GetByPhase: Draft.PhaseTag -> Async<Draft.Draft list>
+// --- Draft ---
 
 type IDraftParticipantRepository =
-    abstract member GetById: Draft.Participant.Id -> Async<Option<Draft.Participant.Participant>>
-    abstract member GetByDraft: Draft.Id.Id -> Async<Draft.Participant.Participant list>
+    abstract member GetByIdAsync: Id: Draft.Participant.Id -> Async<Option<Draft.Participant.Participant>>
+// abstract member GetByDraft: Id: Draft.Id.Id -> Async<Draft.Participant.Participant list> TODO: Do read modelu
 
 type IDraftSubjectRepository =
-    abstract member GetById: Draft.Subject.Id -> Async<Option<Draft.Subject.Subject>>
-    abstract member GetByDraft: Draft.Id.Id -> Async<Draft.Subject.Subject list>
+    abstract member GetByIdAsync: Id: Draft.Subject.Id -> Async<Option<Draft.Subject.Subject>>
+    abstract member GetByDraft: Id: Draft.Id.Id -> Async<Draft.Subject.Subject list>
+
+// --- Competition Engine ---
 
 type ICompetitionEngineSnapshotRepository =
-    abstract member GetSnapshotById: Engine.Id -> Async<EngineSnapshotBlob>
-    abstract member SaveSnapshotById: Id: Engine.Id * Snapshot: Engine.EngineSnapshotBlob -> Async<unit>
+    abstract member GetByIdAsync: Id: Engine.Id -> Async<Option<EngineSnapshotBlob>>
+    abstract member SaveByIdAsync: Id: Engine.Id * Snapshot: Engine.EngineSnapshotBlob -> Async<unit>

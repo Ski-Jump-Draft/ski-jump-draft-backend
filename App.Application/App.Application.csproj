@@ -11,8 +11,8 @@
     </ItemGroup>
     
     <ItemGroup>
+      <Folder Include="ReadModel\ReadRepository\" />
       <Folder Include="UseCase\" />
-      <Folder Include="UseCase\Game\JoinQuickGame\" />
     </ItemGroup>
 
 </Project>

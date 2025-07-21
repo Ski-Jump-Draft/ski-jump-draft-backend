@@ -15,7 +15,7 @@ let evolve (state: Game) =
           HostId = e.HostId
           Settings = e.Settings
           Participants = Participants.empty
-          Phase = Phase.SettingUp }
+          Phase = Phase.Break PhaseTag.PreDraftTag }
 
     | GameEventPayload.ParticipantJoinedV1 e ->
         // The event is trusted – any domain‑level checks were made beforehand.
@@ -29,11 +29,11 @@ let evolve (state: Game) =
         let participants = Participants.remove e.ParticipantId state.Participants
         { state with Participants = participants }
 
-    | GameEventPayload.MatchmakingPhaseStartedV1 _ ->
-        { state with Phase = Phase.Matchmaking }
+    // | GameEventPayload.MatchmakingPhaseStartedV1 _ ->
+    //     { state with Phase = Phase.Matchmaking }
 
-    | GameEventPayload.MatchmakingPhaseEndedV1 _ ->
-        { state with Phase = Phase.Break PhaseTag.PreDraftTag }
+    // | GameEventPayload.MatchmakingPhaseEndedV1 _ ->
+    //     { state with Phase = Phase.Break PhaseTag.PreDraftTag }
 
     | GameEventPayload.PreDraftPhaseStartedV1 e ->
         { state with Phase = Phase.PreDraft e.PreDraftId }

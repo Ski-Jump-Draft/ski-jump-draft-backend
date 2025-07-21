@@ -48,6 +48,16 @@
         <Compile Include="Competition\Competition.fs" />
         <Compile Include="Competition\Advancement.fs" />
         <Compile Include="Competition\Engine.fs" />
+        <Compile Include="Matchmaking\Id.fs" />
+        <Compile Include="Matchmaking\Participant.fs" />
+        <Compile Include="Matchmaking\PhaseTag.fs" />
+        <Compile Include="Matchmaking\MatchmakingFailError.fs" />
+        <Compile Include="Matchmaking\Phase.fs" />
+        <Compile Include="Matchmaking\Error.fs" />
+        <Compile Include="Matchmaking\Settings.fs" />
+        <Compile Include="Matchmaking\Event.fs" />
+        <Compile Include="Matchmaking\Matchmaking.fs" />
+        <Compile Include="Matchmaking\Evolve.fs" />
         <Compile Include="Draft\Id.fs" />
         <Compile Include="Draft\Subject.fs" />
         <Compile Include="Draft\Participant.fs" />
@@ -77,6 +87,7 @@
         <Compile Include="Profile\User.fs" />
         <Compile Include="CrudRepositories.fs" />
         <Compile Include="EventSourcedRepositories.fs" />
+        
 
 
     </ItemGroup>

@@ -1,20 +1,20 @@
 namespace App.Application.Exception;
 
-public class IdNotFoundException : KeyNotFoundException
+public class IdNotFoundException<TId> : KeyNotFoundException
 {
-    public Guid Id { get; }
+    public TId Id { get; }
     
-    public IdNotFoundException(Guid id)
+    public IdNotFoundException(TId id)
     {
         Id = id;
     }
 
-    public IdNotFoundException(string message, Guid id) : base(message)
+    public IdNotFoundException(string message, TId id) : base(message)
     {
         Id = id;
     }
 
-    public IdNotFoundException(string message, System.Exception inner, Guid id) : base(message, inner)
+    public IdNotFoundException(string message, System.Exception inner, TId id) : base(message, inner)
     {
         Id = id;
     }

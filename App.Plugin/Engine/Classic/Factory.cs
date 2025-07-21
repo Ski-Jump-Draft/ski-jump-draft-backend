@@ -1,5 +1,4 @@
-using App.Application.UseCase.Competition.Engine.Creation;
-using App.Application.UseCase.Competition.Engine.Factory;
+using App.Application.Factory;
 using App.Application.Util;
 using App.Domain.Competition;
 using App.Domain.Competition.Results;
@@ -18,9 +17,9 @@ using ParticipantResultModule = App.Domain.Competition.Results.ResultObjects.Par
 namespace App.Plugin.Engine.Classic;
 
 public class Factory(
-    Dictionary<Hill, double> gatePoints,
-    Dictionary<Hill, double> headwindPoints,
-    Dictionary<Hill, double> tailwindPoints,
+    Func<Hill, double> getGatePoints,
+    Func<Hill, double> getHeadwindPoints,
+    Func<Hill, double> getTailwindPoints,
     IGuid guid) : ICompetitionEngineFactory
 {
     public Domain.Competition.Engine.IEngine Create(Context context)
@@ -143,17 +142,17 @@ public class Factory(
     private double PointsPerGate(Hill hill)
     {
         // TODO: Przenieść w lepsze miejsce, może helper poza Classic Competitions Plugin
-        return gatePoints[hill];
+        return getGatePoints(hill);
     }
 
     private double PointsPerHeadwind(Hill hill)
     {
-        return headwindPoints[hill];
+        return getHeadwindPoints(hill);
     }
 
     private double PointsPerTailwind(Hill hill)
     {
-        return tailwindPoints[hill];
+        return getTailwindPoints(hill);
     }
 
     public IEnumerable<Option> RequiredOptions =>

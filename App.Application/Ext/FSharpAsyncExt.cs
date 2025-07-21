@@ -5,6 +5,12 @@ namespace App.Application.Ext;
 
 public static class FSharpAsyncExt
 {
+    public static async Task<T> Await<T>(FSharpAsync<T> fasync, CancellationToken ct)
+    {
+        var res = await FSharpAsync.StartAsTask(fasync, null, null);
+        return res;
+    }
+
     public static async Task<T> AwaitOrThrow<T>(FSharpAsync<T> fasync, string msg, CancellationToken ct)
     {
         var res = await FSharpAsync.StartAsTask(fasync, null, null);
@@ -37,7 +43,7 @@ public static class FSharpAsyncExt
             throw error;
         return res.Value;
     }
-    
+
     public static async Task AwaitOrThrow(FSharpAsync<Unit> fasync, System.Exception error, CancellationToken ct)
     {
         try
@@ -49,8 +55,7 @@ public static class FSharpAsyncExt
             throw error;
         }
     }
-    
+
     public static FSharpAsync<T> Return<T>(T value) =>
         FSharpAsync.AwaitTask(Task.FromResult(value));
-
 }

@@ -1,9 +1,10 @@
-namespace App.Domain.Repository
+namespace App.Domain.Repositories
 
 open App.Domain
 open App.Domain.Competition
 open App.Domain.Draft
 open App.Domain.Game
+open App.Domain.Matchmaking
 open App.Domain.PreDraft
 open App.Domain.Shared
 open App.Domain.Shared.AggregateVersion
@@ -42,3 +43,10 @@ type IPreDraftRepository =
 
 type IGameRepository =
     inherit IEventSourcedRepository<Game, Game.Id.Id, Game.Event.GameEventPayload>
+
+type IMatchmakingRepository =
+    inherit IEventSourcedRepository<
+        App.Domain.Matchmaking.Matchmaking,
+        Matchmaking.Id,
+        App.Domain.Matchmaking.Event.MatchmakingEventPayload
+     >

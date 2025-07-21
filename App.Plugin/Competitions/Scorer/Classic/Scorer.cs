@@ -120,9 +120,4 @@ public sealed class ClassicJumpScorer(
             _ => HillType.SkiFlying
         };
     }
-
-    public a Evaluate<a>(Jump Jump)
-    {
-        throw new NotImplementedException();
-    }
 }
