@@ -5,6 +5,7 @@ open App.Domain
 open App.Domain.Game.Event
 open App.Domain.Game.Participant
 open App.Domain.Game.Ranking
+open App.Domain.Game.Settings
 open App.Domain.Shared.AggregateVersion
 
 // TODO: Ustawienia matchmakingu i pokoju gry. Game.Rules/Game.Settings
@@ -42,6 +43,7 @@ module Game =
         | InvalidPhase of Expected: PhaseTag list * Actual: PhaseTag
         | HostDecisionTimeout of TimeSpan
         | GameRoomFull
+        | TooManyParticipants of Count: int * Max: int
         | ParticipantAlreadyJoined of Participant.Id
         | ParticipantNotInGame of Participant.Id
 
@@ -72,7 +74,7 @@ type Game =
     private
         { Id: Id.Id
           Version: AggregateVersion
-          HostId: Hosting.Host.Id
+          ServerId: Server.Id
           Phase: Phase
           Settings: Settings.Settings
           Participants: Participants }
@@ -97,25 +99,31 @@ type Game =
     static member Create
         id
         version
-        (participantsList: Participant.Id list, hostId, settings)
+        (participantsList: Participant.Id list, serverId, settings)
         : Result<Game * GameEventPayload list, Error> =
         let participants = Participants.from participantsList
 
-        let state =
-            { Id = id
-              Version = version
-              HostId = hostId
-              Phase = Break PreDraftTag
-              Settings = settings
-              Participants = participants }
+        let participantsCount = Participants.count participants
+        let participantLimit = ParticipantLimit.value settings.ParticipantLimit
 
-        let event: Event.GameCreatedV1 =
-            { GameId = id
-              HostId = hostId
-              Settings = settings }
+        if participantsCount > participantLimit then
+            Error(Error.TooManyParticipants(int (participantsCount), int (participantLimit)))
+        else
+            let state =
+                { Id = id
+                  Version = version
+                  ServerId = serverId
+                  Phase = Break PreDraftTag
+                  Settings = settings
+                  Participants = participants }
+
+            let event: Event.GameCreatedV1 =
+                { GameId = id
+                  ServerId = serverId
+                  Settings = settings }
 
 
-        Ok(state, [ GameEventPayload.GameCreatedV1 event ])
+            Ok(state, [ GameEventPayload.GameCreatedV1 event ])
 
     // TODO: Dołączanie do gry
     //

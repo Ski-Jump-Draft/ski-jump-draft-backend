@@ -1,4 +1,4 @@
-namespace App.Application.Util;
+namespace App.Util;
 
 public class DeferredProvider<T>
 {

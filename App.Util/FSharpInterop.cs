@@ -1,6 +1,6 @@
 using Microsoft.FSharp.Collections;
 
-namespace App.Application.Util;
+namespace App.Util;
 
 public static class FSharpInterop
 {

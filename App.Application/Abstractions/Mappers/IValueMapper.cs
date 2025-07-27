@@ -1,6 +1,6 @@
 namespace App.Application.Abstractions.Mappers;
 
-public interface IValueMapper<out TResult, in TId>
+public interface IValueMapper<in TInput, out TOutput>
 {
-    TResult Map(TId id);
+    TOutput Map(TInput id);
 }

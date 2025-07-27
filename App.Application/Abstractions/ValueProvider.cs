@@ -1,6 +1,11 @@
 namespace App.Application.Abstractions;
 
-public interface IValueProvider<T>
+public interface IAsyncValueProvider<T>
+{
+    Task<T> Provide();
+}
+
+public interface IValueProvider<out T>
 {
     T Provide();
 }

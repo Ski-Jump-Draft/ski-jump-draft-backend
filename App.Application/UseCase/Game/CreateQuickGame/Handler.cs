@@ -1,4 +1,5 @@
 using App.Application.Abstractions;
+using App.Application.Abstractions.Mappers;
 using App.Application.Exception;
 using App.Application.Ext;
 using App.Application.Projection;
@@ -22,10 +23,10 @@ public class Handler(
     IGameParticipantRepository gameParticipantsRepository,
     IMatchmakingRepository matchmakings,
     IMatchmakingParticipantsProjection matchmakingParticipantsProjection,
-    Func<MatchmakingParticipantDto, App.Domain.Game.Participant.Participant>
+    IValueMapper<MatchmakingParticipantDto, App.Domain.Game.Participant.Participant>
         translateMatchmakingParticipantDtoToGameParticipant,
-    Func<Guid> getGlobalHostId,
-    Func<Settings.Settings> getGameSettings,
+    IQuickGameServerProvider quickGameServerProvider,
+    IQuickGameSettingsProvider quickGameSettingsProvider,
     IGuid guid
 ) : ICommandHandler<Command, App.Domain.Game.Game>
 {
@@ -38,15 +39,18 @@ public class Handler(
         var matchmakingParticipantDtos =
             (await matchmakingParticipantsProjection.GetParticipantsByMatchmakingIdAsync(matchmakingId)).ToArray();
         var gameParticipants =
-            matchmakingParticipantDtos.Select(translateMatchmakingParticipantDtoToGameParticipant).ToArray();
+            matchmakingParticipantDtos.Select(translateMatchmakingParticipantDtoToGameParticipant.Map)
+                .ToArray();
         var gameParticipantIds = gameParticipants.Select(participant => participant.Id);
+
+        var serverId = await quickGameServerProvider.Provide();
 
         var gameId = Id.Id.NewId(guid.NewGuid());
         var gameVersion = AggregateVersion.AggregateVersion.NewAggregateVersion(0u);
-        var hostId = HostModule.Id.NewId(getGlobalHostId());
-        var settings = getGameSettings();
+        var settings = await quickGameSettingsProvider.Provide();
 
-        var game = Domain.Game.Game.Create(gameId, gameVersion, ListModule.OfSeq(gameParticipantIds), hostId, settings);
+        var game = Domain.Game.Game.Create(gameId, gameVersion, ListModule.OfSeq(gameParticipantIds), serverId,
+            settings);
 
         if (game.IsOk)
         {

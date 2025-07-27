@@ -1,14 +1,13 @@
 namespace App.Domain.Game
 
 open App.Domain
-open App.Domain.Competition
 
 module Competition =
     [<Struct>]
     type Id = Id of System.Guid
 
     type Settings =
-        { HillId: Hill.Hill
+        { HillId: Hill.Id
           CompetitionEnginePluginId: string //Engine.Template.Id
           EngineRawOptions: Map<string, obj> }
 

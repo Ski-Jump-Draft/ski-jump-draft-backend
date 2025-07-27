@@ -1,4 +1,4 @@
-using App.Application.Util;
+using App.Util;
 using App.Domain.Competition;
 using App.Domain.Competition.Results;
 using Microsoft.FSharp.Core;

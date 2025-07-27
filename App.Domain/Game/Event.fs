@@ -7,7 +7,7 @@ open App.Domain.Game.Ranking
 [<Struct; CLIMutable>]
 type GameCreatedV1 =
     { GameId: Game.Id.Id
-      HostId: Host.Id
+      ServerId: Server.Id
       Settings: Settings.Settings }
 
 [<Struct; CLIMutable>]

@@ -1,6 +1,8 @@
+using App.Domain.Game;
 using App.Domain.Repositories;
 
 namespace App.Infrastructure.DomainRepository.Crud.GameParticipant;
 
-public class InMemory : InMemoryCrudDomainRepository<App.Domain.Game.Participant.Id,
-    App.Domain.Game.Participant.Participant>, IGameParticipantRepository;
+public class InMemory(InMemoryCrudDomainRepositoryStarter<Participant.Id, Participant.Participant>? starter)
+    : InMemoryCrudDomainRepository<App.Domain.Game.Participant.Id,
+        App.Domain.Game.Participant.Participant>(starter), IGameParticipantRepository;

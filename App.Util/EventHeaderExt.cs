@@ -1,6 +1,6 @@
 using App.Domain.Shared.EventHelpers;
 
-namespace App.Application.Util;
+namespace App.Util;
 
 public static class EventHeaderExt
 {

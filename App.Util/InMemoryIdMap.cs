@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
-using App.Application.Abstractions;
 
-namespace App.Application.Util;
+namespace App.Util;
 
 public class InMemoryBiDirectionalIdMap<TIdA, TIdB> : IBiDirectionalIdMap<TIdA, TIdB>
     where TIdA : notnull

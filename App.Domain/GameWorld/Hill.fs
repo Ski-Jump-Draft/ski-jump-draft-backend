@@ -43,7 +43,14 @@ type Hill =
     member this.KPoint_ = this.KPoint
     member this.HSPoint_ = this.HSPoint
 
-    static member Create id location name countryId kPoint hsPoint =
+    static member Create
+        id
+        location
+        name
+        countryId
+        kPoint
+        hsPoint
+        : Result<Hill * Event.GameWorldEventPayload list, System.Exception> =
         let state =
             { Id = id
               Location = location

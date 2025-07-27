@@ -1,5 +1,6 @@
 using App.Application.Abstractions;
 using App.Domain.Repositories;
+using App.Infrastructure.DomainRepository.Crud;
 
 namespace App.Web.DependencyInjection;
 
@@ -22,9 +23,16 @@ public static class DomainRepositoriesDependencyInjection
             .AddSingleton<IMatchmakingParticipantRepository,
                 Infrastructure.DomainRepository.Crud.MatchmakingParticipant.InMemory>();
 
+        services.AddSingleton(new InMemoryCrudDomainRepositoryStarter<Domain.GameWorld.HillId, Domain.GameWorld.Hill>(
+            StarterItems:
+            Infrastructure.Temporaries.GameWorld.ConstructHills(),
+            MapToId: hill => hill.Id_
+        ));
+
         services.AddSingleton<IGameWorldHillRepository, Infrastructure.DomainRepository.Crud.GameWorldHill.InMemory>();
-        services.AddSingleton<IGameHillRepository, Infrastructure.DomainRepository.Crud.GameHill.InMemory>();
-        services.AddSingleton<ICompetitionHillRepository, Infrastructure.DomainRepository.Crud.CompetitionHill.InMemory>();
+        //services.AddSingleton<IGameHillRepository, Infrastructure.DomainRepository.Crud.GameHill.InMemory>();
+        services
+            .AddSingleton<ICompetitionHillRepository, Infrastructure.DomainRepository.Crud.CompetitionHill.InMemory>();
 
         // Event-Sourced
         services

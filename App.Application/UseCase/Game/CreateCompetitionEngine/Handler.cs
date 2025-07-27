@@ -14,12 +14,26 @@ public abstract record GameCompetitionType
     public sealed record PreDraft(int Index) : GameCompetitionType;
 }
 
-public record Command(Domain.Game.Id.Id GameId, GameCompetitionType GameCompetitionType)
+public record Command(
+    Domain.Game.Id.Id GameId,
+    Domain.GameWorld.HillId GameWorldHillId,
+    GameCompetitionType GameCompetitionType)
     : ICommand<Domain.Competition.Engine.Id>;
 
+/// <summary>
+/// Creates a `IEngine' for the competition and saves a snapshot into the repository. Creates a `Competition.Hill` and saves it into the repository.
+/// </summary>
+/// <param name="games"></param>
+/// <param name="competitionHills"></param>
+/// <param name="competitionEngineSnapshots"></param>
+/// <param name="competitionEnginePlugins"></param>
+/// <param name="competitionHillFactory"></param>
+/// <param name="guid"></param>
 public class Handler(
     IGameRepository games,
-    IGameHillRepository gameHills,
+    IGameWorldHillRepository gameWorldHills,
+    ICompetitionHillRepository competitionHills,
+    // IGameHillRepository gameHills,
     ICompetitionEngineSnapshotRepository competitionEngineSnapshots,
     ICompetitionEnginePluginRepository competitionEnginePlugins,
     ICompetitionHillFactory competitionHillFactory,
@@ -48,11 +62,12 @@ public class Handler(
                      throw new IdNotFoundException<string>(competitionEnginePluginId);
         var factory = plugin.Factory;
 
-        var gameHillId = settings.HillId;
-        var gameHill = await gameHills.GetByIdAsync(gameHillId)
-            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(gameHillId.Item));
+        var gameWorldHill = await gameWorldHills.GetByIdAsync(command.GameWorldHillId)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(command.GameWorldHillId.Item));
 
-        var competitionHill = await competitionHillFactory.CreateAsync(gameHill, ct);
+        var competitionHill = await competitionHillFactory.CreateAsync(gameWorldHill, ct);
+
+        await competitionHills.SaveAsync(competitionHill.Id, competitionHill);
 
         var engineId = guid.NewGuid();
 

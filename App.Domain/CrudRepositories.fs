@@ -25,8 +25,8 @@ type public IServerRepository =
     inherit IDomainCrudRepository<Domain.Game.Server.Id, Domain.Game.Server>
 
 // --- Game ---
-type public IGameHillRepository =
-    inherit IDomainCrudRepository<Domain.Game.Hill.Id, Domain.Game.Hill.Hill>
+// type public IGameHillRepository =
+//     inherit IDomainCrudRepository<Domain.Game.Hill.Id, Domain.Game.Hill.Hill>
 
 type public IGameParticipantRepository =
     inherit IDomainCrudRepository<Domain.Game.Participant.Id, Domain.Game.Participant.Participant>
@@ -39,6 +39,9 @@ type public IMatchmakingParticipantRepository =
     inherit IDomainCrudRepository<Domain.Matchmaking.Participant.Id, Domain.Matchmaking.Participant>
 
 // --- Pre‑Draft ---
+type public IPreDraftHillRepository =
+    inherit IDomainCrudRepository<Domain.PreDraft.Competitions.Hill.Id, Domain.PreDraft.Competitions.Hill>
+
 type public IPreDraftCompetitionRepository =
     inherit IDomainCrudRepository<Domain.PreDraft.Competitions.Competition.Id, Domain.PreDraft.Competitions.Competition>
 

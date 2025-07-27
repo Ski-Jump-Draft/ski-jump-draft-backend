@@ -1,5 +1,5 @@
 using App.Application.Factory;
-using App.Application.Util;
+using App.Util;
 using App.Domain.Competition;
 using App.Domain.Competition.Results;
 using App.Domain.Competition.Rules;

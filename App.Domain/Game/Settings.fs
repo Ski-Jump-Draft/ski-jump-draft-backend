@@ -94,5 +94,4 @@ type Settings =
       StartingPreDraftPolicy: PhaseTransitionPolicy.StartingPreDraft
       StartingDraftPolicy: PhaseTransitionPolicy.StartingDraft
       StartingCompetitionPolicy: PhaseTransitionPolicy.StartingSimulating
-      EndingGamePolicy: PhaseTransitionPolicy.EndingGame
-      HillId: Hill.Id }
+      EndingGamePolicy: PhaseTransitionPolicy.EndingGame }
