@@ -2,12 +2,12 @@ using App.Util;
 using App.Domain.Competition;
 using App.Domain.Competition.Results;
 using Microsoft.FSharp.Core;
-using ParticipantResultModule = App.Domain.Competition.Results.ResultObjects.ParticipantResultModule;
+using ParticipantResultModule = App.Domain.Competition.Results.ParticipantResultModule;
 
 namespace App.Plugin.Competitions.RankedResultsCreator;
 
 public class Default(RankedResults.ExAequoPolicy exAequoPolicy)
-    : RankedResults.IRankedResultsCreator
+    : RankedResults.IRankedResultsFactory
 {
     public RankedResults.RankedResults Create(ResultsModule.Results results, FSharpOption<Phase.RoundIndex> roundIndex)
     {

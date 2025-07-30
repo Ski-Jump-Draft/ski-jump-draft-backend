@@ -7,57 +7,59 @@ module IndividualParticipant =
 
 type IndividualParticipant = { Id: IndividualParticipant.Id }
 
-module Team =
+module TeamParticipant =
     type Id = Id of Guid
     type Error = | NoMembers
 
-type CompetitionEntity =
-    | IndividualParticipantEntity of IndividualParticipant
-    | TeamEntity of Team
+type Participant =
+    | IndividualParticipant of IndividualParticipant
+    | TeamParticipant of TeamParticipant
 
-and Team =
-    { Id: Team.Id
-      Members: CompetitionEntity list }
+and TeamParticipant =
+    private
+        { Id: TeamParticipant.Id
+          Members: IndividualParticipant list }
 
     static member Create id members =
         if members |> List.isEmpty then
-            Error(Team.Error.NoMembers)
+            Error(TeamParticipant.Error.NoMembers)
         else
             Ok { Id = id; Members = members }
 
-    member this.HierarchyDepth =
-        let rec depth =
-            function
-            | IndividualParticipantEntity _ -> 1u
-            | TeamEntity tg ->
-                let childDepths = tg.Members |> List.map depth
-
-                1u
-                + (if List.isEmpty childDepths then
-                       0u
-                   else
-                       List.max childDepths)
-
-        depth (TeamEntity this)
+    // member this.HierarchyDepth =
+    //     let rec depth =
+    //         function
+    //         | IndividualParticipant _ -> 1u
+    //         | TeamParticipant tg ->
+    //             let childDepths = tg.Members |> List.map depth
+    //
+    //             1u
+    //             + (if List.isEmpty childDepths then
+    //                    0u
+    //                else
+    //                    List.max childDepths)
+    //
+    //     depth (TeamParticipant this)
 
     member this.MembersCount = this.Members |> List.length
-
-    member this.HaveOnlyIndividuals: bool =
-        this.Members
-        |> List.forall (function
-            | IndividualParticipantEntity _ -> true
-            | TeamEntity _ -> false)
+    //
+    // member this.HaveOnlyIndividuals: bool =
+    //     this.Members
+    //     |> List.forall (function
+    //         | IndividualParticipant _ -> true
+    //         | TeamParticipant _ -> false)
 
     member this.ContainsIndividual(individualId: IndividualParticipant.Id) : bool =
-        this.Members
-        |> List.exists (fun participant ->
-            match participant with
-            | IndividualParticipantEntity individual -> individual.Id = individualId
-            | TeamEntity team -> team.ContainsIndividual individualId)
+        this.Members |> List.exists (fun p -> p.Id = individualId)
+// this.Members
+// |> List.exists (fun participant ->
+//     match participant with
+//     | IndividualParticipant individual -> individual.Id = individualId
+//     | TeamParticipant team -> team.ContainsIndividual individualId)
 
 type CompetitionEntityId =
     | IndividualParticipantEntityId of IndividualParticipant.Id
-    | TeamEntityId of Team.Id
+    | TeamEntityId of TeamParticipant.Id
 
 // module Participant =
 //     type IndividualId = IndividualId of Guid

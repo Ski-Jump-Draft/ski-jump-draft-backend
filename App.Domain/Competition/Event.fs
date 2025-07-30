@@ -1,13 +1,24 @@
 module App.Domain.Competition.Event
 
 open App.Domain.Competition
-open App.Domain.Competition.Results.ResultObjects
+open App.Domain.Competition.Results
+open App.Domain.Competition.Results
+
+type CompetitionStartlistDto =
+    { NextIndividualParticipants: IndividualParticipant.Id list }
+
+// type CompetitionParticipantResultDto = {
+//
+// }
+
+type CompetitionResultsDto =
+    { ParticipantResults: ParticipantResult list } // TODO: Może zrobić "czyste" DTO?
 
 [<Struct; CLIMutable>]
 type CompetitionCreatedV1 =
     { CompetitionId: Id.Id
-      StartlistId: Startlist.Id
-      ResultsId: ResultsModule.Id }
+      //ResultsId: ResultsModule.Id
+      Startlist: CompetitionStartlistDto }
 
 [<Struct; CLIMutable>]
 type CompetitionStartedV1 = { CompetitionId: Id.Id }
@@ -15,13 +26,14 @@ type CompetitionStartedV1 = { CompetitionId: Id.Id }
 [<Struct; CLIMutable>]
 type CompetitionRoundStartedV1 =
     { CompetitionId: Id.Id
-      RoundIndex: int }
+      RoundIndex: uint }
 
 [<Struct; CLIMutable>]
 type CompetitionRoundEndedV1 =
     { CompetitionId: Id.Id
-      RoundIndex: int
-      NextRoundIndex: int option }
+      RoundIndex: uint
+    //NextRoundIndex: int option }
+    }
 
 [<Struct; CLIMutable>]
 type CompetitionSuspendedV1 = { CompetitionId: Id.Id }
@@ -39,7 +51,10 @@ type CompetitionEndedV1 = { CompetitionId: Id.Id }
 [<Struct; CLIMutable>]
 type CompetitionJumpResultRegisteredV1 =
     { CompetitionId: Id.Id
-      JumpResultId: JumpResult.Id }
+      ParticipantResultId: ParticipantResult.Id
+      JumpResultId: JumpResult.Id
+      Startlist: CompetitionStartlistDto
+      Results: CompetitionResultsDto }
 
 // ---------- discriminated union + versioning ----------------------------------
 

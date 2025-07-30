@@ -1,7 +1,7 @@
 using App.Domain.Competition;
 using App.Domain.Competition.Jump;
 using App.Domain.Competition.Results;
-using App.Domain.Competition.Results.ResultObjects;
+using App.Domain.Competition.Results;
 using static Microsoft.FSharp.Collections.ListModule;
 using IStylePointsAggregator = App.Domain.Competition.Results.Abstractions.IStylePointsAggregator;
 

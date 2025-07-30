@@ -1,7 +1,7 @@
 using App.Application.Abstractions;
 using App.Domain.Competition;
 using App.Domain.Competition.Results;
-using App.Domain.Competition.Results.ResultObjects;
+using App.Domain.Competition.Results;
 using App.Domain.Shared;
 
 namespace App.Plugin.Competitions.JumpResultCreator;

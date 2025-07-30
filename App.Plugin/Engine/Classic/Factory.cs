@@ -12,7 +12,7 @@ using App.Plugin.Competitions.NextRoundStartDecider;
 using App.Plugin.Competitions.Scorer.Classic;
 using App.Plugin.Competitions.StartlistProvider.AdvancementByLimitDecider;
 using App.Plugin.Competitions.WindPointsGrantor;
-using ParticipantResultModule = App.Domain.Competition.Results.ResultObjects.ParticipantResultModule;
+using ParticipantResultModule = App.Domain.Competition.Results.ParticipantResultModule;
 
 namespace App.Plugin.Engine.Classic;
 

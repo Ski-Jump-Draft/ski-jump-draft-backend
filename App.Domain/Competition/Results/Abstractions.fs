@@ -3,8 +3,7 @@ module App.Domain.Competition.Results.Abstractions
 open App.Domain.Competition
 open App.Domain.Competition.Jump
 open App.Domain.Competition.Phase
-open App.Domain.Competition.Results.ResultObjects
-open App.Domain.Competition.Results.ResultObjects.JumpScore
+open App.Domain.Competition.Results.JumpScore
 
 type IGatePointsGrantor =
     abstract Grant: Jump: Jump -> GatePoints

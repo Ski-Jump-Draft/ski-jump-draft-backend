@@ -1,7 +1,7 @@
 using App.Application.Abstractions;
 using App.Domain.Competition;
 using App.Domain.Competition.Results;
-using App.Domain.Competition.Results.ResultObjects;
+using App.Domain.Competition.Results;
 using App.Domain.Competition.Rules;
 using App.Plugin.Competitions.StartlistProvider.AdvancementByLimitDecider;
 using App.Plugin.Engine.Classic;
@@ -17,7 +17,7 @@ public sealed class Classic(
     CompetitionCategory competitionCategory,
     Func<ResultsModule.Results> getResults,
     Func<Phase.RoundIndex> getRoundIndex,
-    RankedResults.IRankedResultsCreator rankedResultsCreator,
+    RankedResults.IRankedResultsFactory rankedResultsFactory,
     // Func<IndividualParticipantModule.HostId, StartlistModule.EntityModule.HostId> mapIndividualParticipantIdToStartlistEntityId,
     // Func<TeamModule.HostId, StartlistModule.EntityModule.HostId> mapTeamIdToStartlistEntityId,
     Func<ParticipantResultModule.Id, IEnumerable<StartlistModule.EntityModule.Id>>
@@ -41,7 +41,7 @@ public sealed class Classic(
         var roundIndexInt = (int)roundIndex.Item;
         var currentLimit = roundLimits[roundIndexInt];
         var results = getResults();
-        var rankedResults = rankedResultsCreator.Create(results, roundIndex).Item.ToDictionary();
+        var rankedResults = rankedResultsFactory.Create(results, roundIndex).Item.ToDictionary();
         if (competitionCategory.IsIndividual)
         {
             // Jeden wynik w konkursie -> jeden start

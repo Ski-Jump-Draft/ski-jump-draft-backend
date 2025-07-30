@@ -1,10 +1,7 @@
 namespace App.Domain.Competition
 
-open App.Domain.Competition.Results.ResultObjects
 
 module Startlist =
-    type Id = Id of System.Guid
-
     type Error = | StartlistEmptyDuringCreation
 
     module EntityModule =
@@ -14,30 +11,28 @@ module Startlist =
 
 type Startlist =
     private
-        { Id: Startlist.Id
-          NextEntities: List<Startlist.Entity> }
-        
-    member this.Id_ = this.Id
+        { NextIndividualParticipants: List<IndividualParticipant.Id> }
 
-    static member Create id (nextEntities: Startlist.Entity list) =
-        Ok { Id = id; NextEntities = nextEntities }
+    static member Create id (nextIndividualParticipants: IndividualParticipant.Id list) =
+        Ok { NextIndividualParticipants = nextIndividualParticipants }
 
-    static member Empty id = Ok { Id = id; NextEntities = [] }
+    static member Empty id = Ok { NextIndividualParticipants = [] }
 
-    member this.Next: Startlist.Entity option = this.NextEntities |> List.tryItem 0
+    member this.NextParticipant: IndividualParticipant.Id option =
+        this.NextIndividualParticipants |> List.tryItem 0
 
-    member this.Contains entity =
-        this.NextEntities |> List.contains entity
+    member this.Contains individualParticipant =
+        this.NextIndividualParticipants |> List.contains individualParticipant
 
     member this.RemoveFirst() =
         { this with
-            NextEntities = this.NextEntities |> List.skip 1 }
+            NextIndividualParticipants = this.NextIndividualParticipants |> List.skip 1 }
 
 
 type IStartlistProvider =
     // abstract Provide: RoundIndex: Phase.RoundIndex -> Startlist.EntityModule.Id list
-    abstract Provide: unit -> Startlist.EntityModule.Id list
-    abstract RegisterJump: EntityId: Startlist.EntityModule.Id -> unit
+    abstract Provide: unit -> IndividualParticipant.Id list
+    abstract RegisterJump: EntityId: IndividualParticipant.Id -> unit
 // abstract Provide:
 //     RoundIndex: Phase.RoundIndex *
 //     Results: ParticipantResult list *

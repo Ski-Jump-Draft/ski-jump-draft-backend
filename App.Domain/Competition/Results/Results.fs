@@ -3,172 +3,148 @@ module App.Domain.Competition.ResultsModule
 open System
 open App.Domain.Competition
 open App.Domain.Competition.Phase
-open App.Domain.Competition.Results.ResultObjects
-open App.Domain.Competition.Results.ResultObjects.ParticipantResult
+open App.Domain.Competition.Results
+open App.Domain.Competition.Results.ParticipantResult
 
-[<Struct>]
-type Id = Id of Guid
+// [<Struct>]
+// type Id = Id of Guid
 
 type Error =
     | IndividualParticipantHasManyIndividualResults of IndividualResult list
-    | IndividualParticipantBelongsToManyTeamResults of Team.Id list
+    | IndividualParticipantBelongsToManyTeamResults of TeamParticipant.Id list
 
-// type Event =
-//     | IndividualJumpAdded of ResultsId: Id * Timestamp: EventTimestamp * JumpScoreId: JumpScore.Id
-//     | TeamJumpAdded of ResultsId: Id * Timestamp: EventTimestamp * JumpScoreId: JumpScore.Id
-
-[<AutoOpen>]
 module private Helpers =
-    let setRoundPoints round points map = Map.add round points map
 
-    let replaceParticipant predicate replacement list =
-        list |> List.map (fun x -> if predicate x then replacement else x)
+    let updateRoundPoints roundIndex totalPoints pointsByRound =
+        Map.change roundIndex (fun _ -> Some totalPoints) pointsByRound
 
-let private validateParticipantResults (prs: ParticipantResult list) : Error list =
-    /// 1. ten sam zawodnik w wielu wynikach indywidualnych
-    let individualErrors =
-        prs
-        |> List.choose (function
-            | { Details = Details.IndividualResultDetails ir } -> Some ir
-            | _ -> None)
-        |> List.groupBy (fun ir -> ir.IndividualId)
-        |> List.choose (fun (_, group) ->
-            if group.Length > 1 then
-                Some(Error.IndividualParticipantHasManyIndividualResults group)
+    let replaceParticipantResult predicate replacement participantResults =
+        participantResults
+        |> List.map (fun participantResult ->
+            if predicate participantResult then
+                replacement
             else
-                None)
+                participantResult)
 
-    /// 2. zawodnik przypisany do więcej niż jednej drużyny
-    let teamErrors =
-        prs
-        |> List.choose (function
-            | { Details = Details.TeamResultDetails tr } ->
-                tr.MemberResults |> List.map (fun ir -> ir.IndividualId, tr.TeamId) |> Some
+    let duplicatesBy selector items =
+        items
+        |> Seq.groupBy selector
+        |> Seq.filter (fun (_, group) -> Seq.length group > 1)
+        |> Seq.collect snd
+        |> Seq.toList
+
+    let latestTotalPoints pointsByRound =
+        pointsByRound |> Map.toSeq |> Seq.tryLast |> Option.map snd
+
+let private validateParticipantResults (participantResults: ParticipantResult list) : Error list =
+
+    let individualDuplicateErrors =
+        participantResults
+        |> List.choose (fun participantResult ->
+            match participantResult.Details with
+            | Details.IndividualResultDetails individualResult -> Some individualResult
             | _ -> None)
-        |> List.collect id
-        |> List.groupBy fst
-        |> List.choose (fun (_, xs) ->
-            let teamIds = xs |> List.map snd |> List.distinct
+        |> Helpers.duplicatesBy (fun individualResult -> individualResult.IndividualId)
+        |> function
+            | [] -> []
+            | duplicates -> [ Error.IndividualParticipantHasManyIndividualResults duplicates ]
 
-            if teamIds.Length > 1 then
-                Some(Error.IndividualParticipantBelongsToManyTeamResults teamIds)
-            else
-                None)
+    let individualToTeamMappings =
+        participantResults
+        |> List.collect (fun participantResult ->
+            match participantResult.Details with
+            | Details.TeamResultDetails teamResult ->
+                teamResult.MemberResults
+                |> List.map (fun individualResult -> individualResult.IndividualId, teamResult.TeamId)
+            | _ -> [])
 
-    individualErrors @ teamErrors
+    let teamMembershipErrors =
+        individualToTeamMappings
+        |> Helpers.duplicatesBy fst
+        |> List.map snd
+        |> List.distinct
+        |> function
+            | [] -> []
+            | conflictingTeams -> [ Error.IndividualParticipantBelongsToManyTeamResults conflictingTeams ]
 
-type ResultsState = ParticipantResult list
+    individualDuplicateErrors @ teamMembershipErrors
+
+type ParticipantResults = ParticipantResult list
 
 type Results =
-    { Id: Id
-      ParticipantResults: ResultsState }
+    { ParticipantResults: ParticipantResults }
 
-    static member Empty id = { Id = id; ParticipantResults = [] }
+    static member Empty = { ParticipantResults = [] }
 
-    static member FromState (id: Id) (participantResults: ResultsState) : Result<Results, Error list> =
+    static member FromState participantResults =
         match validateParticipantResults participantResults with
-        | [] ->
-            Ok
-                { Id = id
-                  ParticipantResults = participantResults }
+        | [] -> Ok { ParticipantResults = participantResults }
         | errors -> Error errors
 
-
-    member this.GetTeamResult(teamId: Team.Id) : TeamResult =
-        match
-            this.ParticipantResults
-            |> List.tryPick (function
-                | { Details = Details.TeamResultDetails teamResult } when teamResult.TeamId = teamId -> Some teamResult
-                | _ -> None)
-        with
-        | Some teamResult -> teamResult
-        | None -> failwith $"Team result for {teamId} not found"
-
-    member this.GetIndividualResult(individualId: IndividualParticipant.Id) : IndividualResult =
+    member this.GetTeamResult(teamId: TeamParticipant.Id) : ParticipantResult =
         let matching =
             this.ParticipantResults
-            |> List.choose (function
-                | { Details = Details.IndividualResultDetails individualResult } when
-                    individualResult.IndividualId = individualId
-                    ->
-                    Some individualResult
-                | _ -> None)
-
-        match matching with
-        | [ individualResult ] -> individualResult
-        | [] -> failwith $"Individual result for {individualId} not found"
-        | many -> raise (InvalidOperationException $"Individual in many individual results: {many}")
-
-    // member this.MapTotalPointsByRound
-    //     (roundIndex: RoundIndex)
-    //     : Map<ParticipantResult.Id, ParticipantResult.TotalPoints> =
-    //     this.ParticipantResults
-    //     |> List.choose (fun pr ->
-    //         match pr.TotalPoints |> Map.tryFind roundIndex with
-    //         | Some pts -> Some(pr.Id, pts)
-    //         | None -> None)
-    //     |> Map.ofList
-
-    member this.MapTotalPointsByRound
-        (roundIndexOpt: RoundIndex option)
-        : Map<ParticipantResult.Id, ParticipantResult.TotalPoints> =
-
-        this.ParticipantResults
-        |> List.choose (fun pr ->
-            let totalPointsByRound = pr.TotalPoints
-
-            let pointsOpt =
-                match roundIndexOpt with
-                | Some roundIndex -> Map.tryFind roundIndex totalPointsByRound
-                | None ->
-                    match Map.toList totalPointsByRound with
-                    | [] -> None
-                    | xs -> xs |> List.maxBy fst |> snd |> Some
-
-            pointsOpt |> Option.map (fun pts -> pr.Id, pts)
-        )
-        |> Map.ofList
-
-    member this.GetTeamTotalScoreByRound(teamId: Team.Id, roundIndex: RoundIndex) : ParticipantResult.TotalPoints =
-        let pr =
-            this.ParticipantResults
-            |> List.find (function
-                | { Details = Details.TeamResultDetails teamResult } when teamResult.TeamId = teamId -> true
+            |> List.filter (function
+                | { Details = Details.TeamResultDetails tr } when tr.TeamId = teamId -> true
                 | _ -> false)
 
-        pr.TotalPoints |> Map.find roundIndex
+        match matching with
+        | [ pr ] -> pr
+        | [] -> invalidOp $"Team result for {teamId} not found"
+        | _ -> invalidOp $"Team {teamId} appears multiple times in participant results"
+
+    member this.GetIndividualResult(individualId: IndividualParticipant.Id) : ParticipantResult =
+        let matching =
+            this.ParticipantResults
+            |> List.filter (function
+                | { Details = Details.IndividualResultDetails ir } when ir.IndividualId = individualId -> true
+                | _ -> false)
+
+        match matching with
+        | [ pr ] -> pr
+        | [] -> invalidOp $"Individual result for {individualId} not found"
+        | _ -> invalidOp $"Individual {individualId} appears in multiple participant results"
+
+    member this.MapTotalPointsByRound roundIndexOpt =
+        this.ParticipantResults
+        |> List.choose (fun participantResult ->
+            let totalPointsOption =
+                match roundIndexOpt with
+                | Some roundIndex -> Map.tryFind roundIndex participantResult.TotalPoints
+                | None -> Helpers.latestTotalPoints participantResult.TotalPoints
+
+            Option.map (fun pts -> participantResult.Id, pts) totalPointsOption)
+        |> Map.ofList
+
+    member this.GetTeamTotalScoreByRound
+        (teamId: TeamParticipant.Id, roundIndex: RoundIndex)
+        : ParticipantResult.TotalPoints =
+
+        this.GetTeamResult teamId
+        |> fun teamPr -> teamPr.TotalPoints |> Map.find roundIndex
 
     member this.GetIndividualTotalScoreByRound
         (individualId: IndividualParticipant.Id, roundIndex: RoundIndex)
         : ParticipantResult.TotalPoints =
-        let pr =
-            this.ParticipantResults
-            |> List.find (function
-                | { Details = Details.IndividualResultDetails individualResult } when
-                    individualResult.IndividualId = individualId
-                    ->
-                    true
-                | _ -> false)
 
-        pr.TotalPoints |> Map.find roundIndex
+        this.GetIndividualResult individualId
+        |> fun individualPr -> individualPr.TotalPoints |> Map.find roundIndex
 
     member this.RegisterIndividualJump
         (
             jumpResult: JumpResult,
             newTotalPoints: ParticipantResult.TotalPoints,
             potentialParticipantResultId: ParticipantResult.Id
-        ) : Results =
+        ) =
+
         let individualId = jumpResult.IndividualParticipantId
         let roundIndex = jumpResult.RoundIndex
 
-        let (updatedList: ParticipantResult list) =
+        let updatedParticipantResults =
             match
                 this.ParticipantResults
                 |> List.tryFind (function
-                    | { Details = Details.IndividualResultDetails individualResult } when
-                        individualResult.IndividualId = individualId
-                        ->
-                        true
+                    | { Details = Details.IndividualResultDetails ir } when ir.IndividualId = individualId -> true
                     | _ -> false)
             with
             | None ->
@@ -176,52 +152,49 @@ type Results =
                     { IndividualId = individualId
                       JumpResults = [ jumpResult ] }
 
-                let participantResult =
+                let newParticipantResult =
                     { Id = potentialParticipantResultId
-                      TotalPoints = Map.empty |> setRoundPoints roundIndex newTotalPoints
-                      Details = ParticipantResult.Details.IndividualResultDetails individualResult }
+                      TotalPoints = Map.empty |> Helpers.updateRoundPoints roundIndex newTotalPoints
+                      Details = Details.IndividualResultDetails individualResult }
 
-                participantResult :: this.ParticipantResults
+                newParticipantResult :: this.ParticipantResults
+
             | Some existingParticipantResult ->
-                let individualResult =
+                let updatedIndividualResult =
                     match existingParticipantResult.Details with
-                    | Details.IndividualResultDetails individualResult -> individualResult
-                    | _ -> failwith "Mismatched participant result kind"
-
-                let updatedIr =
-                    { individualResult with
-                        JumpResults = jumpResult :: individualResult.JumpResults }
+                    | Details.IndividualResultDetails ir ->
+                        { ir with
+                            JumpResults = jumpResult :: ir.JumpResults }
+                    | _ -> invalidOp "Mismatched participant result type"
 
                 let updatedParticipantResult =
                     { existingParticipantResult with
-                        Details = ParticipantResult.Details.IndividualResultDetails updatedIr
+                        Details = Details.IndividualResultDetails updatedIndividualResult
                         TotalPoints =
                             existingParticipantResult.TotalPoints
-                            |> setRoundPoints roundIndex newTotalPoints }
+                            |> Helpers.updateRoundPoints roundIndex newTotalPoints }
 
-                replaceParticipant
-                    (fun participantResult -> participantResult.Id = existingParticipantResult.Id)
+                Helpers.replaceParticipantResult
+                    (fun pr -> pr.Id = existingParticipantResult.Id)
                     updatedParticipantResult
                     this.ParticipantResults
 
-        { this with
-            ParticipantResults = updatedList }
+        { ParticipantResults = updatedParticipantResults }
 
     member this.RegisterTeamJump
         (
             jumpResult: JumpResult,
-            teamId: Team.Id,
+            teamId: TeamParticipant.Id,
             newIndividualTotalPoints: ParticipantResult.TotalPoints,
             newTeamTotalPoints: ParticipantResult.TotalPoints,
             potentialIndividualResultId: ParticipantResult.Id,
             potentialTeamResultId: ParticipantResult.Id
-        ) : Results =
+        ) =
 
         let individualId = jumpResult.IndividualParticipantId
         let roundIndex = jumpResult.RoundIndex
 
-        // validation: participant cannot belong to other teams
-        let otherTeams =
+        let conflictingTeams =
             this.ParticipantResults
             |> List.choose (function
                 | { Details = Details.TeamResultDetails teamResult } when
@@ -230,21 +203,19 @@ type Results =
                     Some teamResult.TeamId
                 | _ -> None)
 
-        match otherTeams with
-        | _ :: _ -> raise (InvalidOperationException $"Individual {individualId} already in teams {otherTeams}")
+        match conflictingTeams with
+        | _ :: _ -> invalidOp $"Individual {individualId} already appears in teams {conflictingTeams}"
         | [] -> ()
 
-        // update or create individual ParticipantResult
-        let resultsAfterIndividualUpdate =
+        let afterIndividualUpdate =
             (this.RegisterIndividualJump(jumpResult, newIndividualTotalPoints, potentialIndividualResultId))
                 .ParticipantResults
 
-        // update or create team ParticipantResult
         let updatedParticipantResults =
             match
-                resultsAfterIndividualUpdate
+                afterIndividualUpdate
                 |> List.tryFind (function
-                    | { Details = Details.TeamResultDetails teamResult } when teamResult.TeamId = teamId -> true
+                    | { Details = Details.TeamResultDetails tr } when tr.TeamId = teamId -> true
                     | _ -> false)
             with
             | None ->
@@ -252,22 +223,22 @@ type Results =
                     { IndividualId = individualId
                       JumpResults = [ jumpResult ] }
 
-                let newTeamRes =
+                let newTeamResult =
                     { TeamId = teamId
                       MemberResults = [ newIndividualResult ] }
 
                 let newParticipantResult =
                     { Id = potentialTeamResultId
-                      TotalPoints = Map.empty |> setRoundPoints roundIndex newTeamTotalPoints
-                      Details = Details.TeamResultDetails newTeamRes }
+                      TotalPoints = Map.empty |> Helpers.updateRoundPoints roundIndex newTeamTotalPoints
+                      Details = Details.TeamResultDetails newTeamResult }
 
-                newParticipantResult :: resultsAfterIndividualUpdate
+                newParticipantResult :: afterIndividualUpdate
 
             | Some existingParticipantResult ->
                 let teamResult =
                     match existingParticipantResult.Details with
-                    | Details.TeamResultDetails teamResult -> teamResult
-                    | _ -> failwith "Mismatched participant result kind"
+                    | Details.TeamResultDetails tr -> tr
+                    | _ -> invalidOp "Mismatched participant result type"
 
                 let updatedMemberResults =
                     match teamResult.IndividualResultOf individualId with
@@ -275,31 +246,30 @@ type Results =
                         { IndividualId = individualId
                           JumpResults = [ jumpResult ] }
                         :: teamResult.MemberResults
-                    | Some individualResult ->
-                        let updatedIr =
-                            { individualResult with
-                                JumpResults = jumpResult :: individualResult.JumpResults }
+                    | Some existingIndividualResult ->
+                        let updatedIndividualResult =
+                            { existingIndividualResult with
+                                JumpResults = jumpResult :: existingIndividualResult.JumpResults }
 
-                        replaceParticipant
-                            (fun individualResult -> individualResult.IndividualId = individualId)
-                            updatedIr
+                        Helpers.replaceParticipantResult
+                            (fun ir -> ir.IndividualId = individualId)
+                            updatedIndividualResult
                             teamResult.MemberResults
 
-                let updatedTeamRes =
+                let updatedTeamResult =
                     { teamResult with
                         MemberResults = updatedMemberResults }
 
                 let updatedParticipantResult =
                     { existingParticipantResult with
-                        Details = ParticipantResult.Details.TeamResultDetails updatedTeamRes
+                        Details = Details.TeamResultDetails updatedTeamResult
                         TotalPoints =
                             existingParticipantResult.TotalPoints
-                            |> setRoundPoints roundIndex newTeamTotalPoints }
+                            |> Helpers.updateRoundPoints roundIndex newTeamTotalPoints }
 
-                replaceParticipant
+                Helpers.replaceParticipantResult
                     (fun pr -> pr.Id = existingParticipantResult.Id)
                     updatedParticipantResult
-                    resultsAfterIndividualUpdate
+                    afterIndividualUpdate
 
-        { this with
-            ParticipantResults = updatedParticipantResults }
+        { ParticipantResults = updatedParticipantResults }

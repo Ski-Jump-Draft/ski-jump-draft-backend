@@ -1,4 +1,4 @@
-namespace App.Domain.Competition.Results.ResultObjects
+namespace App.Domain.Competition.Results
 
 open System
 open App.Domain.Competition
@@ -44,7 +44,7 @@ type IndividualResult =
       JumpResults: JumpResult list }
 
 type TeamResult =
-    { TeamId: Team.Id
+    { TeamId: TeamParticipant.Id
       MemberResults: IndividualResult list }
 
     member this.IndividualResultOf id =
@@ -57,7 +57,6 @@ module ParticipantResult =
     type Id = Id of System.Guid
     type TotalPoints = TotalPoints of double
 
-    [<AutoOpen>]
     module TotalPoints =
         let inline (+) (TotalPoints a) (TotalPoints b) = TotalPoints(a + b)
         let zero = TotalPoints 0

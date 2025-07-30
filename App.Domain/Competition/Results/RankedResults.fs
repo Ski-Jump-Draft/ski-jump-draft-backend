@@ -1,10 +1,6 @@
 module App.Domain.Competition.Results.RankedResults
 
-open App.Domain.Competition
 open App.Domain.Competition.Phase
-open App.Domain.Competition.Results.ResultObjects
-open App.Domain.Competition.ResultsModule
-open App.Domain.CustomStrategies
 
 type Position = private Position of int
 
@@ -71,16 +67,16 @@ module Position =
 //
 //         let toId =
 //             function
-//             | Results.ResultObjects.Individual individual ->
+//             | Results.Individual individual ->
 //                 Results.ParticipantResultId.IndividualId individual.IndividualId
-//             | Results.ResultObjects.Team team -> Results.ParticipantResultId.TeamId team.TeamId
+//             | Results.Team team -> Results.ParticipantResultId.TeamId team.TeamId
 //
 //         let groups =
 //             participantResults
 //             |> List.groupBy (fun participantResult ->
 //                 match participantResult with
-//                 | Results.ResultObjects.Individual individual -> individual.TotalPoints
-//                 | Results.ResultObjects.Team team -> team.TotalPoints)
+//                 | Results.Individual individual -> individual.TotalPoints
+//                 | Results.Team team -> team.TotalPoints)
 //             |> List.sortByDescending (fun (pts, _) -> let (Results.Points v) = pts in v)
 //             |> List.map snd
 //
@@ -142,5 +138,5 @@ type ExAequoPolicy =
 
 type RankedResults = RankedResults of Map<Position, ParticipantResult.Id list>
 
-type IRankedResultsCreator =
-    abstract member Create: Results: Results * RoundIndex: RoundIndex option -> RankedResults
+type IRankedResultsFactory =
+    abstract member Create: ParticipantResults: ParticipantResult list * RoundIndex: RoundIndex option -> RankedResults

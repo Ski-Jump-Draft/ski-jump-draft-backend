@@ -1,7 +1,7 @@
 using System.Text.Json;
 using App.Domain.Competition;
 using App.Domain.Competition.Jump;
-using App.Domain.Competition.Results.ResultObjects;
+using App.Domain.Competition.Results;
 using App.Domain.Competition.Rules;
 using Microsoft.FSharp.Collections;
 using Microsoft.FSharp.Core;
@@ -12,7 +12,7 @@ using Abstractions = App.Domain.Competition.Results.Abstractions;
 using IndividualParticipantModule = App.Domain.Competition.IndividualParticipantModule;
 using ResultsModule = App.Domain.Competition.ResultsModule;
 using Competition = App.Domain.Competition;
-using ParticipantResultModule = App.Domain.Competition.Results.ResultObjects.ParticipantResultModule;
+using ParticipantResultModule = App.Domain.Competition.Results.ParticipantResultModule;
 
 namespace App.Plugin.Engine.Classic;
 
@@ -58,7 +58,7 @@ public sealed class ClassicEngine : Competition.Engine.IEngine
         get
         {
             var isLastRound = _state.CurrentRoundIndex + 1 >= _options.RoundLimits.Count;
-            var noMoreJumpers = !FSharpOption<StartlistModule.Entity>.get_IsSome(Startlist?.Next);
+            var noMoreJumpers = !FSharpOption<StartlistModule.Entity>.get_IsSome(Startlist?.NextParticipant);
             return isLastRound && noMoreJumpers;
         }
     }
@@ -231,7 +231,7 @@ public sealed class ClassicEngine : Competition.Engine.IEngine
 
         foreach (var teamGroup in groupedByTeam)
         {
-            var teamId = Domain.Competition.TeamModule.Id.NewId(teamGroup.Key);
+            var teamId = Domain.Competition.TeamParticipantModule.Id.NewId(teamGroup.Key);
 
             var memberResults = teamGroup.Select(kvp =>
             {

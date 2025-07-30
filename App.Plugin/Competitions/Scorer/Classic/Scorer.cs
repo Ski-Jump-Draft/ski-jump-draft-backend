@@ -1,7 +1,7 @@
 using App.Domain.Competition;
 using App.Domain.Competition.Jump;
 using App.Domain.Competition.Results;
-using ResultObjects = App.Domain.Competition.Results.ResultObjects;
+using ResultObjects = App.Domain.Competition.Results;
 using static Microsoft.FSharp.Collections.ListModule;
 using Abstractions = App.Domain.Competition.Results.Abstractions;
 

@@ -1,23 +1,19 @@
 namespace App.Domain.Competition
 
-open System
+open App.Domain.Competition.Engine
 open App.Domain.Competition.Phase
 open App.Domain
+open App.Domain.Competition.ResultsModule
+
+// TODO: Evolve dla Competition na podstawie eventów domenowych ze startlist i results (!!)
 
 module Competition =
-    // type Settings = { Rules: Rules.Rules }
-
-    type Error = InvalidPhase of Expected: PhaseTag list * Actual: PhaseTag
+    type Error =
+        | InvalidPhase of Expected: PhaseTag list * Actual: PhaseTag
+        | EngineEventsConflict of UnallowedEvents: Engine.Event list * Message: string
+        | CannotDetermineCompetitionPhase of EngineEvents: Engine.Event list
 
 open Competition
-
-// type Competition =
-//     { Id: Competition.Id
-//       HillId: Competition.Hill.Id
-//       Phase: Phase.Phase
-//       ResultsId: Results.Id
-//       Startlist: Startlist
-//       Settings: Settings }
 
 module internal Internal =
     let tag =
@@ -38,19 +34,13 @@ open Internal
 type Competition =
     { Id: Id.Id
       Phase: Phase.Phase
-      StartlistId: Competition.Startlist.Id
-      //HillId: Competition.Hill.Id
-      ResultsId: ResultsModule.Id
-    //Startlist: Startlist
-    //Settings: Settings
-    }
+      Engine: Engine.IEngine }
 
     static member TagOfPhase phase =
         match phase with
         | NotStarted -> NotStartedTag
         | Running _ -> RunningTag
         | Break _ -> BreakTag
-        //| Suspended previousPhase -> SuspendedTag(Competition.TagOfPhase(previousPhase))
         | Suspended _ -> SuspendedTag
         | Cancelled -> CancelledTag
         | Ended -> EndedTag
@@ -58,167 +48,182 @@ type Competition =
     member this.InvalidPhaseError expected =
         InvalidPhase(expected, Competition.TagOfPhase(this.Phase))
 
-    static member Create id startlistId resultsId =
+    static member Create id (engine: IEngine) startlistId resultsId =
+        let startlist = engine.GenerateStartlist()
+
         let state =
             { Id = id
               Phase = NotStarted
-              StartlistId = startlistId
-              ResultsId = resultsId }
+              Engine = engine }
 
         let event =
             Event.CompetitionCreatedV1
                 { CompetitionId = id
-                  StartlistId = startlistId
-                  ResultsId = resultsId }
+                  Startlist = { NextIndividualParticipants = startlist.NextIndividualParticipants } }
 
         Ok(state, [ event ])
 
+    member this.GenerateResults: Results = this.Engine.GenerateResults()
 
-    // static member Create id resultsId (hillId: Hill.Id) (startlist: Startlist) rules =
-    //     if not startlist.NoOneHasCompleted then
-    //         Error(Error.StartlistCompletionNotEmpty(startlist.CompletedSet))
-    //     else
-    //         Ok
-    //             { Id = id
-    //               HillId = hillId
-    //               Phase = NotStarted
-    //               Results = Results.Empty(resultsId) (TieBreakPolicy.ExAequo TieBreakPolicy.ExAequoPolicy.AddOneAfterExAequo) // TODO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
-    //               Startlist = startlist
-    //               Settings = { Rules = rules } }
-    //
-    // /// TODO, Sprawdź przed dodaniem skoku: Czy w tej serii już skakał? Rzuć error.
-    // member this.RegisterJump (participantId: Participant.IndividualId) (jumpResult: Results.JumpResult) =
-    //     match this.Startlist.Next with
-    //     | Some nextIndividualParticipant ->
-    //         match this.Phase with
-    //         | NotStarted ->
-    //             let roundIndex = RoundIndex 0u
-    //             let totalPoints = 500m
-    //             let competitionType = "team" // TODO
-    //             match competitionType with
-    //             | "team" ->
-    //                 let teamId = Guid.NewGuid // TODO
-    //                 let newResults = this.Results.RegisterJumpOfTeamParticipant(participantId teamId jumpResult 0 0)
-    //     | None ->
-    //         invalidOp "This should not be even raised, lmao"
+    member this.GenerateStartlist: Startlist = this.Engine.GenerateStartlist()
+
+    member this.RegisterJump
+        (jump: Competition.Jump.Jump)
+        : Result<Competition * Event.CompetitionEventPayload list, Error> =
+        match this.Phase with
+        | NotStarted
+        | Running _
+        | Break _ ->
+            let (snapshot, engineEvents) = this.Engine.RegisterJump jump
+
+            let competitionEvents =
+                engineEvents
+                |> List.fold
+                    (fun acc e ->
+                        let newEvent =
+                            match e with
+                            | RoundStarted index ->
+                                Event.CompetitionEventPayload.CompetitionRoundStartedV1
+                                    { CompetitionId = this.Id
+                                      RoundIndex = index }
+                            | RoundEnded index ->
+                                Event.CompetitionEventPayload.CompetitionRoundEndedV1
+                                    { CompetitionId = this.Id
+                                      RoundIndex = index }
+                            | JumpRegistered(participantResultId, jumpResultId) ->
+                                let startlist = this.Engine.GenerateStartlist()
+                                let results = this.Engine.GenerateResults()
+
+                                Event.CompetitionEventPayload.CompetitionJumpResultRegisteredV1
+                                    { CompetitionId = this.Id
+                                      ParticipantResultId = participantResultId
+                                      JumpResultId = jumpResultId
+                                      Startlist = { NextIndividualParticipants = startlist.NextIndividualParticipants }
+                                      Results = { ParticipantResults = results.ParticipantResults } }
+                            | ParticipantDisqualified -> failwith "todo"
+                            | CompetitionEnded ->
+                                Event.CompetitionEventPayload.CompetitionEndedV1 { CompetitionId = this.Id }
+
+                        newEvent :: acc)
+                    []
+                |> List.rev
+
+            let jumpResultHasBeenRegistered =
+                competitionEvents
+                |> List.exists (function
+                    | Event.CompetitionEventPayload.CompetitionJumpResultRegisteredV1 _ -> true
+                    | _ -> false)
+
+            let roundHasStarted =
+                competitionEvents
+                |> List.exists (function
+                    | Event.CompetitionEventPayload.CompetitionRoundStartedV1 _ -> true
+                    | _ -> false)
+
+            let roundHasEnded =
+                competitionEvents
+                |> List.exists (function
+                    | Event.CompetitionEventPayload.CompetitionRoundEndedV1 _ -> true
+                    | _ -> false)
+
+            let competitionHasEnded =
+                competitionEvents
+                |> List.exists (function
+                    | Event.CompetitionEventPayload.CompetitionEndedV1 _ -> true
+                    | _ -> false)
+
+            let engineEventsHasDuplicates =
+                List.length engineEvents <> Set.count (Set.ofList engineEvents)
+
+            if engineEventsHasDuplicates then
+                Error(Error.EngineEventsConflict(engineEvents, "Engine cannot return engineEvents with duplicates."))
+            elif not (jumpResultHasBeenRegistered) then
+                Error(Error.EngineEventsConflict(engineEvents, "Engine must return JumpRegistered event."))
+            elif roundHasStarted && roundHasEnded then
+                Error(Error.EngineEventsConflict(engineEvents, "Engine cannot start and end round simultanousely."))
+            else
+                let competitionPhase =
+                    if roundHasStarted then
+                        let roundIndex =
+                            competitionEvents
+                            |> List.pick (function
+                                | Event.CompetitionEventPayload.CompetitionRoundStartedV1 ev -> Some ev.RoundIndex
+                                | _ -> None)
+
+                        Ok(Phase.Running(RoundIndex roundIndex))
+                    elif roundHasEnded && not competitionHasEnded then
+                        let nextRoundIndex =
+                            competitionEvents
+                            |> List.pick (function
+                                | Event.CompetitionEventPayload.CompetitionRoundStartedV1 ev -> Some ev.RoundIndex
+                                | _ -> None)
+
+                        Ok(Phase.Break(RoundIndex nextRoundIndex))
+                    elif roundHasEnded && competitionHasEnded then
+                        Ok Phase.Ended
+                    else
+                        Error(CannotDetermineCompetitionPhase engineEvents)
+
+                match competitionPhase with
+                | Error error -> Error error
+                | Ok competitionPhase ->
+                    let state = { this with Phase = competitionPhase }
+                    Ok(state, competitionEvents)
+
+        | phase -> expect [ NotStartedTag; BreakTag; RunningTag ] phase
+
+    // member this.StartRound() =
     //     match this.Phase with
     //     | NotStarted ->
     //         let roundIndex = RoundIndex 0u
-    //         let totalPoints = ParticipantResult.Points.tryCreate (500m) // TODO
+    //         let state = { this with Phase = Running roundIndex }
     //
-    //         let newResults =
-    //             this.Results.RegisterJumpResult participantId jumpResult totalPoints timestamp
+    //         let events =
+    //             [ Event.CompetitionRoundStartedV1
+    //                   { CompetitionId = this.Id
+    //                     RoundIndex = Convert.ToInt32 roundIndex } ]
     //
-    //         let state =
-    //             { this with
-    //                 Results = newResults
-    //                 Phase = Phase.Running roundIndex }
+    //         ok state events
     //
-    //         let startedCompetitionEvent = Event.CompetitionStarted(this.Id, timestamp)
+    //     | Break nextRound ->
+    //         let state = { this with Phase = Running nextRound }
     //
-    //         let jumpRegisteredEvent =
-    //             Event.CompetitionJumpResultRegistered(this.Id, timestamp, jumpResult.Id)
+    //         let events =
+    //             [ Event.CompetitionRoundStartedV1
+    //                   { CompetitionId = this.Id
+    //                     RoundIndex = Convert.ToInt32 nextRound } ]
     //
-    //         Ok(state, [ startedCompetitionEvent ])
-    //     | Running currentRoundIndex ->
-    //         if this.Results.ContainsJumpForRound currentRoundIndex participantId then
-    //             Error
+    //         ok state events
     //
-    //         let totalPoints = ParticipantResult.Points.tryCreate (500m) // TODO
+    //     | phase -> expect [ NotStartedTag; BreakTag ] phase
     //
-    //         let newResults =
-    //             this.Results.RegisterJumpResult participantId jumpResult totalPoints timestamp
     //
-    //         let state =
-    //             { this with
-    //                 Results = newResults
-    //                 Phase = Phase.Running currentRoundIndex }
+    // member this.EndRound(endCompetition: bool) =
+    //     match this.Phase with
+    //     | Running roundIdx ->
+    //         let (RoundIndex roundIdxUint) = roundIdx
+    //         let nextRoundInt = Convert.ToInt32(roundIdxUint + 1u)
+    //         let nextRoundUint = uint (nextRoundInt)
     //
-    //         let startedCompetitionEvent = Event.CompetitionStarted(this.Id, timestamp)
+    //         let roundEnded =
+    //             Event.CompetitionRoundEndedV1
+    //                 { CompetitionId = this.Id
+    //                   RoundIndex = Convert.ToInt32 roundIdx
+    //                   NextRoundIndex = if endCompetition then Some nextRoundInt else None }
     //
-    //         let jumpRegisteredEvent =
-    //             Event.CompetitionJumpResultRegistered(this.Id, timestamp, jumpResult.Id)
+    //         if endCompetition then
+    //             let state = { this with Phase = Ended }
+    //             let events = [ roundEnded; Event.CompetitionEndedV1 { CompetitionId = this.Id } ]
+    //             ok state events
+    //         else
+    //             let state =
+    //                 { this with
+    //                     Phase = Break(RoundIndex nextRoundUint) }
     //
-    //         Ok(state, [ startedCompetitionEvent ])
-    //     | Break nextRoundIndex ->
-    //         let totalPoints = ParticipantResult.Points.tryCreate (500m) // TODO
+    //             let events = [ roundEnded ]
+    //             ok state events
     //
-    //         let newResults =
-    //             this.Results.RegisterJumpResult participantId jumpResult totalPoints timestamp
-    //
-    //         let state =
-    //             { this with
-    //                 Results = newResults
-    //                 Phase = Phase.Running nextRoundIndex }
-    //
-    //         let startedCompetitionEvent = Event.CompetitionStarted(this.Id, timestamp)
-    //
-    //         let jumpRegisteredEvent =
-    //             Event.CompetitionJumpResultRegistered(this.Id, timestamp, jumpResult.Id)
-    //
-    //         Ok(state, [ startedCompetitionEvent ])
-    //     | _ -> Error(this.InvalidPhaseError([ PhaseTag.NotStartedTag; PhaseTag.BreakTag; PhaseTag.RunningTag ]))
-    //
-    // // member this.ModifyCurrentRoundResult participantId newResult
-    //
-    // member this.Disqualify participantId timestamp =
-    //     // TODO:
-    //     // Jeśli drużynówka, w zależności od policy zdyskwalifikuj całą drużynę albo jednego zawodnika
-    //     // Jeśli indywidualnie, DSQ w aktualnej rundzie i niemożność startu później
-    //     None
-
-    member this.StartRound() =
-        match this.Phase with
-        | NotStarted ->
-            let roundIndex = RoundIndex 0u
-            let state = { this with Phase = Running roundIndex }
-
-            let events =
-                [ Event.CompetitionRoundStartedV1
-                      { CompetitionId = this.Id
-                        RoundIndex = Convert.ToInt32 roundIndex } ]
-
-            ok state events
-
-        | Break nextRound ->
-            let state = { this with Phase = Running nextRound }
-
-            let events =
-                [ Event.CompetitionRoundStartedV1
-                      { CompetitionId = this.Id
-                        RoundIndex = Convert.ToInt32 nextRound } ]
-
-            ok state events
-
-        | phase -> expect [ NotStartedTag; BreakTag ] phase
-
-
-    member this.EndRound(endCompetition: bool) =
-        match this.Phase with
-        | Running roundIdx ->
-            let (RoundIndex roundIdxUint) = roundIdx
-            let nextRoundInt = Convert.ToInt32(roundIdxUint + 1u)
-            let nextRoundUint = uint (nextRoundInt)
-
-            let roundEnded =
-                Event.CompetitionRoundEndedV1
-                    { CompetitionId = this.Id
-                      RoundIndex = Convert.ToInt32 roundIdx
-                      NextRoundIndex = if endCompetition then Some nextRoundInt else None }
-
-            if endCompetition then
-                let state = { this with Phase = Ended }
-                let events = [ roundEnded; Event.CompetitionEndedV1 { CompetitionId = this.Id } ]
-                ok state events
-            else
-                let state =
-                    { this with
-                        Phase = Break(RoundIndex nextRoundUint) }
-
-                let events = [ roundEnded ]
-                ok state events
-
-        | phase -> expect [ RunningTag ] phase
+    //     | phase -> expect [ RunningTag ] phase
 
     member this.Cancel() =
         match this.Phase with

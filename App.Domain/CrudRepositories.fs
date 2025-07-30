@@ -31,8 +31,10 @@ type public IServerRepository =
 type public IGameParticipantRepository =
     inherit IDomainCrudRepository<Domain.Game.Participant.Id, Domain.Game.Participant.Participant>
 
-type public IGameCompetitionRepository =
-    inherit IDomainCrudRepository<Domain.Game.Competition.Id, Domain.Game.Competition>
+// TODO: Co z IGameCompetitionRepository? Co z koncepcją Game Competition i co to jesT?
+
+// type public IGameCompetitionRepository =
+//     inherit IDomainCrudRepository<Domain.Game.Competition.Id, Domain.Game.Competition>
 
 // --- Matchmaking ---
 type public IMatchmakingParticipantRepository =
@@ -42,25 +44,16 @@ type public IMatchmakingParticipantRepository =
 type public IPreDraftHillRepository =
     inherit IDomainCrudRepository<Domain.PreDraft.Competitions.Hill.Id, Domain.PreDraft.Competitions.Hill>
 
-// type public IPreDraftCompetitionRepository =
-//     inherit IDomainCrudRepository<Domain.PreDraft.Competitions.Competition.Id, Domain.PreDraft.Competitions.Competition>
-
 // --- Competition ---
 type public ICompetitionHillRepository =
     inherit IDomainCrudRepository<Domain.Competition.Hill.Id, Domain.Competition.Hill>
 
-type public ICompetitionResultsRepository =
-    inherit IDomainCrudRepository<Domain.Competition.ResultsModule.Id, Domain.Competition.ResultsModule.Results>
-
-type public ICompetitionStartlistRepository =
-    inherit IDomainCrudRepository<Domain.Competition.Startlist.Id, Domain.Competition.Startlist>
+// type public ICompetitionResultsRepository =
+//     inherit IDomainCrudRepository<Domain.Competition.ResultsModule.Id, Domain.Competition.ResultsModule.Results>
 
 // --- Draft ---
 type public IDraftParticipantRepository =
     inherit IDomainCrudRepository<Domain.Draft.Participant.Id, Domain.Draft.Participant.Participant>
-
-type public IDraftSubjectRepository =
-    inherit IDomainCrudRepository<Domain.Draft.Subject.Id, Domain.Draft.Subject.Subject>
 
 // --- Competition Engine ---
 type public ICompetitionEngineSnapshotRepository =
