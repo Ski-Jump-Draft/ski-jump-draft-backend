@@ -6,20 +6,49 @@ open App.Domain.Shared.AggregateVersion
 
 let evolve (state: Draft) (event: DomainEvent<DraftEventPayload>) =
     let version = AggregateVersion event.Header.AggregateVersion
+
     match event.Payload with
     | DraftEventPayload.DraftCreatedV1 e ->
+        let subjects: Subject.Subject list =
+            e.Subjects
+            |> List.map (fun dto ->
+                let identity =
+                    match dto.Identity with
+                    | DraftSubjectIdentityDto.Jumper j ->
+                        Subject.Identity.Jumper
+                            { Name = j.Name
+                              Surname = j.Surname
+                              CountryCode = j.CountryCode }
+                    | DraftSubjectIdentityDto.Team t ->
+                        Subject.Identity.Team
+                            { Name = t.Name
+                              CountryCode = t.CountryCode }
+
+                { Id = dto.Id; Identity = identity })
+
         { Id = e.DraftId
           Version = version
-          Settings = e.Settings
-          Participants = e.Participants
+          Settings =
+            { Order = e.Settings.Order
+              MaxJumpersPerPlayer = e.Settings.MaxJumpersPerPlayer
+              PickTimeout = e.Settings.PickTimeout
+              UniqueJumpers = e.Settings.UniqueJumpers }
+          Participants = e.Participants |> List.map (fun p -> { Id = p.Id })
+          Subjects = subjects
           Seed = e.Seed
           Phase = NotStarted }
 
     | DraftEventPayload.DraftStartedV1 _ ->
         let strategy = Order.OrderStrategyFactory.create state.Settings.Order
-        let initialOrder = strategy.ComputeInitialOrder(state.Participants, state.Seed)
+
+        let initialOrder =
+            strategy.ComputeInitialOrder(state.Participants |> List.map _.Id, state.Seed)
+
         let picks = Picks.Picks.Empty initialOrder
-        { state with Phase = Running(0, initialOrder, picks); Version = version }
+
+        { state with
+            Phase = Running(0, initialOrder, picks)
+            Version = version }
 
     | DraftEventPayload.DraftSubjectPickedV1 _ -> state
 
@@ -30,18 +59,27 @@ let evolve (state: Draft) (event: DomainEvent<DraftEventPayload>) =
             let totalAllowed = List.length order * int state.Settings.MaxJumpersPerPlayer
             let completedRounds = updatedPicks.Total() / List.length order
             let strategy = Order.OrderStrategyFactory.create state.Settings.Order
-            let (nextOrder, nextIdx) = strategy.ComputeNextOrder(order, currentIdx, completedRounds, state.Seed)
+
+            let (nextOrder, nextIdx) =
+                strategy.ComputeNextOrder(order, currentIdx, completedRounds, state.Seed)
+
             let newPhase =
                 if updatedPicks.Total() = totalAllowed then
                     Done updatedPicks
                 else
                     Running(nextIdx, nextOrder, updatedPicks)
-            { state with Phase = newPhase; Version = version }
+
+            { state with
+                Phase = newPhase
+                Version = version }
         | _ -> state
 
     | DraftEventPayload.DraftEndedV1 _ ->
         match state.Phase with
-        | Running(_, _, picks) -> { state with Phase = Done picks; Version = version }
+        | Running(_, _, picks) ->
+            { state with
+                Phase = Done picks
+                Version = version }
         | _ -> state
 
 let evolveFromEvents (events: DomainEvent<DraftEventPayload> list) : Draft =

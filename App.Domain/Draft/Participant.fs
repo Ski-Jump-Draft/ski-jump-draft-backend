@@ -22,4 +22,5 @@ module Name =
 
     let value (Name v) = v
 
-type Participant = { Id: Id; Name: Name }
+type Participant =
+    { Id: Id } //; Name: Name }

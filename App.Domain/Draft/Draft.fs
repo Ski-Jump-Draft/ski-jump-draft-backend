@@ -19,15 +19,17 @@ type Phase =
 type Error =
     | InvalidPhase of expected: PhaseTag list * actual: PhaseTag
     | ParticipantNotAllowedToPick of Participant.Id
+    | SubjectNotAvailable of Subject.Id
     | PickingLimitReached
-    | JumperTaken
+    | SubjectAlreadyPicked
 
 type Draft =
     private
         { Id: Id.Id
           Version: AggregateVersion
           Settings: Settings.Settings
-          Participants: Participant.Id list
+          Participants: Participant.Participant list
+          Subjects: Subject.Subject list
           Seed: uint64
           Phase: Phase }
 
@@ -43,19 +45,50 @@ type Draft =
         | Running _ -> RunningTag
         | Done _ -> DoneTag
 
-    static member Create id version settings participants seed : Result<Draft * DraftEventPayload list, Error> =
+    static member Create
+        id
+        version
+        settings
+        participants
+        subjects
+        seed
+        : Result<Draft * DraftEventPayload list, Error> =
         let state =
             { Id = id
               Version = version
               Settings = settings
               Participants = participants
+              Subjects = subjects
               Seed = seed
               Phase = NotStarted }
 
+        let subjectDtos =
+            subjects
+            |> List.map (fun s ->
+                match s.Identity with
+                | Subject.Identity.Jumper j ->
+                    { Id = s.Id
+                      Identity =
+                        DraftSubjectIdentityDto.Jumper
+                            { Name = j.Name
+                              Surname = j.Surname
+                              CountryCode = j.CountryCode } }
+                | Subject.Identity.Team t ->
+                    { Id = s.Id
+                      Identity =
+                        DraftSubjectIdentityDto.Team
+                            { Name = t.Name
+                              CountryCode = t.CountryCode } })
+
         let event: DraftCreatedV1 =
             { DraftId = id
-              Settings = settings
-              Participants = participants
+              Settings =
+                { Order = settings.Order
+                  MaxJumpersPerPlayer = settings.MaxJumpersPerPlayer
+                  PickTimeout = settings.PickTimeout
+                  UniqueJumpers = settings.UniqueJumpers }
+              Participants = participants |> List.map (fun p -> { DraftParticipantDto.Id = p.Id })
+              Subjects = subjectDtos
               Seed = seed }
 
         Ok(state, [ DraftEventPayload.DraftCreatedV1 event ])
@@ -64,11 +97,13 @@ type Draft =
         match this.Phase with
         | NotStarted ->
             let strategy = OrderStrategyFactory.create this.Settings.Order
-            let initialOrd = strategy.ComputeInitialOrder(this.Participants, this.Seed)
+            let participantIds = this.Participants |> List.map _.Id
+
+            let initialOrder = strategy.ComputeInitialOrder(participantIds, this.Seed)
 
             let newState =
                 { this with
-                    Phase = Running(0, initialOrd, Picks.Empty initialOrd) }
+                    Phase = Running(0, initialOrder, Picks.Empty initialOrder) }
 
             let payload: DraftStartedV1 = { DraftId = this.Id }
 
@@ -79,12 +114,15 @@ type Draft =
     member this.Pick(participantId: Participant.Id, subjectId: Subject.Id) =
         match this.Phase with
         | Running(currentIdx, order, picks) ->
-            if order.[currentIdx] <> participantId then
+
+            if not (this.Subjects |> List.exists (fun s -> s.Id = subjectId)) then
+                Error(SubjectNotAvailable subjectId)
+            elif order.[currentIdx] <> participantId then
                 Error(ParticipantNotAllowedToPick participantId)
             elif picks.PicksNumberOf participantId >= int this.Settings.MaxJumpersPerPlayer then
                 Error PickingLimitReached
             elif this.Settings.UniqueJumpers && picks.ContainsSubject subjectId then
-                Error JumperTaken
+                Error SubjectAlreadyPicked
             else
                 let updatedPicks = picks.AddPick(participantId, subjectId)
                 let totalAllowed = int this.Settings.MaxJumpersPerPlayer * List.length order

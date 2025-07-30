@@ -1,12 +1,39 @@
 module App.Domain.Draft.Event
 
+open System
 open App.Domain
+
+type DraftParticipantDto = { Id: Participant.Id }
+
+type DraftSubjectJumperDto =
+    { Name: Subject.Jumper.Name
+      Surname: Subject.Jumper.Surname
+      CountryCode: Subject.CountryCode }
+
+type DraftSubjectTeamDto =
+    { Name: Subject.Team.Name
+      CountryCode: Subject.CountryCode }
+
+type DraftSubjectIdentityDto =
+    | Jumper of DraftSubjectJumperDto
+    | Team of DraftSubjectTeamDto
+
+type DraftSubjectDto =
+    { Id: Subject.Id
+      Identity: DraftSubjectIdentityDto }
+
+type DraftSettingsDto =
+    { Order: Order.Order
+      MaxJumpersPerPlayer: uint
+      UniqueJumpers: bool
+      PickTimeout: Picks.PickTimeout }
 
 [<Struct; CLIMutable>]
 type DraftCreatedV1 =
     { DraftId: Draft.Id.Id
-      Settings: Draft.Settings.Settings
-      Participants: Draft.Participant.Id list
+      Settings: DraftSettingsDto
+      Participants: DraftParticipantDto list
+      Subjects: DraftSubjectDto list
       Seed: uint64 }
 
 [<Struct; CLIMutable>]
