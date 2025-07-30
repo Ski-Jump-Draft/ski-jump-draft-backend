@@ -42,14 +42,16 @@ type DraftPhaseEndedV1 =
       DraftId: Draft.Id.Id }
 
 [<Struct; CLIMutable>]
-type CompetitionPhaseStartedV1 =
-    { GameId: Game.Id.Id
-      CompetitionId: Game.Competition.Id }
+type GameCompetitionDto =
+    { CompetitionId: App.Domain.Competition.Id.Id }
 
 [<Struct; CLIMutable>]
-type CompetitionPhaseEndedV1 =
+type CompetitionPhaseStartedV1 =
     { GameId: Game.Id.Id
-      CompetitionId: Game.Competition.Id }
+      GameCompetition: GameCompetitionDto }
+
+[<Struct; CLIMutable>]
+type CompetitionPhaseEndedV1 = { GameId: Game.Id.Id }
 
 [<Struct; CLIMutable>]
 type GameEndedV1 =

@@ -28,7 +28,7 @@ module Game =
     type Phase =
         | PreDraft of PreDraft.Id.Id
         | Draft of Draft.Id.Id
-        | Competition of Game.Competition.Id
+        | Competition of Game.Competition
         | Ended of GameRanking
         | Break of Next: PhaseTag
 
@@ -198,16 +198,16 @@ type Game =
             Ok(state, [ GameEventPayload.DraftPhaseEndedV1 event ])
         | _ -> Error(InvalidPhase([ DraftTag ], Game.TagOfPhase this.Phase))
 
-    member this.StartCompetition competitionId =
+    member this.StartCompetition(gameCompetition) =
         match this.Phase with
         | Break(Next = PhaseTag.CompetitionTag) ->
             let state =
                 { this with
-                    Phase = Phase.Competition competitionId }
+                    Phase = Phase.Competition gameCompetition }
 
             let event: CompetitionPhaseStartedV1 =
                 { GameId = this.Id
-                  CompetitionId = competitionId }
+                  GameCompetition = { CompetitionId = gameCompetition.CompetitionId } }
 
             Ok(state, [ GameEventPayload.CompetitionPhaseStartedV1 event ])
 
@@ -220,9 +220,7 @@ type Game =
                 { this with
                     Phase = Phase.Break PhaseTag.EndedTag }
 
-            let event: CompetitionPhaseEndedV1 =
-                { GameId = this.Id
-                  CompetitionId = competitionId }
+            let event: CompetitionPhaseEndedV1 = { GameId = this.Id }
 
             Ok(state, [ GameEventPayload.CompetitionPhaseEndedV1 event ])
         | _ -> Error(InvalidPhase([ CompetitionTag ], Game.TagOfPhase this.Phase))

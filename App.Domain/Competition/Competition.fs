@@ -34,7 +34,7 @@ open Internal
 type Competition =
     { Id: Id.Id
       Phase: Phase.Phase
-      Engine: Engine.IEngine }
+      Engine: IEngine }
 
     static member TagOfPhase phase =
         match phase with
@@ -48,7 +48,7 @@ type Competition =
     member this.InvalidPhaseError expected =
         InvalidPhase(expected, Competition.TagOfPhase(this.Phase))
 
-    static member Create id (engine: IEngine) startlistId resultsId =
+    static member Create id (engine: IEngine) =
         let startlist = engine.GenerateStartlist()
 
         let state =

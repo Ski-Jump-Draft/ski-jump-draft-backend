@@ -59,7 +59,7 @@ let evolve (state: Game) (event: DomainEvent<GameEventPayload>) =
 
     | GameEventPayload.CompetitionPhaseStartedV1 e ->
         { state with
-            Phase = Phase.Competition e.CompetitionId
+            Phase = Phase.Competition(App.Domain.Game.Competition.Create e.GameCompetition.CompetitionId)
             Version = version }
 
     | GameEventPayload.CompetitionPhaseEndedV1 _ ->

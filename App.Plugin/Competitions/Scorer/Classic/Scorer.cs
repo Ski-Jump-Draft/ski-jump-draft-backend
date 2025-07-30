@@ -18,7 +18,7 @@ public sealed class ClassicJumpScorer(
     {
         var distance = DistanceModule.value(jump.Distance);
         var kPoint = HillModule.KPointModule.value(jump.KPoint);
-        var hsPoint = HillModule.HSPointModule.value(jump.HSPoint);
+        var hsPoint = HillModule.HsPointModule.value(jump.HsPoint);
         var hillType = ClassifyByHs(hsPoint);
 
         var distancePoints = PointsPerKPoint(hillType) + ((distance - kPoint) * PointsPerMeter(kPoint));

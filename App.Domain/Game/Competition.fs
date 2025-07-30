@@ -15,9 +15,7 @@ module Competition =
           EngineRawOptions: Map<string, obj> }
 
 type Competition =
-    { Id: Competition.Id
-      CompetitionId: App.Domain.Competition.Id.Id }
+    private
+        { CompetitionId: App.Domain.Competition.Id.Id }
 
-    static member Create id competitionId =
-        { Id = id
-          CompetitionId = competitionId }
+    static member Create competitionId = { CompetitionId = competitionId }

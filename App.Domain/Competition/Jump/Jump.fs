@@ -20,12 +20,12 @@ module Jump =
     type Id = Id of System.Guid
 
 type Jump =
-    { Id: Jump.Id
+    { //Id: Jump.Id
       IndividualParticipantId: IndividualParticipant.Id
-      HillId: Hill.Id
+      Hill: Hill
       GateStatus: Gate.GateStatus
       WindMeasurement: Wind.WindMeasurement
       JudgeMarks: Judgement.JudgeMarksList option
       Distance: Distance
       KPoint: Hill.KPoint
-      HSPoint: Hill.HSPoint }
+      HsPoint: Hill.HsPoint }

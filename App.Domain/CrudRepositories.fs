@@ -45,8 +45,11 @@ type public IPreDraftHillRepository =
     inherit IDomainCrudRepository<Domain.PreDraft.Competitions.Hill.Id, Domain.PreDraft.Competitions.Hill>
 
 // --- Competition ---
-type public ICompetitionHillRepository =
-    inherit IDomainCrudRepository<Domain.Competition.Hill.Id, Domain.Competition.Hill>
+
+// TODO: Może przywrócić te repozytorium?
+//
+// type public ICompetitionHillRepository =
+//     inherit IDomainCrudRepository<Domain.Competition.Hill.Id, Domain.Competition.Hill>
 
 // type public ICompetitionResultsRepository =
 //     inherit IDomainCrudRepository<Domain.Competition.ResultsModule.Id, Domain.Competition.ResultsModule.Results>
