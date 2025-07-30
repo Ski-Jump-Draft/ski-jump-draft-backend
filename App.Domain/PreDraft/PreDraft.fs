@@ -4,7 +4,6 @@ open App.Domain
 open App.Domain.PreDraft.Event
 open App.Domain.PreDraft.Id
 open App.Domain.PreDraft.Competitions
-open App.Domain.Time
 
 open App.Domain.PreDraft.Phase
 
@@ -20,84 +19,51 @@ type PreDraft =
 
     static member TagOfPhase phase =
         match phase with
-        | NotStarted -> NotStartedTag
-        | Competition _ -> CompetitionTag
-        | Break _ -> BreakTag
+        | InProgress _ -> InProgressTag
         | Ended -> EndedTag
 
-    static member Create id settings clock =
+    static member Create id settings firstCompetitionId : Result<PreDraft * PreDraftEventPayload list, Error> =
         let state =
             { Id = id
-              Phase = NotStarted
+              Phase = InProgress(CompetitionIndex 0u, firstCompetitionId)
               Settings = settings }
 
-        let event: PreDraftCreatedV1 = { PreDraftId = id; Settings = settings }
+        let createdEvent: PreDraftCreatedV1 = { PreDraftId = id; Settings = settings }
 
-        Ok(state, [ event ])
+        let preDraftCompetitionStarted: PreDraftCompetitionStartedV1 =
+            { PreDraftId = id
+              Index = CompetitionIndex 0u
+              CompetitionId = firstCompetitionId }
 
-    member this.StartCompetition(competitionId: Competition.Id) =
+        Ok(
+            state,
+            [ PreDraftEventPayload.PreDraftCreatedV1 createdEvent
+              PreDraftEventPayload.PreDraftCompetitionStartedV1 preDraftCompetitionStarted ]
+        )
+
+    member this.Advance(maybeCompetitionId: Competition.Id option) =
         match this.Phase with
-        | NotStarted ->
-            let index = CompetitionIndex(0u)
+        | InProgress(index, competitionId) ->
+            match maybeCompetitionId with
+            | None ->
+                let state = { this with Phase = Ended }
+                let event = PreDraftEndedV1 { PreDraftId = this.Id }
+                Ok(state, [ event ])
 
-            let state =
-                { this with
-                    Phase = Phase.Competition(index, competitionId) }
+            | Some nextCompetitionId ->
+                let nextCompetitionIndex =
+                    let (CompetitionIndex i) = index in CompetitionIndex(i + 1u) // lol
 
-            let preDraftStartedEvent: PreDraftStartedV1 = { PreDraftId = this.Id }
+                let state =
+                    { this with
+                        Phase = InProgress(nextCompetitionIndex, nextCompetitionId) }
 
-            let competitionStartedEvent: CompetitionStartedV1 =
-                { PreDraftId = this.Id
-                  Index = index
-                  CompetitionId = competitionId }
+                let event =
+                    PreDraftCompetitionStartedV1
+                        { PreDraftId = this.Id
+                          CompetitionId = nextCompetitionId
+                          Index = nextCompetitionIndex }
 
-            Ok(
-                state,
-                [ PreDraftEventPayload.PreDraftStartedV1 preDraftStartedEvent
-                  PreDraftEventPayload.CompetitionStartedV1 competitionStartedEvent ]
-            )
-        | Break nextCompetitionIndex ->
-            let state =
-                { this with
-                    Phase = Competition(nextCompetitionIndex, competitionId) }
+                Ok(state, [ event ])
 
-            let competitionStartedEvent: CompetitionStartedV1 =
-                { PreDraftId = this.Id
-                  Index = nextCompetitionIndex
-                  CompetitionId = competitionId }
-
-            Ok(state, [ PreDraftEventPayload.CompetitionStartedV1 competitionStartedEvent ])
-        | _ -> Error(InvalidPhase([ PhaseTag.NotStartedTag; PhaseTag.BreakTag ], PreDraft.TagOfPhase(this.Phase)))
-
-    member this.EndCurrentCompetition =
-        match this.Phase with
-        | Competition(competitionIndex, competitionId) ->
-            let (CompetitionIndex competitionIndexUint) = competitionIndex
-            let maxCompetitionIndex = uint (this.Settings.Competitions.Length - 1)
-            let nextCompetitionIndexUint = competitionIndexUint + 1u
-            let shouldEnd = nextCompetitionIndexUint > maxCompetitionIndex
-
-            let phase =
-                if shouldEnd then
-                    Phase.Ended
-                else
-                    Phase.Break(CompetitionIndex(nextCompetitionIndexUint))
-
-            let state = { this with Phase = phase }
-
-            let competitionEndedEvent: CompetitionEndedV1 =
-                { PreDraftId = this.Id
-                  Index = competitionIndex
-                  CompetitionId = competitionId }
-
-            let preDraftEnded: PreDraftEndedV1 = { PreDraftId = this.Id }
-
-            let events =
-                if shouldEnd then
-                    [ PreDraftEventPayload.CompetitionEndedV1 competitionEndedEvent
-                      PreDraftEventPayload.PreDraftEndedV1 preDraftEnded ]
-                else
-                    [ PreDraftEventPayload.CompetitionEndedV1 competitionEndedEvent ]
-
-            Ok(state, events)
-        | _ -> Error(InvalidPhase([ PhaseTag.CompetitionTag ], PreDraft.TagOfPhase(this.Phase)))
+        | Ended -> Error(InvalidPhase([ PhaseTag.InProgressTag ], PreDraft.TagOfPhase(this.Phase)))

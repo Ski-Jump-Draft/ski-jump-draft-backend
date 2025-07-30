@@ -42,8 +42,8 @@ type public IMatchmakingParticipantRepository =
 type public IPreDraftHillRepository =
     inherit IDomainCrudRepository<Domain.PreDraft.Competitions.Hill.Id, Domain.PreDraft.Competitions.Hill>
 
-type public IPreDraftCompetitionRepository =
-    inherit IDomainCrudRepository<Domain.PreDraft.Competitions.Competition.Id, Domain.PreDraft.Competitions.Competition>
+// type public IPreDraftCompetitionRepository =
+//     inherit IDomainCrudRepository<Domain.PreDraft.Competitions.Competition.Id, Domain.PreDraft.Competitions.Competition>
 
 // --- Competition ---
 type public ICompetitionHillRepository =

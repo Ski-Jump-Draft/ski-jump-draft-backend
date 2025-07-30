@@ -11,16 +11,7 @@ type PreDraftCreatedV1 =
       Settings: Settings }
 
 [<Struct; CLIMutable>]
-type PreDraftStartedV1 = { PreDraftId: Id.Id }
-
-[<Struct; CLIMutable>]
-type CompetitionStartedV1 =
-    { PreDraftId: Id.Id
-      Index: CompetitionIndex
-      CompetitionId: Competition.Id }
-
-[<Struct; CLIMutable>]
-type CompetitionEndedV1 =
+type PreDraftCompetitionStartedV1 =
     { PreDraftId: Id.Id
       Index: CompetitionIndex
       CompetitionId: Competition.Id }
@@ -30,16 +21,12 @@ type PreDraftEndedV1 = { PreDraftId: Id.Id }
 
 type PreDraftEventPayload =
     | PreDraftCreatedV1 of PreDraftCreatedV1
-    | PreDraftStartedV1 of PreDraftStartedV1
-    | CompetitionStartedV1 of CompetitionStartedV1
-    | CompetitionEndedV1 of CompetitionEndedV1
+    | PreDraftCompetitionStartedV1 of PreDraftCompetitionStartedV1
     | PreDraftEndedV1 of PreDraftEndedV1
 
 module Versioning =
     let schemaVersion =
         function
         | PreDraftCreatedV1 _ -> 1us
-        | PreDraftStartedV1 _ -> 1us
-        | CompetitionStartedV1 _ -> 1us
-        | CompetitionEndedV1 _ -> 1us
+        | PreDraftCompetitionStartedV1 _ -> 1us
         | PreDraftEndedV1 _ -> 1us

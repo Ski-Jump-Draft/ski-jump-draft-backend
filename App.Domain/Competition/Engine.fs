@@ -16,12 +16,13 @@ type Phase =
 type Id = Id of System.Guid
 
 module Template =
-    //type Id = Id of System.Guid
+    type Id = Id of System.Guid
     type Name = Name of string
     type Description = Description of string
     type Author = Author of string
 
 type ITemplate =
+    abstract Id: Template.Id
     abstract Name: Template.Name
     abstract Description: Template.Description
     abstract Author: Template.Author
@@ -46,4 +47,3 @@ type IEngine =
     abstract Startlist: Startlist
     abstract ToSnapshot: unit -> EngineSnapshotBlob
     abstract LoadSnapshot: EngineSnapshotBlob -> unit
-
