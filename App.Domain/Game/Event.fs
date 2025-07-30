@@ -1,30 +1,25 @@
 module App.Domain.Game.Event
 
 open App.Domain
-open App.Domain.Game.Hosting
+open App.Domain.Game.Participant
 open App.Domain.Game.Ranking
 
 [<Struct; CLIMutable>]
 type GameCreatedV1 =
     { GameId: Game.Id.Id
-      ServerId: Server.Id
-      Settings: Settings.Settings }
-
-[<Struct; CLIMutable>]
-type ParticipantJoinedV1 =
-    { GameId: Game.Id.Id
-      ParticipantId: Participant.Id }
+      Settings: Settings.Settings
+      Participants: Participants }
+//
+// [<Struct; CLIMutable>]
+// type ParticipantJoinedV1 =
+//     { GameId: Game.Id.Id
+//       ParticipantId: Participant.Id }
 
 [<Struct; CLIMutable>]
 type ParticipantLeftV1 =
     { GameId: Game.Id.Id
-      ParticipantId: Participant.Id }
-//
-// [<Struct; CLIMutable>]
-// type MatchmakingPhaseStartedV1 = { GameId: Game.Id.Id }
-//
-// [<Struct; CLIMutable>]
-// type MatchmakingPhaseEndedV1 = { GameId: Game.Id.Id }
+      // ParticipantId: Participant.Id }
+      Participant: Participant.Participant }
 
 [<Struct; CLIMutable>]
 type PreDraftPhaseStartedV1 =
@@ -59,11 +54,11 @@ type CompetitionPhaseEndedV1 =
 [<Struct; CLIMutable>]
 type GameEndedV1 =
     { GameId: Game.Id.Id
-      Results: EndedGameResults.Ranking }
+      Ranking: GameRanking }
 
 type GameEventPayload =
     | GameCreatedV1 of GameCreatedV1
-    | ParticipantJoinedV1 of ParticipantJoinedV1
+    //| ParticipantJoinedV1 of ParticipantJoinedV1
     | ParticipantLeftV1 of ParticipantLeftV1
     | PreDraftPhaseStartedV1 of PreDraftPhaseStartedV1
     | PreDraftPhaseEndedV1 of PreDraftPhaseEndedV1
@@ -77,7 +72,7 @@ module Versioning =
     let schemaVersion =
         function
         | GameCreatedV1 _ -> 1us
-        | ParticipantJoinedV1 _ -> 1us
+        //| ParticipantJoinedV1 _ -> 1us
         | ParticipantLeftV1 _ -> 1us
         | PreDraftPhaseStartedV1 _ -> 1us
         | PreDraftPhaseEndedV1 _ -> 1us

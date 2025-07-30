@@ -29,7 +29,7 @@ public abstract class DefaultEventSourcedRepository<TAggregate, TId, TPayload>(
     }
 
     public async Task SaveAsync(
-        TAggregate aggregate,
+        TId aggregateId,
         FSharpList<TPayload> payloads,
         AggregateVersion.AggregateVersion expectedVersionAfterSave,
         Guid correlationId,
@@ -51,7 +51,7 @@ public abstract class DefaultEventSourcedRepository<TAggregate, TId, TPayload>(
                     payload))
             .ToList();
 
-        await store.AppendAsync(id(aggregate), domainEvents, (int)expectedVersionAfterSave.Item, ct)
+        await store.AppendAsync(aggregateId, domainEvents, (int)expectedVersionAfterSave.Item, ct)
             .ConfigureAwait(false);
         await eventBus.PublishAsync(domainEvents, ct).ConfigureAwait(false);
     }

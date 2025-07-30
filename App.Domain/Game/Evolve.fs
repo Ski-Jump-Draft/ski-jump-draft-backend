@@ -3,6 +3,7 @@ module App.Domain.Game.Evolve
 open App.Domain.Game
 open App.Domain.Game.Event
 open App.Domain.Game.Game
+open App.Domain.Game.Participant
 open App.Domain.Shared
 open App.Domain.Shared.AggregateVersion
 
@@ -14,23 +15,23 @@ let evolve (state: Game) (event: DomainEvent<GameEventPayload>) =
     | GameEventPayload.GameCreatedV1 e ->
         { Id = e.GameId
           Version = version
-          ServerId = e.ServerId
+          //ServerId = e.ServerId
           Settings = e.Settings
           Participants = Participants.empty
           Phase = Phase.Break PhaseTag.PreDraftTag }
 
-    | GameEventPayload.ParticipantJoinedV1 e ->
-        let participants =
-            match Participants.add e.ParticipantId state.Participants with
-            | Ok ps -> ps
-            | Error _ -> state.Participants
-
-        { state with
-            Participants = participants
-            Version = version }
+    // | GameEventPayload.ParticipantJoinedV1 e ->
+    //     let participants =
+    //         match Participants.add e.ParticipantId state.Participants with
+    //         | Ok ps -> ps
+    //         | Error _ -> state.Participants
+    //
+    //     { state with
+    //         Participants = participants
+    //         Version = version }
 
     | GameEventPayload.ParticipantLeftV1 e ->
-        let participants = Participants.remove e.ParticipantId state.Participants
+        let participants = Participants.remove e.Participant state.Participants
 
         { state with
             Participants = participants
@@ -68,7 +69,7 @@ let evolve (state: Game) (event: DomainEvent<GameEventPayload>) =
 
     | GameEventPayload.GameEndedV1 e ->
         { state with
-            Phase = Phase.Ended e.Results
+            Phase = Phase.Ended e.Ranking
             Version = version }
 
 /// Evolves a full aggregate state from a historical list of domain events.

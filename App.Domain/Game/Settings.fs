@@ -62,35 +62,27 @@ module PhaseTransitionPolicy =
             | Retry
             | DelegateControlToHost
 
-    // type EndingMatchmaking =
-    //     | HostDecides of HostDecisionTimeout option
-    //     | AutoAfter of
-    //         AutostartAfterTime.Time *
-    //         AutostartAfterTime.MinimalPlayersCount *
-    //         AutostartAfterTime.FailurePolicy
-    //     | AutoWhenFull
-
     type StartingPreDraft =
         | HostDecides of HostDecisionTimeout
-        | AutoAfter of TimeSpan
+        | AutoAfter of TimeSpan option
 
     type StartingDraft =
         | HostDecides of HostDecisionTimeout
-        | AutoAfter of TimeSpan
+        | AutoAfter of TimeSpan option
 
     type StartingSimulating =
         | HostDecides of HostDecisionTimeout
-        | AutoAfter of TimeSpan
+        | AutoAfter of TimeSpan option
 
     type EndingGame =
         | HostDecides of HostDecisionTimeout
-        | AutoAfter of TimeSpan
+        | AutoAfter of TimeSpan option
 
 type Settings =
     { ParticipantLimit: ParticipantLimit
-      PreDraftSettings: App.Domain.PreDraft.Settings.Settings
-      DraftSettings: App.Domain.Draft.Settings.Settings
-      CompetitionSettings: App.Domain.Game.Competition.Settings
+      // PreDraftSettings: App.Domain.PreDraft.Settings.Settings
+      // DraftSettings: App.Domain.Draft.Settings.Settings
+      // CompetitionSettings: Domain.Game.Competition.Settings
       StartingPreDraftPolicy: PhaseTransitionPolicy.StartingPreDraft
       StartingDraftPolicy: PhaseTransitionPolicy.StartingDraft
       StartingCompetitionPolicy: PhaseTransitionPolicy.StartingSimulating

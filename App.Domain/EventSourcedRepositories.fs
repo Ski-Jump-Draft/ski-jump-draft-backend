@@ -14,7 +14,7 @@ type IEventSourcedRepository<'TAggregate, 'TId, 'TPayload> =
     abstract LoadAsync: Id: 'TId * Ct: CancellationToken -> Task<'TAggregate option>
 
     abstract SaveAsync:
-        Aggregate: 'TAggregate *
+        AggregateId: 'TId *
         Events: 'TPayload list *
         ExpectedVersion: AggregateVersion *
         CorrelationId: System.Guid *
