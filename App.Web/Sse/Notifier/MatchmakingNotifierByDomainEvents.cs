@@ -1,16 +1,12 @@
-using System.Collections.Concurrent;
-using System.Runtime.CompilerServices;
-using System.Threading.Channels;
 using App.Application.Abstractions;
 using App.Application.Projection;
 using App.Domain.Matchmaking;
 using App.Domain.Shared;
-using Microsoft.AspNetCore.SignalR;
 
-namespace App.Web.Hub.Matchmaking;
+namespace App.Web.Sse.Notifier;
 
 public class MatchmakingNotifierByDomainEvents(
-    IHubContext<MatchmakingHub> hub,
+    ISseStream sse,
     IActiveMatchmakingsProjection activeMatchmakings)
     : IEventHandler<Event.MatchmakingEventPayload>
 {
@@ -23,11 +19,11 @@ public class MatchmakingNotifierByDomainEvents(
                 var matchmakingId = playerJoinedEvent.Item.MatchmakingId.Item;
                 var matchmaking = await activeMatchmakings.GetActiveMatchmakingAsync(matchmakingId, ct);
                 ValidateActiveMatchmaking(matchmaking, matchmakingId, "MatchmakingPlayerJoinedV1");
-                await hub.Clients.Group(matchmakingId.ToString()).SendAsync("updated", new
+                await sse.PublishAsync(matchmakingId.ToString(), "updated", new
                 {
                     CurrentPlayersCount = matchmaking!.CurrentPlayersCount,
-                    MaxPlayersCount = matchmaking.MaxPlayersCount,
-                }, cancellationToken: ct);
+                    MaxPlayersCount = matchmaking.MaxPlayersCount
+                }, ct);
                 break;
             }
             case Event.MatchmakingEventPayload.MatchmakingPlayerLeftV1 playerLeftEvent:
@@ -35,30 +31,32 @@ public class MatchmakingNotifierByDomainEvents(
                 var matchmakingId = playerLeftEvent.Item.MatchmakingId.Item;
                 var matchmaking = await activeMatchmakings.GetActiveMatchmakingAsync(matchmakingId, ct);
                 ValidateActiveMatchmaking(matchmaking, matchmakingId, "MatchmakingPlayerLeftV1");
-                await hub.Clients.Group(matchmakingId.ToString()).SendAsync("updated", new
+                await sse.PublishAsync(matchmakingId.ToString(), "updated", new
                 {
                     CurrentPlayersCount = matchmaking!.CurrentPlayersCount,
-                    MaxPlayersCount = matchmaking.MaxPlayersCount,
-                }, cancellationToken: ct);
+                    MaxPlayersCount = matchmaking.MaxPlayersCount
+                }, ct);
                 break;
             }
             case Event.MatchmakingEventPayload.MatchmakingEndedV1 matchmakingEndedEvent:
             {
                 var matchmakingId = matchmakingEndedEvent.Item.MatchmakingId.Item;
-                await hub.Clients.Group(matchmakingId.ToString()).SendAsync("ended", new
+
+                await sse.PublishAsync(matchmakingId.ToString(), "ended", new
                 {
-                    PlayersCount = matchmakingEndedEvent.Item.PlayersCount,
-                }, cancellationToken: ct);
+                    PlayersCount = matchmakingEndedEvent.Item,
+                }, ct);
                 break;
             }
             case Event.MatchmakingEventPayload.MatchmakingFailedV1 matchmakingFailedEvent:
             {
                 var matchmakingId = matchmakingFailedEvent.Item.MatchmakingId.Item;
-                await hub.Clients.Group(matchmakingId.ToString()).SendAsync("failed", new
+
+                await sse.PublishAsync(matchmakingId.ToString(), "failed", new
                 {
                     PlayersCount = matchmakingFailedEvent.Item.PlayersCount,
                     Reason = matchmakingFailedEvent.Item.Error.ToString(),
-                }, cancellationToken: ct);
+                }, ct);
                 break;
             }
         }

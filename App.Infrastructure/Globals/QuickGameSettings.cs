@@ -22,7 +22,7 @@ public class DefaultQuickGameSettingsProvider(
             Tuple.Create("EnableWindPoints", (object)true),
             Tuple.Create("RoundLimits", (object)new List<string> { "Soft 50", "Soft 30" })
         ]);
-        
+
         var gameWorldHill = hillSelector.Select();
         var gameWorldHillId = gameWorldHill.Id_;
 
@@ -42,7 +42,7 @@ public class DefaultQuickGameSettingsProvider(
         var draftSettings = new Domain.Draft.Settings.Settings(Order.Snake, 4, true,
             Picks.PickTimeout.NewFixed(pickTimeoutFixedTime));
         var competitionSettings =
-            new App.Domain.Game.CompetitionModule.Settings(gameWorldHillId, "classic", classicEngineOptions);
+            new App.Domain.Game.CompetitionModule.Settings("classic", classicEngineOptions);
 
         return Task.FromResult(new Settings.Settings(participantLimit, preDraftSettings, draftSettings,
             competitionSettings, Settings.PhaseTransitionPolicy.StartingPreDraft.NewAutoAfter(TimeSpan.FromSeconds(15)),

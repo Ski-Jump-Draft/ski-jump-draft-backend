@@ -11,7 +11,10 @@ public static class GameWorld
         return
         [
             new Country(CountryModule.Id.NewId(Guid.Parse("c4f3ffed-1576-425f-b84d-fc5cb37b362d")),
-                CountryCodeModule.tryCreate("POL").Value)
+                CountryCodeModule.tryCreate("POL").Value),
+            new Country(CountryModule.Id.NewId(Guid.Parse("d2117abc-1576-425f-b84d-fc5cb37b362d")
+                ),
+                CountryCodeModule.tryCreate("NOR").Value)
         ];
     }
 
@@ -26,15 +29,15 @@ public static class GameWorld
 
         return new[]
         {
-            Hill.Create(HillId.NewHillId(Guid.Parse("11111111-1111-1111-1111-11111111111")),
+            Hill.Create(HillId.NewHillId(Guid.Parse("bdb53387-47ee-4180-9fbb-e2e6c8fd6001")),
                 HillModule.Location.NewLocation("Zakopane"), HillModule.Name.NewName("Wielka Krokiew"),
                 GetCountry("POL"), HillModule.KPointModule.tryCreate(125).Value,
                 HillModule.HSPointModule.tryCreate(140).Value),
-            Hill.Create(HillId.NewHillId(Guid.Parse("22222222-2222-2222-2222-22222222222")),
+            Hill.Create(HillId.NewHillId(Guid.Parse("41c03a25-9d24-4ec0-8237-94df208e1642")),
                 HillModule.Location.NewLocation("Oberstdorf"), HillModule.Name.NewName("Orlen Arena"),
                 GetCountry("POL"), HillModule.KPointModule.tryCreate(120).Value,
                 HillModule.HSPointModule.tryCreate(137).Value),
-            Hill.Create(HillId.NewHillId(Guid.Parse("22222223-3333-3333-3333-11111111111")),
+            Hill.Create(HillId.NewHillId(Guid.Parse("a4ffb647-5023-4418-adac-d0ad07346eb8")),
                 HillModule.Location.NewLocation("Vikersund"), HillModule.Name.NewName("Vikersundbakken"),
                 GetCountry("NOR"), HillModule.KPointModule.tryCreate(200).Value,
                 HillModule.HSPointModule.tryCreate(240).Value),

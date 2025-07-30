@@ -12,9 +12,9 @@ public class GameHub(ICommandBus commandBus, IGamePhasePlan gamePhasePlan, ICloc
     public async Task JoinGroup(string matchmakingId, string participantId, CancellationToken ct)
     {
         var createQuickGameCommand =
-            new App.Application.UseCase.Game.CreateQuickGame.Command(Guid.Parse(matchmakingId));
+            new Application.UseCase.Game.QuickGame.Create.Command(Guid.Parse(matchmakingId));
         var game = await commandBus
-            .SendAsync<App.Application.UseCase.Game.CreateQuickGame.Command, App.Domain.Game.Game>(
+            .SendAsync<Application.UseCase.Game.QuickGame.Create.Command, App.Domain.Game.Game>(
                 createQuickGameCommand, ct);
         await Groups.AddToGroupAsync(Context.ConnectionId, game.Id_.ToString(), ct);
         

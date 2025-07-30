@@ -2,7 +2,7 @@ using App.Domain.Shared;
 
 namespace App.Infrastructure.Utility;
 
-public class DefaultGuid : IGuid
+public class SystemGuid : IGuid
 {
     public System.Guid NewGuid()
     {

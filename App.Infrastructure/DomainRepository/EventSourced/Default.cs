@@ -31,25 +31,27 @@ public abstract class DefaultEventSourcedRepository<TAggregate, TId, TPayload>(
     public async Task SaveAsync(
         TAggregate aggregate,
         FSharpList<TPayload> payloads,
-        AggregateVersion.AggregateVersion expectedVersion,
+        AggregateVersion.AggregateVersion expectedVersionAfterSave,
         Guid correlationId,
         Guid causationId,
         CancellationToken ct = default)
     {
-        var domainEvents = payloads.Select(p =>
+        var version = (int)expectedVersionAfterSave.Item;
+        var domainEvents = payloads.Select(payload =>
                 new DomainEvent<TPayload>(
                     new EventHeader
                     {
                         EventId = guid.NewGuid(),
-                        SchemaVer = Convert.ToUInt16(schemaVersion(p)),
+                        AggregateVersion = (uint)version,
+                        SchemaVer = Convert.ToUInt16(schemaVersion(payload)),
                         OccurredAt = clock.Now,
                         CorrelationId = correlationId,
                         CausationId = causationId
                     },
-                    p))
+                    payload))
             .ToList();
 
-        await store.AppendAsync(id(aggregate), domainEvents, (int)expectedVersion.Item, ct)
+        await store.AppendAsync(id(aggregate), domainEvents, (int)expectedVersionAfterSave.Item, ct)
             .ConfigureAwait(false);
         await eventBus.PublishAsync(domainEvents, ct).ConfigureAwait(false);
     }

@@ -10,7 +10,10 @@ public static class AsyncExt
         }
         catch (System.Exception ex)
         {
-            throw wrap(ex);
+            var wrapped = wrap(ex);
+            if (wrapped.InnerException == null && wrapped is not null)
+                throw new System.Exception(wrapped.Message, ex);
+            throw wrapped!;
         }
     }
 
@@ -22,7 +25,10 @@ public static class AsyncExt
         }
         catch (System.Exception ex)
         {
-            throw wrap(ex);
+            var wrapped = wrap(ex);
+            if (wrapped.InnerException == null && wrapped is not null)
+                throw new System.Exception(wrapped.Message, ex);
+            throw wrapped!;
         }
     }
 }

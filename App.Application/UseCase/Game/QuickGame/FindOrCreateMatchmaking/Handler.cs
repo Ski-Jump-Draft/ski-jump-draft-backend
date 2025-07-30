@@ -1,13 +1,14 @@
-namespace App.Application.UseCase.Game.QuickMatchmaking.FindOrCreate;
+using App.Application.UseCase.Helper;
 
-using App.Application.Abstractions;
-using App.Application.Exception;
-using App.Application.Ext;
-using App.Application.Projection;
-using App.Application.UseCase.Game.Exception;
+namespace App.Application.UseCase.Game.QuickGame.FindOrCreateMatchmaking;
+
+using Abstractions;
+using Ext;
+using Projection;
+using Exception;
 using App.Domain.Matchmaking;
-using App.Domain.Shared;
-using App.Domain.Repositories;
+using Domain.Shared;
+using Domain.Repositories;
 
 // TODO: Walidacja i nie raw string!
 public record Command(
@@ -18,7 +19,7 @@ public class Handler(
     IMatchmakingRepository matchmakings,
     IActiveGamesProjection activeGamesProjection,
     IActiveMatchmakingsProjection activeMatchmakingsProjection,
-    Func<Settings> getSettings,
+    IQuickGameMatchmakingSettingsProvider matchmakingSettingsProvider,
     IGuid guid
 ) : ICommandHandler<Command, Guid>
 {
@@ -50,9 +51,9 @@ public class Handler(
                 // TODO: Może hosty do matchmakingów?
                 // 
                 // var hostId = App.Domain.Matchmaking.Hosting.HostModule.Id.NewId(getGlobalHostId());
-                var settings = getSettings();
+                var settings = await matchmakingSettingsProvider.Provide();
                 var matchmaking =
-                    Domain.Matchmaking.Matchmaking.Create(matchmakingId, aggregateVersion, settings);
+                    Matchmaking.Create(matchmakingId, aggregateVersion, settings);
                 if (!matchmaking.IsOk)
                     throw new JoiningQuickMatchmakingFailedException(command.Nick,
                         JoiningQuickMatchmakingFailReason.ErrorDuringSettingUp);
@@ -63,7 +64,8 @@ public class Handler(
                 var causationId = correlationId;
                 var expectedVersion = matchmakingAggregate.Version_;
                 await
-                    matchmakings.SaveAsync(matchmakingAggregate, events, expectedVersion, correlationId, causationId, ct)
+                    matchmakings.SaveAsync(matchmakingAggregate, events, expectedVersion, correlationId, causationId,
+                            ct)
                         .AwaitOrWrap(_ => new JoiningQuickMatchmakingFailedException(command.Nick,
                             JoiningQuickMatchmakingFailReason.ErrorDuringSettingUp));
                 return matchmakingId.Item;

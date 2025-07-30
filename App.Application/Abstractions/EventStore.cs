@@ -2,7 +2,7 @@ using App.Domain.Shared;
 
 namespace App.Application.Abstractions;
 
-public interface IEventStore<TId, TPayload>
+public interface IEventStore<in TId, TPayload>
 {
     Task AppendAsync(
         TId streamId,

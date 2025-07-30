@@ -1,11 +1,13 @@
+using System.Text.Json.Serialization;
 using App.Web.DependencyInjection;
-using App.Web.Hub.Game;
-using App.Web.Hub.Matchmaking;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
-builder.Services.AddSignalR();
+builder.Services.AddControllers().AddJsonOptions(o =>
+{
+    o.JsonSerializerOptions.Converters.Add(new JsonFSharpConverter());
+});
+builder.Services.AddEndpointsApiExplorer();
 // TODO: Na produkcji
 //
 // builder.Services.AddMongo(builder.Configuration);
@@ -19,7 +21,9 @@ builder.Services
     .AddUtilities()
     .AddFactories()
     .AddPluginsInfrastructure()
-    .AddApplication();
+    .AddApplication()
+    .AddQuickGameApplicationHelpers()
+    .AddSseInfrastructure();
 
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
     p.WithOrigins("http://localhost:3000").AllowAnyHeader().AllowAnyMethod()));
@@ -39,7 +43,5 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.MapHub<MatchmakingHub>("/matchmaking/hub");
-app.MapHub<GameHub>("/game/hub");
 
 app.Run();

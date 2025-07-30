@@ -6,6 +6,7 @@ open App.Domain.Shared.EventHelpers
 open App.Domain.Time
 
 let create<'T>
+    (aggregateVer: uint)
     (schemaVer: uint16)
     (occuredAt: DateTimeOffset)
     (id: Guid)
@@ -16,6 +17,7 @@ let create<'T>
 
     let header =
         { EventId = id
+          AggregateVersion = aggregateVer
           SchemaVer = schemaVer
           OccurredAt = occuredAt
           CorrelationId = Some correlationId

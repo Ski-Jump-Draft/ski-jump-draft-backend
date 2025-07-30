@@ -1,5 +1,6 @@
 using App.Application.Factory;
-using App.Application.Factory.Impl.HillMapping;
+using App.Application.Factory.Helper.HillMapping;
+using App.Application.UseCase.Helper;
 
 namespace App.Web.DependencyInjection;
 
@@ -14,6 +15,10 @@ public static class FactoriesDependencyInjection
         //services.AddSingleton<IGameHillFactory, Application.Factory.Impl.GameHill.Default>();
         services.AddSingleton<IPreDraftCompetitionHillFactory, Application.Factory.Impl.PreDraftHill.Default>();
         services.AddSingleton<ICompetitionHillFactory, Application.Factory.Impl.CompetitionHill.Default>();
+
+        services
+            .AddSingleton<IMatchmakingParticipantFactory, Application.Factory.Impl.MatchmakingParticipant.Default>();
+        services.AddSingleton<IGameParticipantFactory, Application.Factory.Impl.GameParticipant.Default>();
 
         return services;
     }

@@ -1,4 +1,3 @@
-using App.Util;
 using App.Application.Exception;
 using App.Application.Ext;
 using App.Domain.PreDraft.Competitions;

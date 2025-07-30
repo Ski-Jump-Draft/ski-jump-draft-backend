@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using App.Application.Abstractions;
 using App.Application.Abstractions.Mappers;
 using App.Application.Exception;
@@ -5,6 +6,7 @@ using App.Application.Ext;
 using App.Application.Projection;
 using App.Application.ReadModel.Projection;
 using App.Application.UseCase.Game.Exception;
+using App.Application.UseCase.Helper;
 using App.Domain.Game;
 using App.Domain.Game.Hosting;
 using App.Domain.Shared;
@@ -12,7 +14,7 @@ using App.Domain.Repositories;
 using Microsoft.FSharp.Collections;
 using Settings = App.Domain.Game.Settings;
 
-namespace App.Application.UseCase.Game.CreateQuickGame;
+namespace App.Application.UseCase.Game.QuickGame.Create;
 
 public record Command(
     Guid MatchmakingId
@@ -20,11 +22,11 @@ public record Command(
 
 public class Handler(
     IGameRepository games,
-    IGameParticipantRepository gameParticipantsRepository,
+    //IMatchmakingParticipantRepository matchmakingParticipantRepository,
+    IGameParticipantRepository gameParticipantRepository,
     IMatchmakingRepository matchmakings,
     IMatchmakingParticipantsProjection matchmakingParticipantsProjection,
-    IValueMapper<MatchmakingParticipantDto, App.Domain.Game.Participant.Participant>
-        translateMatchmakingParticipantDtoToGameParticipant,
+    IGameParticipantFactory gameParticipantFactory,
     IQuickGameServerProvider quickGameServerProvider,
     IQuickGameSettingsProvider quickGameSettingsProvider,
     IGuid guid
@@ -39,9 +41,13 @@ public class Handler(
         var matchmakingParticipantDtos =
             (await matchmakingParticipantsProjection.GetParticipantsByMatchmakingIdAsync(matchmakingId)).ToArray();
         var gameParticipants =
-            matchmakingParticipantDtos.Select(translateMatchmakingParticipantDtoToGameParticipant.Map)
-                .ToArray();
+            matchmakingParticipantDtos.Select(gameParticipantFactory.CreateFromDto).ToImmutableArray();
         var gameParticipantIds = gameParticipants.Select(participant => participant.Id);
+        
+        foreach (var gameParticipant in gameParticipants)
+        {
+            await gameParticipantRepository.SaveAsync(gameParticipant.Id, gameParticipant);
+        }
 
         var serverId = await quickGameServerProvider.Provide();
 
@@ -63,7 +69,7 @@ public class Handler(
             await Task.WhenAll(
                 gameParticipants
                     .Select(gp =>
-                        gameParticipantsRepository.SaveAsync(gp.Id, gp)
+                        gameParticipantRepository.SaveAsync(gp.Id, gp)
                             .AwaitOrWrap(_ => new CreatingQuickGameFailedException(matchmaking)))
             );
 

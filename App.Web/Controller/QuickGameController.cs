@@ -20,15 +20,16 @@ public class QuickGameController(ICommandBus commandBus) : ControllerBase
     public async Task<IActionResult> Join([FromBody] JoinMatchmakingDto matchmakingDto, CancellationToken ct)
     {
         var findOrCreateCommand =
-            new Application.UseCase.Game.QuickMatchmaking.FindOrCreate.Command(matchmakingDto.Nick);
+            new Application.UseCase.Game.QuickGame.FindOrCreateMatchmaking.Command(matchmakingDto.Nick);
         var matchmakingId =
-            await commandBus.SendAsync<Application.UseCase.Game.QuickMatchmaking.FindOrCreate.Command, Guid>(
+            await commandBus.SendAsync<Application.UseCase.Game.QuickGame.FindOrCreateMatchmaking.Command, Guid>(
                 findOrCreateCommand, ct);
         var joinCommand =
-            new Application.UseCase.Game.QuickMatchmaking.Join.Command(matchmakingId, matchmakingDto.Nick);
+            new Application.UseCase.Game.QuickGame.JoinMatchmaking.Command(matchmakingId,
+                matchmakingDto.Nick);
         var matchmakingParticipantId =
             await commandBus
-                .SendAsync<Application.UseCase.Game.QuickMatchmaking.Join.Command,
+                .SendAsync<Application.UseCase.Game.QuickGame.JoinMatchmaking.Command,
                     App.Domain.Matchmaking.ParticipantModule.Id>(
                     joinCommand, ct);
 

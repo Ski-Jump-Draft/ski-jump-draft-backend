@@ -1,4 +1,3 @@
-using App.Application.Abstractions;
 using App.Util;
 
 namespace App.Application.Factory;

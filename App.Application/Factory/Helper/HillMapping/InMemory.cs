@@ -1,6 +1,6 @@
 using App.Util;
 
-namespace App.Application.Factory.Impl.HillMapping;
+namespace App.Application.Factory.Helper.HillMapping;
 
 // public class
 //     InMemoryGameHillMapping : InMemoryBiDirectionalIdMap<Domain.GameWorld.HillId, Domain.Game.Hill.Id>,

@@ -30,7 +30,7 @@ public static class DomainRepositoriesDependencyInjection
         ));
 
         services.AddSingleton<IGameWorldHillRepository, Infrastructure.DomainRepository.Crud.GameWorldHill.InMemory>();
-        //services.AddSingleton<IGameHillRepository, Infrastructure.DomainRepository.Crud.GameHill.InMemory>();
+        services.AddSingleton<IPreDraftHillRepository, Infrastructure.DomainRepository.Crud.PreDraftHill.InMemory>();
         services
             .AddSingleton<ICompetitionHillRepository, Infrastructure.DomainRepository.Crud.CompetitionHill.InMemory>();
 

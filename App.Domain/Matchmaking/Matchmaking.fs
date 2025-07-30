@@ -4,7 +4,6 @@ open App.Domain.Matchmaking.Event
 open App.Domain.Shared.AggregateVersion
 
 module internal Internal =
-
     let tag =
         function
         | Active _ -> ActiveTag
@@ -12,7 +11,6 @@ module internal Internal =
         | Ended _ -> EndedTag
 
     let expect phases actual = Error(InvalidPhase(phases, tag actual))
-
     let ok state (events: Event.MatchmakingEventPayload list) = Ok(state, events)
 
 open Internal
@@ -47,19 +45,18 @@ type Matchmaking =
         | Active players ->
             if not this.CanJoin then
                 match this.RoomIsFull with
-                | Ok roomIsFull ->
-                    if roomIsFull then
-                        let playersCount = players |> Set.count
-                        Error(Error.RoomFull playersCount)
-                    else
-                        Error(Error.InternalError)
-                | Error error -> Error(error)
-            elif players |> Set.contains playerId then
+                | Ok true -> Error(Error.RoomFull(Set.count players))
+                | Ok false -> Error(Error.InternalError)
+                | Error e -> Error e
+            elif Set.contains playerId players then
                 Error(Error.PlayerAlreadyJoined playerId)
             else
+                let nextVersion = increment this.Version
+
                 let state =
                     { this with
-                        Phase = Active(players |> Set.add playerId) }
+                        Phase = Active(Set.add playerId players)
+                        Version = nextVersion }
 
                 let events =
                     [ Event.MatchmakingPlayerJoinedV1
@@ -67,73 +64,75 @@ type Matchmaking =
                             ParticipantId = playerId } ]
 
                 ok state events
+        | phase -> expect [ ActiveTag ] phase
 
+    member this.Leave playerId =
+        match this.Phase with
+        | Active players when Set.contains playerId players ->
+            let nextVersion = increment this.Version
+
+            let state =
+                { this with
+                    Phase = Active(Set.remove playerId players)
+                    Version = nextVersion }
+
+            let events =
+                [ Event.MatchmakingPlayerLeftV1
+                      { MatchmakingId = this.Id
+                        ParticipantId = playerId } ]
+
+            ok state events
+        | Active _ -> Error(Error.PlayerNotJoined playerId)
+        | phase -> expect [ ActiveTag ] phase
+
+    member this.End =
+        match this.Phase with
+        | Active players ->
+            let nextVersion = increment this.Version
+
+            let state =
+                { this with
+                    Phase = Ended players
+                    Version = nextVersion }
+
+            let events =
+                [ Event.MatchmakingEndedV1
+                      { MatchmakingId = this.Id
+                        PlayersCount = Set.count players } ]
+
+            ok state events
+        | phase -> expect [ ActiveTag ] phase
+
+    member this.EndWithFailure reason =
+        match this.Phase with
+        | Active players ->
+            let nextVersion = increment this.Version
+
+            let state =
+                { this with
+                    Phase = Failed(players, reason)
+                    Version = nextVersion }
+
+            let events =
+                [ Event.MatchmakingFailedV1
+                      { MatchmakingId = this.Id
+                        PlayersCount = Set.count players
+                        Error = reason } ]
+
+            ok state events
         | phase -> expect [ ActiveTag ] phase
 
     member this.RoomIsFull: Result<bool, Error> =
         match this.Phase with
         | Active players ->
             let limit = PlayersCount.value this.Settings.MaxPlayersCount
-            Ok((players |> Set.count) = limit)
+            Ok(Set.count players = limit)
         | phase -> expect [ ActiveTag ] phase
 
     member this.CanJoin =
         match this.Phase with
-        | Active players ->
+        | Active _ ->
             match this.RoomIsFull with
-            | Ok roomIsFull -> not roomIsFull
-            | Error error -> false
+            | Ok full -> not full
+            | _ -> false
         | _ -> false
-
-    member this.Leave playerId =
-        match this.Phase with
-        | Active players ->
-            if not (players |> Set.contains playerId) then
-                Error(Error.PlayerNotJoined playerId)
-            else
-                let state =
-                    { this with
-                        Phase = Active(players |> Set.remove playerId) }
-
-                let events =
-                    [ Event.MatchmakingPlayerLeftV1
-                          { MatchmakingId = this.Id
-                            ParticipantId = playerId } ]
-
-                ok state events
-
-        | phase -> expect [ ActiveTag ] phase
-
-    member this.End =
-        match this.Phase with
-        | Active players ->
-            let playersCount = players |> Set.count
-            let state = { this with Phase = Ended players }
-
-            let events =
-                [ Event.MatchmakingEndedV1
-                      { MatchmakingId = this.Id
-                        PlayersCount = playersCount } ]
-
-            ok state events
-
-        | phase -> expect [ ActiveTag ] phase
-
-    member this.EndWithFailure reason =
-        match this.Phase with
-        | Active players ->
-            let playersCount = players |> Set.count
-
-            let state =
-                { this with
-                    Phase = Failed(players, reason) }
-
-            let events =
-                [ Event.MatchmakingFailedV1
-                      { MatchmakingId = this.Id
-                        PlayersCount = playersCount
-                        Error = reason } ]
-
-            ok state events
-
-        | phase -> expect [ ActiveTag ] phase

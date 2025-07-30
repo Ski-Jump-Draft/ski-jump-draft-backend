@@ -6,8 +6,11 @@ module Competition =
     [<Struct>]
     type Id = Id of System.Guid
 
+    // module Hill =
+    //     type Id = Id of System.Guid
+
     type Settings =
-        { HillId: Hill.Id
+        { //HillId: Hill.Id
           CompetitionEnginePluginId: string //Engine.Template.Id
           EngineRawOptions: Map<string, obj> }
 

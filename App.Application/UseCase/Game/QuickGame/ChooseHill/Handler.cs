@@ -2,7 +2,7 @@ using App.Application.Abstractions;
 using App.Application.ReadModel.Projection;
 using Random = App.Domain.Shared.Random;
 
-namespace App.Application.UseCase.Game.ChooseQuickGameHill;
+namespace App.Application.UseCase.Game.QuickGame.ChooseHill;
 
 public record Command(
 ) : ICommand<Domain.GameWorld.HillId>;

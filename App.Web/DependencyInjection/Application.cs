@@ -14,20 +14,20 @@ public static class ApplicationDependencyInjection
             .AddScoped<ICommandHandler<Application.UseCase.Game.CreateCompetitionEngine.Command,
                 Domain.Competition.Engine.Id>, Application.UseCase.Game.CreateCompetitionEngine.Handler>();
         services
-            .AddScoped<ICommandHandler<Application.UseCase.Game.CreateQuickGame.Command, Domain.Game.Game>,
-                Application.UseCase.Game.CreateQuickGame.Handler>();
+            .AddScoped<ICommandHandler<Application.UseCase.Game.QuickGame.Create.Command, Domain.Game.Game>,
+                Application.UseCase.Game.QuickGame.Create.Handler>();
         services
             .AddScoped<ICommandHandler<Application.UseCase.Game.EndDraftPhase.Command>,
                 Application.UseCase.Game.EndDraftPhase.Handler>();
         services
-            .AddScoped<ICommandHandler<Application.UseCase.Game.ChooseQuickGameHill.Command,
-                Domain.GameWorld.HillId>, Application.UseCase.Game.ChooseQuickGameHill.Handler>();
+            .AddScoped<ICommandHandler<Application.UseCase.Game.QuickGame.ChooseHill.Command,
+                Domain.GameWorld.HillId>, Application.UseCase.Game.QuickGame.ChooseHill.Handler>();
         services
-            .AddScoped<ICommandHandler<Application.UseCase.Game.QuickMatchmaking.FindOrCreate.Command, Guid>,
-                Application.UseCase.Game.QuickMatchmaking.FindOrCreate.Handler>();
+            .AddScoped<ICommandHandler<Application.UseCase.Game.QuickGame.FindOrCreateMatchmaking.Command, Guid>,
+                Application.UseCase.Game.QuickGame.FindOrCreateMatchmaking.Handler>();
         services
-            .AddScoped<ICommandHandler<Application.UseCase.Game.QuickMatchmaking.Join.Command,
-                Domain.Matchmaking.ParticipantModule.Id>, Application.UseCase.Game.QuickMatchmaking.Join.Handler>();
+            .AddScoped<ICommandHandler<Application.UseCase.Game.QuickGame.JoinMatchmaking.Command,
+                Domain.Matchmaking.ParticipantModule.Id>, Application.UseCase.Game.QuickGame.JoinMatchmaking.Handler>();
         return services;
     }
 }

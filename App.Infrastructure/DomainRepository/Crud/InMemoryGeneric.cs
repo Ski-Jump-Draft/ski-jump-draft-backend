@@ -7,7 +7,7 @@ namespace App.Infrastructure.DomainRepository.Crud;
 public record InMemoryCrudDomainRepositoryStarter<TId, T>(IReadOnlyCollection<T> StarterItems, Func<T, TId> MapToId)
     where TId : notnull;
 
-public class InMemoryCrudDomainRepository<TId, T>(InMemoryCrudDomainRepositoryStarter<TId, T>? starter)
+public class InMemoryCrudDomainRepository<TId, T>(InMemoryCrudDomainRepositoryStarter<TId, T>? starter = null)
     : IDomainCrudRepository<TId, T> where TId : notnull
 {
     private readonly ConcurrentDictionary<TId, T> _store = InitStore(starter);
@@ -27,7 +27,7 @@ public class InMemoryCrudDomainRepository<TId, T>(InMemoryCrudDomainRepositorySt
         return Task.CompletedTask;
     }
 
-    private static ConcurrentDictionary<TId, T> InitStore(InMemoryCrudDomainRepositoryStarter<TId, T>? starter)
+    private static ConcurrentDictionary<TId, T> InitStore(InMemoryCrudDomainRepositoryStarter<TId, T>? starter = null)
         => starter?.StarterItems.ToDictionary(starter.MapToId)
             is { } dict
             ? new ConcurrentDictionary<TId, T>(dict)

@@ -3,7 +3,7 @@ using App.Domain.Draft;
 using App.Domain.Draft.Order;
 using App.Domain.Repositories;
 using App.Domain.Shared;
-using App.Infrastructure.GuidAdapters;
+using App.Infrastructure.Utility;
 using App.Tests.Fakes.Factory;
 using Microsoft.FSharp.Collections;
 using Microsoft.FSharp.Core;

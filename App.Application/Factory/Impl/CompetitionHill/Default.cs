@@ -9,7 +9,7 @@ namespace App.Application.Factory.Impl.CompetitionHill;
 
 public class Default(
     IGuid guid,
-    IGameWorldHillRepository gameWorldHills,
+    //IGameWorldHillRepository gameWorldHills,
     ICompetitionHillMapping competitionHillMapping,
     ICompetitionHillRepository competitionHills)
     : ICompetitionHillFactory

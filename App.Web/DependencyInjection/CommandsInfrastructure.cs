@@ -7,7 +7,7 @@ public static class CommandsInfrastructureDependencyInjection
     public static IServiceCollection AddCommandsInfrastructure(
         this IServiceCollection services)
     {
-        services.AddSingleton<ICommandBus, Infrastructure.CommandBus.InMemory>();
+        services.AddScoped<ICommandBus, Infrastructure.CommandBus.InMemory>();
 
         return services;
     }

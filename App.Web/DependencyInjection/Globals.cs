@@ -12,13 +12,6 @@ public static class GlobalsDependencyInjection
     public static IServiceCollection AddGlboals(
         this IServiceCollection services)
     {
-        services
-            .AddSingleton<IValueMapper<MatchmakingParticipantDto, Domain.Game.Participant.Participant>,
-                Application.Factory.Impl.GameParticipant.FromMatchmakingParticipant.Default>();
-        services.AddSingleton<IQuickGameServerProvider, OnlyQuickGameServerProvider>();
-
-        services.AddSingleton<IQuickGameHillSelector, RandomQuickGameHillSelector>();
-        services.AddSingleton<IQuickGameSettingsProvider, DefaultQuickGameSettingsProvider>();
 
         return services;
     }

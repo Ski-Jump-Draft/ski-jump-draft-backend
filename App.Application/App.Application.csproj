@@ -12,7 +12,7 @@
     </ItemGroup>
     
     <ItemGroup>
-      <Folder Include="Abstractions\Globals\" />
+      <Folder Include="Factory\Helper\" />
     </ItemGroup>
 
 </Project>

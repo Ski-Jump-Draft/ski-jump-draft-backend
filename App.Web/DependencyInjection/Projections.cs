@@ -8,6 +8,8 @@ public static class ProjectionDependencyInjection
 {
     public static IServiceCollection AddProjections(this IServiceCollection services)
     {
+        services.AddSingleton<IServersProjection, Infrastructure.Projection.Hosting.Servers.Test>();
+
         services.AddSingleton<IGameWorldHillProjection, Infrastructure.Projection.GameWorld.Hill.InMemory>();
         services
             .AddSingleton<IEventHandler<Domain.GameWorld.Event.GameWorldEventPayload>,
