@@ -24,13 +24,13 @@ public class InMemory : IActiveMatchmakingsProjection, IEventHandler<Event.Match
         switch (ev.Payload)
         {
             case Event.MatchmakingEventPayload.MatchmakingCreatedV1 payload:
-                var minPlayersCount = PlayersCountModule.value(payload.Item.Settings.MinPlayersCount);
-                var maxPlayersCount = PlayersCountModule.value(payload.Item.Settings.MaxPlayersCount);
+                var minPlayersCount = PlayersCountModule.value(payload.Item.Settings.MaxParticipants);
+                var maxPlayersCount = PlayersCountModule.value(payload.Item.Settings.MinParticipants);
                 _store[payload.Item.MatchmakingId.Item] = new ActiveMatchmakingDto(
                     payload.Item.MatchmakingId.Item, 0, minPlayersCount, maxPlayersCount);
                 break;
 
-            case Event.MatchmakingEventPayload.MatchmakingPlayerJoinedV1 payload:
+            case Event.MatchmakingEventPayload.MatchmakingParticipantJoinedV1 payload:
                 var playersCountAfterJoin = _store[payload.Item.MatchmakingId.Item].CurrentPlayersCount + 1;
                 _store[payload.Item.MatchmakingId.Item] = _store[payload.Item.MatchmakingId.Item] with
                 {
@@ -38,7 +38,7 @@ public class InMemory : IActiveMatchmakingsProjection, IEventHandler<Event.Match
                 };
                 break;
 
-            case Event.MatchmakingEventPayload.MatchmakingPlayerLeftV1 payload:
+            case Event.MatchmakingEventPayload.MatchmakingParticipantLeftV1 payload:
                 var playersCountAfterLeave = _store[payload.Item.MatchmakingId.Item].CurrentPlayersCount - 1;
                 _store[payload.Item.MatchmakingId.Item] = _store[payload.Item.MatchmakingId.Item] with
                 {

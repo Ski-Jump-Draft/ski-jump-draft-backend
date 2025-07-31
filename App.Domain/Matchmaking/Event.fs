@@ -10,19 +10,25 @@ type MatchmakingCreatedV1 =
 [<Struct; CLIMutable>]
 type MatchmakingFailedV1 =
     { MatchmakingId: Id
-      Error: MatchmakingFailError; PlayersCount: int }
+      Reason: MatchmakingFailReason
+      ParticipantsCount: int }
 
 [<Struct; CLIMutable>]
 type MatchmakingEndedV1 =
-    { MatchmakingId: Id; PlayersCount: int }
-
-[<Struct; CLIMutable>]
-type MatchmakingPlayerJoinedV1 =
     { MatchmakingId: Id
-      ParticipantId: Participant.Id }
+      ParticipantsCount: int }
+
+type MatchmakingParticipantDtoV1 =
+    { Id: Participant.Id
+      Nick: Participant.Nick }
 
 [<Struct; CLIMutable>]
-type MatchmakingPlayerLeftV1 =
+type MatchmakingParticipantJoinedV1 =
+    { MatchmakingId: Id
+      Participant: MatchmakingParticipantDtoV1 }
+
+[<Struct; CLIMutable>]
+type MatchmakingParticipantLeftV1 =
     { MatchmakingId: Id
       ParticipantId: Participant.Id }
 
@@ -30,8 +36,8 @@ type MatchmakingEventPayload =
     | MatchmakingCreatedV1 of MatchmakingCreatedV1
     | MatchmakingFailedV1 of MatchmakingFailedV1
     | MatchmakingEndedV1 of MatchmakingEndedV1
-    | MatchmakingPlayerJoinedV1 of MatchmakingPlayerJoinedV1
-    | MatchmakingPlayerLeftV1 of MatchmakingPlayerLeftV1
+    | MatchmakingParticipantJoinedV1 of MatchmakingParticipantJoinedV1
+    | MatchmakingParticipantLeftV1 of MatchmakingParticipantLeftV1
 
 module Versioning =
     let schemaVersion =
@@ -39,5 +45,5 @@ module Versioning =
         | MatchmakingCreatedV1 _ -> 1us
         | MatchmakingFailedV1 _ -> 1us
         | MatchmakingEndedV1 _ -> 1us
-        | MatchmakingPlayerJoinedV1 _ -> 1us
-        | MatchmakingPlayerLeftV1 _ -> 1us
+        | MatchmakingParticipantJoinedV1 _ -> 1us
+        | MatchmakingParticipantLeftV1 _ -> 1us

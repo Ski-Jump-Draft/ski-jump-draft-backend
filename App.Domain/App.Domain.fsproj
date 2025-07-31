@@ -53,7 +53,7 @@
         <Compile Include="Matchmaking\Id.fs" />
         <Compile Include="Matchmaking\Participant.fs" />
         <Compile Include="Matchmaking\PhaseTag.fs" />
-        <Compile Include="Matchmaking\MatchmakingFailError.fs" />
+        <Compile Include="Matchmaking\MatchmakingFailReason.fs" />
         <Compile Include="Matchmaking\Phase.fs" />
         <Compile Include="Matchmaking\Error.fs" />
         <Compile Include="Matchmaking\Settings.fs" />

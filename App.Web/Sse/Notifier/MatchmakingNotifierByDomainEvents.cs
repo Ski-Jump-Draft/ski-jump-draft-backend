@@ -14,11 +14,11 @@ public class MatchmakingNotifierByDomainEvents(
     {
         switch (@event.Payload)
         {
-            case Event.MatchmakingEventPayload.MatchmakingPlayerJoinedV1 playerJoinedEvent:
+            case Event.MatchmakingEventPayload.MatchmakingParticipantJoinedV1 playerJoinedEvent:
             {
                 var matchmakingId = playerJoinedEvent.Item.MatchmakingId.Item;
                 var matchmaking = await activeMatchmakings.GetActiveMatchmakingAsync(matchmakingId, ct);
-                ValidateActiveMatchmaking(matchmaking, matchmakingId, "MatchmakingPlayerJoinedV1");
+                ValidateActiveMatchmaking(matchmaking, matchmakingId, "MatchmakingParticipantJoinedV1");
                 await sse.PublishAsync(matchmakingId.ToString(), "updated", new
                 {
                     CurrentPlayersCount = matchmaking!.CurrentPlayersCount,
@@ -26,11 +26,11 @@ public class MatchmakingNotifierByDomainEvents(
                 }, ct);
                 break;
             }
-            case Event.MatchmakingEventPayload.MatchmakingPlayerLeftV1 playerLeftEvent:
+            case Event.MatchmakingEventPayload.MatchmakingParticipantLeftV1 playerLeftEvent:
             {
                 var matchmakingId = playerLeftEvent.Item.MatchmakingId.Item;
                 var matchmaking = await activeMatchmakings.GetActiveMatchmakingAsync(matchmakingId, ct);
-                ValidateActiveMatchmaking(matchmaking, matchmakingId, "MatchmakingPlayerLeftV1");
+                ValidateActiveMatchmaking(matchmaking, matchmakingId, "MatchmakingParticipantLeftV1");
                 await sse.PublishAsync(matchmakingId.ToString(), "updated", new
                 {
                     CurrentPlayersCount = matchmaking!.CurrentPlayersCount,
@@ -54,8 +54,8 @@ public class MatchmakingNotifierByDomainEvents(
 
                 await sse.PublishAsync(matchmakingId.ToString(), "failed", new
                 {
-                    PlayersCount = matchmakingFailedEvent.Item.PlayersCount,
-                    Reason = matchmakingFailedEvent.Item.Error.ToString(),
+                    PlayersCount = matchmakingFailedEvent.Item.ParticipantsCount,
+                    Reason = matchmakingFailedEvent.Item.Reason.ToString(),
                 }, ct);
                 break;
             }

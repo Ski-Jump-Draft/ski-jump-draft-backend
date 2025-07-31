@@ -48,7 +48,7 @@ public class Handler(
 
         throw error switch
         {
-            Error.PlayerNotJoined => new MatchmakingParticipantNotInMatchmakingException(matchmaking,
+            Error.ParticipantNotInMatchmaking => new MatchmakingParticipantNotInMatchmakingException(matchmaking,
                 matchmakingParticipant),
             _ => new LeavingMatchmakingFailedException(matchmaking, matchmakingParticipant,
                 LeavingMatchmakingFailReason.Unknown)

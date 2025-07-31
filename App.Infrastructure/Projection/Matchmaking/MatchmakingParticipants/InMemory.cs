@@ -25,7 +25,7 @@ public class InMemory : IMatchmakingParticipantsProjection, IEventHandler<Event.
                 _store[payload.Item.MatchmakingId.Item] = [];
                 break;
 
-            case Event.MatchmakingEventPayload.MatchmakingPlayerJoinedV1 payload:
+            case Event.MatchmakingEventPayload.MatchmakingParticipantJoinedV1 payload:
             {
                 var id = payload.Item.MatchmakingId.Item;
                 var existing = _store.GetValueOrDefault(id) ?? [];
@@ -36,7 +36,7 @@ public class InMemory : IMatchmakingParticipantsProjection, IEventHandler<Event.
                 break;
             }
 
-            case Event.MatchmakingEventPayload.MatchmakingPlayerLeftV1 payload:
+            case Event.MatchmakingEventPayload.MatchmakingParticipantLeftV1 payload:
             {
                 var id = payload.Item.MatchmakingId.Item;
                 var existing = _store.GetValueOrDefault(id) ?? [];

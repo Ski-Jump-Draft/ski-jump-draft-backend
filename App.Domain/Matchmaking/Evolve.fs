@@ -1,53 +1,48 @@
 module App.Domain.Matchmaking.Evolve
 
-open App.Domain
-open App.Domain.Matchmaking
-open App.Domain.Matchmaking.Event
-open App.Domain.Matchmaking
 open App.Domain.Shared
 open App.Domain.Shared.AggregateVersion
+open App.Domain.Matchmaking
+open App.Domain.Matchmaking.Event
 
-let evolve (state: Matchmaking) (event: DomainEvent<MatchmakingEventPayload>) =
+let evolve (state: Matchmaking) (event: DomainEvent<MatchmakingEventPayload>) : Matchmaking =
     let version = AggregateVersion event.Header.AggregateVersion
 
     match event.Payload with
-    | MatchmakingEventPayload.MatchmakingCreatedV1 e ->
+    | MatchmakingCreatedV1 e ->
         { Id = e.MatchmakingId
           Version = version
           Settings = e.Settings
-          Phase = Phase.Active Set.empty }
+          Phase = Active
+          Participants = Set.empty }
 
-    | MatchmakingEventPayload.MatchmakingPlayerJoinedV1 e ->
-        match state.Phase with
-        | Active players ->
-            { state with
-                Phase = Active(Set.add e.ParticipantId players)
-                Version = version }
-        | _ -> state
+    | MatchmakingParticipantJoinedV1 e ->
+        let participant =
+            { Id = e.Participant.Id
+              Nick = e.Participant.Nick }
 
-    | MatchmakingEventPayload.MatchmakingPlayerLeftV1 e ->
-        match state.Phase with
-        | Active players ->
-            { state with
-                Phase = Active(Set.remove e.ParticipantId players)
-                Version = version }
-        | _ -> state
+        { state with
+            Participants =
+                state.Participants
+                |> Set.add
+                    { Id = participant.Id
+                      Nick = participant.Nick }
+            Version = version }
 
-    | MatchmakingEventPayload.MatchmakingEndedV1 _ ->
-        match state.Phase with
-        | Active players ->
-            { state with
-                Phase = Ended players
-                Version = version }
-        | _ -> state
+    | MatchmakingParticipantLeftV1 e ->
+        { state with
+            Participants = state.Participants |> Set.filter (fun p -> p.Id <> e.ParticipantId)
+            Version = version }
 
-    | MatchmakingEventPayload.MatchmakingFailedV1 e ->
-        match state.Phase with
-        | Active players ->
-            { state with
-                Phase = Failed(players, e.Error)
-                Version = version }
-        | _ -> state
+    | MatchmakingEndedV1 _ ->
+        { state with
+            Phase = Ended
+            Version = version }
+
+    | MatchmakingFailedV1 e ->
+        { state with
+            Phase = Failed e.Reason
+            Version = version }
 
 let evolveFromEvents (events: DomainEvent<MatchmakingEventPayload> list) : Matchmaking =
     events |> List.fold evolve Unchecked.defaultof<Matchmaking>

@@ -56,9 +56,9 @@ public class Handler(
 
         throw error switch
         {
-            Error.PlayerAlreadyJoined => new MatchmakingParticipantAlreadyJoinedException(matchmaking,
+            Error.ParticipantAlreadyJoined => new MatchmakingParticipantAlreadyJoinedException(matchmaking,
                 matchmakingParticipant),
-            Error.PlayerNotJoined => new MatchmakingParticipantNotInMatchmakingException(matchmaking,
+            Error.ParticipantNotInMatchmaking => new MatchmakingParticipantNotInMatchmakingException(matchmaking,
                 matchmakingParticipant),
             Error.RoomFull => new MatchmakingRoomFullException(matchmaking),
             Error.InvalidPhase invalidPhaseError => new JoiningMatchmakingInvalidPhaseException(
