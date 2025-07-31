@@ -1,4 +1,4 @@
-using App.Application.Abstractions;
+using App.Application.Commanding;
 using App.Application.Exception;
 using App.Domain.Draft;
 using App.Domain.Shared;
@@ -7,7 +7,7 @@ namespace App.Application.Saga;
 
 public class DraftSaga(
     IDraftToGameMapStore draftToGameMap,
-    ICommandBus commands)
+    ICommandBus commandBus)
     : IEventHandler<Event.DraftEventPayload>
 {
     public async Task HandleAsync(DomainEvent<Event.DraftEventPayload> @event, CancellationToken ct)
@@ -20,7 +20,10 @@ public class DraftSaga(
                 throw new IdNotFoundException<Guid>(draftEndedV1Payload.Item.DraftId.Item);
 
             var command = new UseCase.Game.EndDraftPhase.Command(map.GameId);
-            await commands.SendAsync(command, ct);
+            var envelope = new CommandEnvelope<UseCase.Game.EndDraftPhase.Command>(command,
+                MessageContext.Next(@event.Header.CorrelationId));
+
+            await commandBus.SendAsync(envelope, ct);
         }
     }
 }

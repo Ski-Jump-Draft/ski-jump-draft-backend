@@ -13,7 +13,7 @@ module Competition =
 
      type Settings =
          { //HillId: Hill.Id
-           CompetitionEnginePluginId: App.Domain.Competition.Engine.Id
+           CompetitionEnginePluginId: string
            EngineRawOptions: Map<string, obj> }
 
 // type Competition =

@@ -55,8 +55,8 @@ type public IPreDraftHillRepository =
 //     inherit IDomainCrudRepository<Domain.Competition.ResultsModule.Id, Domain.Competition.ResultsModule.Results>
 
 // --- Draft ---
-type public IDraftParticipantRepository =
-    inherit IDomainCrudRepository<Domain.Draft.Participant.Id, Domain.Draft.Participant.Participant>
+// type public IDraftParticipantRepository =
+//     inherit IDomainCrudRepository<Domain.Draft.Participant.Id, Domain.Draft.Participant.Participant>
 
 // --- Competition Engine ---
 type public ICompetitionEngineSnapshotRepository =

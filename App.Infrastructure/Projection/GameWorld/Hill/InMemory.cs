@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using App.Application.Abstractions;
+using App.Application.Commanding;
 using App.Application.ReadModel.Projection;
 using App.Domain.GameWorld;
 using App.Domain.Shared;

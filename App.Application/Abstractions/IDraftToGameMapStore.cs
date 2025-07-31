@@ -1,6 +1,6 @@
 using App.Domain.Draft;
 
-namespace App.Application.Abstractions;
+namespace App.Application.Commanding;
 
 public record MapResult(bool Found, Domain.Game.Id.Id? GameId);
 

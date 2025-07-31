@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
-using App.Application.Abstractions;
-using App.Application.Abstractions.Mappers;
+using App.Application.Commanding;
+using App.Application.Commanding.Mappers;
 using App.Application.Exception;
 using App.Application.Ext;
 using App.Application.Projection;

@@ -1,4 +1,4 @@
-using App.Application.Abstractions;
+using App.Application.Commanding;
 using Microsoft.Extensions.Hosting;
 
 namespace App.Infrastructure.PluginsRegistration;

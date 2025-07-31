@@ -1,12 +1,12 @@
 using App.Application.Factory;
 using App.Domain.Competition;
 
-namespace App.Application.Abstractions;
+namespace App.Application.Commanding;
 
 public interface ICompetitionEnginePlugin
 {
     string PluginId { get; }
-    Engine.ITemplate Template { get; }
+    Engine.Metadata Metadata { get; }
     ICompetitionEngineFactory Factory { get; }
 }
 
@@ -17,5 +17,7 @@ public interface ICompetitionEnginePluginRepository
     //  Task<IEnumerable<ICompetitionEnginePlugin>> GetPluginsAsync(CancellationToken cancellationToken = default);
 
     Task Register(ICompetitionEnginePlugin plugin);
-    Task<ICompetitionEnginePlugin?> GetByIdAsync(string pluginId, CancellationToken cancellationToken = default);
+
+    Task<ICompetitionEnginePlugin?> GetByIdAsync(string pluginId,
+        CancellationToken cancellationToken = default);
 }

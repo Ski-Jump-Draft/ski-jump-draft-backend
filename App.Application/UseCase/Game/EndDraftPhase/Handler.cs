@@ -1,4 +1,4 @@
-using App.Application.Abstractions;
+using App.Application.Commanding;
 using App.Application.Exception;
 using App.Application.Ext;
 using App.Domain.Game;
@@ -11,20 +11,18 @@ public record Command(Id.Id GameId) : ICommand;
 
 public class Handler(IGameRepository games, IGuid guid) : ICommandHandler<Command>
 {
-    public async Task HandleAsync(Command command, CancellationToken ct)
+    public async Task HandleAsync(Command command, MessageContext messageContext, CancellationToken ct)
     {
         var game = await games.LoadAsync(command.GameId, ct)
             .AwaitOrWrap(_ => new IdNotFoundException<Guid>(command.GameId.Item));
         var newGameResult = game.EndDraft();
         if (newGameResult.IsOk)
         {
-            var (state, events) = newGameResult.ResultValue;
-
-            var correlationId = guid.NewGuid();
-            var causationId = correlationId;
+            var (gameAggregate, events) = newGameResult.ResultValue;
+            
             var expectedVersion = game.Version_;
 
-            await games.SaveAsync(state, events, expectedVersion, correlationId, causationId, ct);
+            await games.SaveAsync(gameAggregate.Id_, events, expectedVersion, messageContext.CorrelationId, messageContext.CausationId, ct);
         }
     }
 }

@@ -1,6 +1,6 @@
 namespace App.Plugin.Engine.Classic;
 
-public class Template : Domain.Competition.Engine.ITemplate
+public class Metadata : Domain.Competition.Engine.Metadata
 {
     public Domain.Competition.Engine.Template.Name Name =>
         Domain.Competition.Engine.Template.Name.NewName("Klasyczny silnik konkursowy");

@@ -1,4 +1,4 @@
-using App.Application.Abstractions;
+using App.Application.Commanding;
 using App.Application.Exception;
 using App.Application.Ext;
 using App.Domain.Competition;
@@ -9,88 +9,41 @@ namespace App.Application.UseCase.Competition.RegisterJump;
 public record Command(Domain.Game.Id.Id GameId, Domain.Competition.Jump.Jump Jump) : ICommand;
 
 public class Handler(
-    Domain.Competition.Engine.IEngine competitionEngine,
     IGameRepository games,
-    IGameCompetitionRepository gameCompetitions,
-    IPreDraftCompetitionRepository preDraftCompetitions,
-    ICompetitionRepository competitions,
-    ICompetitionResultsRepository competitionResultsRepository,
-    ICompetitionStartlistRepository competitionStartlists,
-    IPreDraftRepository preDrafts,
-    ICompetitionEngineSnapshotRepository competitionEnginesSnapshot) : ICommandHandler<Command>
+    ICompetitionRepository competitions) : ICommandHandler<Command>
 {
-    public async Task HandleAsync(Command command, CancellationToken ct)
+    public async Task HandleAsync(Command command, MessageContext messageContext, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
 
-        var game = (await games.LoadAsync(command.GameId, ct)
-            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(command.GameId.Item)));
-        var competitionId =
-            await TryExtractCompetitionIdFromGamePhase(game.Phase_, gameCompetitions, preDraftCompetitions, preDrafts,
-                ct);
-        var competition = (await competitions.LoadAsync(competitionId, ct)
-            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(competitionId.Item)));
+        var game = await games.LoadAsync(command.GameId, ct)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(command.GameId.Item));
 
-        var engineSnapshot = competitionEngine.RegisterJump(command.Jump);
-
-        var results = ResultsModule.Results.FromState(competition.ResultsId, competitionEngine.ResultsState)
-            .ResultValue; // TODO: Niebezpieczny fragment
-        await competitionResultsRepository.SaveAsync(results.Id, results);
-
-        var existingStartlist = (await
-            competitionStartlists.GetByIdAsync(competition.StartlistId)
-                .AwaitOrWrap(ex => new IdNotFoundException<Guid>(competition.StartlistId.Item)));
-        var newStartlist = existingStartlist.RemoveFirst();
-        await competitionStartlists.SaveAsync(newStartlist.Id_, newStartlist);
-
-        // TODO kiedyś tam:   CompetitionOrder.addForRound(roundIndex, jump/participant)
-
-        // }
-        await competitionEnginesSnapshot.SaveAsync(competitionEngine.Id, engineSnapshot)
-            .AwaitOrWrap(ex => new IdNotFoundException<Guid>(competitionId.Item));
-    }
-
-    private static async Task<Domain.Competition.Id.Id> TryExtractCompetitionIdFromGamePhase(
-        Domain.Game.GameModule.Phase phase,
-        IGameCompetitionRepository gameCompetitions,
-        IPreDraftCompetitionRepository preDraftCompetitions,
-        IPreDraftRepository preDrafts, CancellationToken ct)
-    {
-        return phase switch
+        if (!game.Phase_.IsCompetition)
         {
-            Domain.Game.GameModule.Phase.Competition gameCompetitionId => await GetCompetitionIdFromGameCompetition(
-                gameCompetitions, gameCompetitionId.Item),
-            Domain.Game.GameModule.Phase.PreDraft preDraftId => await GetCompetitionIdFromPreDraftPhase(preDrafts,
-                preDraftCompetitions, preDraftId.Item, ct),
-            _ => throw new InvalidOperationException("Expected is not in competition/pre-draft phase")
-        };
-    }
+            // TODO: Lepszy błąd
+            throw new InvalidOperationException("Game is not in Competition phase");
+        }
 
-    private static async Task<Domain.Competition.Id.Id> GetCompetitionIdFromGameCompetition(
-        IGameCompetitionRepository repo,
-        Domain.Game.CompetitionModule.Id id)
-    {
-        var gameCompetition = (await repo.GetByIdAsync(id).AwaitOrWrap(ex => new IdNotFoundException<Guid>(id.Item)));
-        return gameCompetition.CompetitionId;
-    }
+        var gameCompetition = ((Domain.Game.GameModule.Phase.Competition)game.Phase_).Item;
+        var competitionId = gameCompetition.CompetitionId_;
+        var competition = await competitions.LoadAsync(competitionId, ct)
+            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(competitionId.Item));
 
-    private static async Task<Domain.Competition.Id.Id> GetCompetitionIdFromPreDraftPhase(
-        IPreDraftRepository preDrafts,
-        IPreDraftCompetitionRepository preDraftCompetitions,
-        Domain.PreDraft.Id.Id id,
-        CancellationToken ct
-    )
-    {
-        var preDraft = (await preDrafts.LoadAsync(id, ct).AwaitOrWrap(_ => new IdNotFoundException<Guid>(id.Item)));
+        var jumpRegistrationResult = competition.RegisterJump(command.Jump);
+        if (jumpRegistrationResult.IsOk)
+        {
+            var (competitionAggreggate, competitionEvents) = jumpRegistrationResult.ResultValue;
+            var expectedAggregtateVersion = competition.Version_;
+            await competitions.SaveAsync(competitionId, competitionEvents, expectedAggregtateVersion,
+                messageContext.CorrelationId,
+                messageContext.CausationId, ct);
+        }
 
-        if (!preDraft.Phase.IsCompetition)
-            throw new InvalidOperationException("PreDraft is not in Competition phase");
-
-        var compPhase = (Domain.PreDraft.Phase.Phase.Competition)preDraft.Phase;
-        var preDraftCompetition = await
-            preDraftCompetitions.GetByIdAsync(compPhase.CompetitionId)
-                .AwaitOrWrap(_ => new IdNotFoundException<Guid>(compPhase.CompetitionId.Item));
-
-        return preDraftCompetition.CompetitionId;
+        // TODO: Kwestia Competition engine snapshots
+        //
+        // await
+        //     competitionEnginesSnapshot.SaveAsync(competitionEngine.Id, engineSnapshot)
+        //         .AwaitOrWrap(_ => new EngineSnapshotSavingFailedException());
     }
 }

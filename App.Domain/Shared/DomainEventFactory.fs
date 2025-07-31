@@ -11,7 +11,7 @@ let create<'T>
     (occuredAt: DateTimeOffset)
     (id: Guid)
     (correlationId: Guid)
-    (causationId: Guid option)
+    (causationId: Guid)
     (payload: 'T)
     : DomainEvent<'T> =
 
@@ -20,7 +20,7 @@ let create<'T>
           AggregateVersion = aggregateVer
           SchemaVer = schemaVer
           OccurredAt = occuredAt
-          CorrelationId = Some correlationId
+          CorrelationId = correlationId
           CausationId = causationId }
         : EventHeader
 

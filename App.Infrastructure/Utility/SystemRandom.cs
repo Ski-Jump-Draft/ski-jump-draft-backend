@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Microsoft.FSharp.Collections;
 
 namespace App.Infrastructure.Utility;
@@ -8,7 +9,6 @@ public class SystemRandom : Domain.Shared.Random.IRandom
 {
     private readonly System.Random _random = new();
 
-
     public FSharpList<T> ShuffleList<T>(int seed, FSharpList<T> list)
     {
         var rnd = new System.Random(seed);
@@ -18,5 +18,12 @@ public class SystemRandom : Domain.Shared.Random.IRandom
     public int RandomInt(int min, int max)
     {
         return _random.Next(min, max + 1);
+    }
+
+    public ulong NextUInt64()
+    {
+        Span<byte> buffer = stackalloc byte[8];
+        RandomNumberGenerator.Fill(buffer);
+        return BitConverter.ToUInt64(buffer);
     }
 }

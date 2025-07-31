@@ -6,4 +6,4 @@ public interface IMatchmakingParticipantsProjection
         App.Domain.Matchmaking.Id matchmakingId);
 }
 
-public record MatchmakingParticipantDto(Guid Id);
+public record MatchmakingParticipantDto(Guid Id, string Nick);

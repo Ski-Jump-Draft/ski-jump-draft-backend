@@ -1,4 +1,4 @@
-using App.Application.Abstractions;
+using App.Application.Commanding;
 using App.Application.Factory;
 using App.Domain.Shared;
 using App.Plugin.Engine.Classic;
@@ -14,7 +14,7 @@ public class Plugin(
 {
     public string PluginId => "classic";
 
-    public Domain.Competition.Engine.ITemplate Template => new Template();
+    public Domain.Competition.Engine.Metadata Metadata => new Metadata();
 
     public ICompetitionEngineFactory Factory =>
         factory; // new Factory(gatePoints, headwindPoints, tailwindPoints, guid);

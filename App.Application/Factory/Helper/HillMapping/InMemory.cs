@@ -6,15 +6,14 @@ namespace App.Application.Factory.Helper.HillMapping;
 //     InMemoryGameHillMapping : InMemoryBiDirectionalIdMap<Domain.GameWorld.HillId, Domain.Game.Hill.Id>,
 //     IGameHillMapping;
 
-
 public class
-    InMemoryPreDraftHillMapping : InMemoryBiDirectionalIdMap<Domain.GameWorld.HillId,
+    InMemoryPreDraftHillMapping : InMemoryBiDirectionalIdMap<Domain.GameWorld.HillTypes.Id,
         Domain.PreDraft.Competitions.HillModule.Id>,
     IPreDraftHillMapping;
 
-public class
-    InMemoryCompetitionHillMapping : InMemoryBiDirectionalIdMap<Domain.GameWorld.HillId, Domain.Competition.HillModule.Id>,
-    ICompetitionHillMapping;
+// public class
+//     InMemoryCompetitionHillMapping : InMemoryBiDirectionalIdMap<Domain.GameWorld.HillTypes.Id, Domain.Competition.HillModule.Id>,
+//     ICompetitionHillMapping;
 
 //
 // public class

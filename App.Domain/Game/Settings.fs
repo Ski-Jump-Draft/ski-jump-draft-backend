@@ -80,9 +80,6 @@ module PhaseTransitionPolicy =
 
 type Settings =
     { ParticipantLimit: ParticipantLimit
-      // PreDraftSettings: App.Domain.PreDraft.Settings.Settings
-      // DraftSettings: App.Domain.Draft.Settings.Settings
-      // CompetitionSettings: Domain.Game.Competition.Settings
       StartingPreDraftPolicy: PhaseTransitionPolicy.StartingPreDraft
       StartingDraftPolicy: PhaseTransitionPolicy.StartingDraft
       StartingCompetitionPolicy: PhaseTransitionPolicy.StartingSimulating

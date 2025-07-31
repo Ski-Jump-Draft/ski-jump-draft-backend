@@ -14,17 +14,16 @@ type Phase =
 
 type Id = Id of System.Guid
 
-module Template =
+module Metadata =
     type Id = Id of System.Guid
     type Name = Name of string
     type Description = Description of string
     type Author = Author of string
 
-type ITemplate =
-    abstract Id: Template.Id
-    abstract Name: Template.Name
-    abstract Description: Template.Description
-    abstract Author: Template.Author
+type Metadata =
+    abstract Name: Metadata.Name
+    abstract Description: Metadata.Description
+    abstract Author: Metadata.Author
 
 // type IEngine =
 //     abstract Id: Id

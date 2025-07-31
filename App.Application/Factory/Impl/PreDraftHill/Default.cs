@@ -12,16 +12,18 @@ public class Default(
     IPreDraftHillRepository preDraftHills)
     : IPreDraftCompetitionHillFactory
 {
-    public async Task<Hill> CreateAsync(Domain.GameWorld.HillId gameHillId, CancellationToken ct)
+    public async Task<Hill> CreateAsync(Domain.GameWorld.Hill gameHill, CancellationToken ct)
     {
-        if (preDraftHillMapping.TryMap(gameHillId, out var preDraftHillId))
+        if (preDraftHillMapping.TryMap(gameHill.Id_, out var preDraftHillId))
         {
             return await preDraftHills.GetByIdAsync(preDraftHillId)
-                .AwaitOrWrap(_ => new IdNotFoundException<Guid>(gameHillId.Item));
+                .AwaitOrWrap(_ => new IdNotFoundException<Guid>(gameHill.Id_.Item));
         }
 
-        var id = guid.NewGuid();
+        var id = HillModule.Id.NewId(guid.NewGuid());
 
-        return new Domain.PreDraft.Competitions.Hill(Domain.PreDraft.Competitions.HillModule.Id.NewId(id));
+        preDraftHillMapping.Add(gameHill.Id_, id);
+
+        return new Domain.PreDraft.Competitions.Hill(id);
     }
 }

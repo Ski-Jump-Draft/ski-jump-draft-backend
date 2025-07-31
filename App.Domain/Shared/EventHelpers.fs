@@ -13,8 +13,8 @@ type EventHeader =
         /// From 1
         SchemaVer: uint16
         OccurredAt: EventTimestamp
-        CorrelationId: Guid option
-        CausationId: Guid option
+        CorrelationId: Guid
+        CausationId: Guid
     }
 
 module EventHeader =

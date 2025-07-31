@@ -1,4 +1,4 @@
-using App.Application.Abstractions;
+using App.Application.Commanding;
 using App.Application.Exception;
 using App.Application.Ext;
 using App.Application.UseCase.Game.Exception;
@@ -15,11 +15,11 @@ public record Command(
 
 public class Handler(
     IMatchmakingRepository matchmakings,
-    IMatchmakingParticipantRepository matchmakingParticipants,
     IGuid guid
 ) : ICommandHandler<Command, App.Domain.Matchmaking.ParticipantModule.Id>
 {
-    public async Task<App.Domain.Matchmaking.ParticipantModule.Id> HandleAsync(Command command, CancellationToken ct)
+    public async Task<App.Domain.Matchmaking.ParticipantModule.Id> HandleAsync(Command command,
+        MessageContext messageContext, CancellationToken ct)
     {
         var matchmakingId = command.MatchmakingId;
         var matchmaking = await matchmakings.LoadAsync(matchmakingId, ct)
@@ -35,19 +35,12 @@ public class Handler(
         {
             var (aggregate, events) = leaveResult.ResultValue;
 
-            var correlationId = guid.NewGuid();
-            var causationId = correlationId;
             var expectedVersion = aggregate.Version_;
-
             await
-                matchmakings.SaveAsync(aggregate, events, expectedVersion, correlationId, causationId, ct).AwaitOrWrap(_ =>
+                matchmakings.SaveAsync(aggregate.Id_, events, expectedVersion, messageContext.CorrelationId,
+                    messageContext.CausationId, ct).AwaitOrWrap(_ =>
                     new LeavingMatchmakingFailedException(matchmaking, matchmakingParticipant,
                         LeavingMatchmakingFailReason.ErrorDuringUpdatingMatchmaking));
-            // TODO
-            //
-            // await FSharpAsyncExt.AwaitOrThrow(matchmakingParticipants.RemoveAsync(matchmakingParticipant.Id),
-            //     new LeavingMatchmakingFailedException(matchmaking, matchmakingParticipant,
-            //         LeavingMatchmakingFailReason.ErrorDuringUpdatingMatchmaking), ct);
             return matchmakingParticipant.Id;
         }
 

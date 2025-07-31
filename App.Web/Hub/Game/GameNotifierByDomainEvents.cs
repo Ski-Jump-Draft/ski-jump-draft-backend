@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Threading.Channels;
-using App.Application.Abstractions;
+using App.Application.Commanding;
 using App.Application.Projection;
 using App.Domain.Game;
 using App.Domain.Shared;

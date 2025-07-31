@@ -4,35 +4,49 @@ namespace App.Application.UseCase.Draft.Exception;
 
 public class DraftPickFailedException : System.Exception
 {
-    Domain.Draft.Draft Draft { get; }
-    Participant.Participant Participant { get; }
-    Subject.Subject Subject { get; }
-    private object? AdditionalData { get; }
+    public Id.Id DraftId { get; }
+    public Participant.Id ParticipantId { get; }
+    public Subject.Id SubjectId { get; }
+    public object? AdditionalData { get; }
 
-    public DraftPickFailedException(Domain.Draft.Draft draft, Participant.Participant participant,
-        Subject.Subject subject, object? additionalData = null)
+    public DraftPickFailedException(
+        Id.Id draftId,
+        Participant.Id participantId,
+        Subject.Id subjectId,
+        object? additionalData = null)
     {
-        Draft = draft;
-        Participant = participant;
-        Subject = subject;
+        DraftId = draftId;
+        ParticipantId = participantId;
+        SubjectId = subjectId;
         AdditionalData = additionalData;
     }
 
-    public DraftPickFailedException(string message, Domain.Draft.Draft draft, Participant.Participant participant,
-        Subject.Subject subject, object? additionalData = null) : base(message)
+    public DraftPickFailedException(
+        string message,
+        Id.Id draftId,
+        Participant.Id participantId,
+        Subject.Id subjectId,
+        object? additionalData = null)
+        : base(message)
     {
-        Draft = draft;
-        Participant = participant;
-        Subject = subject;
+        DraftId = draftId;
+        ParticipantId = participantId;
+        SubjectId = subjectId;
         AdditionalData = additionalData;
     }
 
-    public DraftPickFailedException(string message, System.Exception inner, Domain.Draft.Draft draft,
-        Participant.Participant participant, Subject.Subject subject, object? additionalData = null) : base(message, inner)
+    public DraftPickFailedException(
+        string message,
+        System.Exception inner,
+        Id.Id draftId,
+        Participant.Id participantId,
+        Subject.Id subjectId,
+        object? additionalData = null)
+        : base(message, inner)
     {
-        Draft = draft;
-        Participant = participant;
-        Subject = subject;
+        DraftId = draftId;
+        ParticipantId = participantId;
+        SubjectId = subjectId;
         AdditionalData = additionalData;
     }
 }

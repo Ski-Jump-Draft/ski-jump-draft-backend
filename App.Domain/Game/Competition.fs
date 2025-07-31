@@ -18,4 +18,6 @@ type Competition =
     private
         { CompetitionId: App.Domain.Competition.Id.Id }
 
+    member this.CompetitionId_ = this.CompetitionId
+
     static member Create competitionId = { CompetitionId = competitionId }

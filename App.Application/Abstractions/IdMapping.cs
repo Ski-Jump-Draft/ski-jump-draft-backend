@@ -1,2 +1,2 @@
-namespace App.Application.Abstractions;
+namespace App.Application.Commanding;
 

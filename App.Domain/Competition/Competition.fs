@@ -4,6 +4,7 @@ open App.Domain.Competition.Engine
 open App.Domain.Competition.Phase
 open App.Domain
 open App.Domain.Competition.ResultsModule
+open App.Domain.Shared
 
 // TODO: Evolve dla Competition na podstawie eventów domenowych ze startlist i results (!!)
 
@@ -32,9 +33,15 @@ module internal Internal =
 open Internal
 
 type Competition =
-    { Id: Id.Id
-      Phase: Phase.Phase
-      Engine: IEngine }
+    private
+        { Id: Id.Id
+          Version: AggregateVersion.AggregateVersion
+          Phase: Phase.Phase
+          Engine: IEngine }
+        
+    member this.Id_ = this.Id
+    member this.Phase_ = this.Phase
+    member this.Version_ = this.Version
 
     static member TagOfPhase phase =
         match phase with
@@ -48,11 +55,12 @@ type Competition =
     member this.InvalidPhaseError expected =
         InvalidPhase(expected, Competition.TagOfPhase(this.Phase))
 
-    static member Create id (engine: IEngine) =
+    static member Create id version (engine: IEngine) =
         let startlist = engine.GenerateStartlist()
 
         let state =
             { Id = id
+              Version = version
               Phase = NotStarted
               Engine = engine }
 
@@ -63,9 +71,9 @@ type Competition =
 
         Ok(state, [ event ])
 
-    member this.GenerateResults: Results = this.Engine.GenerateResults()
+    member this.GenerateResults(): Results = this.Engine.GenerateResults()
 
-    member this.GenerateStartlist: Startlist = this.Engine.GenerateStartlist()
+    member this.GenerateStartlist(): Startlist = this.Engine.GenerateStartlist()
 
     member this.RegisterJump
         (jump: Competition.Jump.Jump)
