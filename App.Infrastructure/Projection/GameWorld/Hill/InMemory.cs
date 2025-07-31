@@ -6,7 +6,7 @@ using App.Domain.Shared;
 
 namespace App.Infrastructure.Projection.GameWorld.Hill;
 
-public class InMemory : IGameWorldHillProjection, IEventHandler<Event.GameWorldEventPayload>
+public class InMemory : IGameWorldHillProjection, IEventHandler<Event.HillEventPayload>
 {
     private readonly ConcurrentDictionary<HillId, GameWorldHillDto> _state = new();
 
@@ -16,22 +16,22 @@ public class InMemory : IGameWorldHillProjection, IEventHandler<Event.GameWorldE
         return Task.FromResult(result);
     }
 
-    public Task HandleAsync(DomainEvent<Event.GameWorldEventPayload> @event, CancellationToken ct)
+    public Task HandleAsync(DomainEvent<Event.HillEventPayload> @event, CancellationToken ct)
     {
         switch (@event.Payload)
         {
-            case Event.GameWorldEventPayload.HillCreatedV1 payload:
+            case Event.HillEventPayload.HillCreatedV1 payload:
                 var dto = new GameWorldHillDto(
                     payload.Item.HillId.Item,
                     payload.Item.Location,
                     payload.Item.CountryId,
                     payload.Item.KPoint,
-                    payload.Item.HSPoint
+                    payload.Item.HsPoint
                 );
                 _state[payload.Item.HillId] = dto;
                 break;
 
-            case Event.GameWorldEventPayload.HillRemovedV1 payload:
+            case Event.HillEventPayload.HillRemovedV1 payload:
                 _state.TryRemove(payload.Item.HillId, out _);
                 break;
         }

@@ -16,12 +16,13 @@
         <Compile Include="Shared\EventAbstractions.fs" />
         <Compile Include="Shared\DomainEventFactory.fs" />
         <Compile Include="Shared\AggregateVersion.fs" />
-        <Compile Include="GameWorld\Id.fs" />
-        <Compile Include="GameWorld\Event.fs" />
         <Compile Include="GameWorld\Country.fs" />
-        <Compile Include="GameWorld\Hill.fs" />
-        <Compile Include="GameWorld\Jumper.fs" />
+        <Compile Include="GameWorld\JumperTypes.fs" />
+        <Compile Include="GameWorld\HillTypes.fs" />
+        <Compile Include="GameWorld\Event.fs" />
         <Compile Include="GameWorld\JumperSkills.fs" />
+        <Compile Include="GameWorld\Jumper.fs" />
+        <Compile Include="GameWorld\Hill.fs" />
         <Compile Include="CustomStrategies\CustomStrategy.fs" />
         <Compile Include="Competition\Id.fs" />
         <Compile Include="Competition\Shared.fs" />

@@ -11,11 +11,14 @@ type public IUserRepository =
     inherit IDomainCrudRepository<Domain.Profile.User.Id, Domain.Profile.User.User>
 
 // --- GameWorld ---
+type public IGameWorldCountryRepository =
+    inherit IDomainCrudRepository<Domain.GameWorld.Country.Id, Domain.GameWorld.Country>
+
 type public IGameWorldHillRepository =
-    inherit IDomainCrudRepository<Domain.GameWorld.HillId, Domain.GameWorld.Hill>
+    inherit IDomainCrudRepository<Domain.GameWorld.HillTypes.Id, Domain.GameWorld.Hill>
 
 type public IGameWorldJumperRepository =
-    inherit IDomainCrudRepository<Domain.GameWorld.Jumper.Id, Domain.GameWorld.Jumper>
+    inherit IDomainCrudRepository<Domain.GameWorld.JumperTypes.Id, Domain.GameWorld.Jumper>
 
 // --- Hosting ---
 type public IHostRepository =
@@ -27,9 +30,6 @@ type public IServerRepository =
 // --- Game ---
 // type public IGameHillRepository =
 //     inherit IDomainCrudRepository<Domain.Game.Hill.Id, Domain.Game.Hill.Hill>
-
-type public IGameParticipantRepository =
-    inherit IDomainCrudRepository<Domain.Game.Participant.Id, Domain.Game.Participant.Participant>
 
 // TODO: Co z IGameCompetitionRepository? Co z koncepcją Game Competition i co to jesT?
 

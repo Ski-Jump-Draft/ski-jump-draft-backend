@@ -32,15 +32,15 @@ public static class GameWorld
             Hill.Create(HillId.NewHillId(Guid.Parse("bdb53387-47ee-4180-9fbb-e2e6c8fd6001")),
                 HillModule.Location.NewLocation("Zakopane"), HillModule.Name.NewName("Wielka Krokiew"),
                 GetCountry("POL"), HillModule.KPointModule.tryCreate(125).Value,
-                HillModule.HSPointModule.tryCreate(140).Value),
+                HillModule.HsPointModule.tryCreate(140).Value),
             Hill.Create(HillId.NewHillId(Guid.Parse("41c03a25-9d24-4ec0-8237-94df208e1642")),
                 HillModule.Location.NewLocation("Oberstdorf"), HillModule.Name.NewName("Orlen Arena"),
                 GetCountry("POL"), HillModule.KPointModule.tryCreate(120).Value,
-                HillModule.HSPointModule.tryCreate(137).Value),
+                HillModule.HsPointModule.tryCreate(137).Value),
             Hill.Create(HillId.NewHillId(Guid.Parse("a4ffb647-5023-4418-adac-d0ad07346eb8")),
                 HillModule.Location.NewLocation("Vikersund"), HillModule.Name.NewName("Vikersundbakken"),
                 GetCountry("NOR"), HillModule.KPointModule.tryCreate(200).Value,
-                HillModule.HSPointModule.tryCreate(240).Value),
+                HillModule.HsPointModule.tryCreate(240).Value),
         }.Select(result => result.ResultValue.Item1).ToReadOnlyCollection();
     }
 }

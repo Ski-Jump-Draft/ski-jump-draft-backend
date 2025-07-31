@@ -12,7 +12,7 @@ public static class ProjectionDependencyInjection
 
         services.AddSingleton<IGameWorldHillProjection, Infrastructure.Projection.GameWorld.Hill.InMemory>();
         services
-            .AddSingleton<IEventHandler<Domain.GameWorld.Event.GameWorldEventPayload>,
+            .AddSingleton<IEventHandler<Domain.GameWorld.Event.HillEventPayload>,
                 Infrastructure.Projection.GameWorld.Hill.InMemory>();
 
         services.AddSingleton<IActiveGamesProjection, Infrastructure.Projection.Game.ActiveGames.InMemory>();
