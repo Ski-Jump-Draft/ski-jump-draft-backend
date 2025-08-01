@@ -16,7 +16,7 @@ public class Handler(
         CancellationToken ct)
     {
         var hills = (await gameWorldHills.GetAllAsync()).ToArray();
-        var randomIndex = random.RandomInt(0, hills.Length - 1);
+        var randomIndex = random.NextInt(0, hills.Length - 1);
         var hill = hills[randomIndex];
         return Domain.GameWorld.HillTypes.Id.NewId(hill.Id);
     }

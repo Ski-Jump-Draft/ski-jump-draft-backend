@@ -4,56 +4,56 @@ open App.Domain
 open App.Domain.Game.Participant
 open App.Domain.Game.Ranking
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type GameCreatedV1 =
     { GameId: Game.Id.Id
       Settings: Settings.Settings
       Participants: Participants }
 //
-// [<Struct; CLIMutable>]
+// [<CLIMutable>]
 // type ParticipantJoinedV1 =
 //     { GameId: Game.Id.Id
 //       ParticipantId: Participant.Id }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type ParticipantLeftV1 =
     { GameId: Game.Id.Id
       // ParticipantId: Participant.Id }
       Participant: Participant.Participant }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type PreDraftPhaseStartedV1 =
     { GameId: Game.Id.Id
       PreDraftId: PreDraft.Id.Id }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type PreDraftPhaseEndedV1 =
     { GameId: Game.Id.Id
       PreDraftId: PreDraft.Id.Id }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type DraftPhaseStartedV1 =
     { GameId: Game.Id.Id
       DraftId: Draft.Id.Id }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type DraftPhaseEndedV1 =
     { GameId: Game.Id.Id
       DraftId: Draft.Id.Id }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type GameCompetitionDto =
     { CompetitionId: App.Domain.Competition.Id.Id }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type CompetitionPhaseStartedV1 =
     { GameId: Game.Id.Id
       GameCompetition: GameCompetitionDto }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type CompetitionPhaseEndedV1 = { GameId: Game.Id.Id }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type GameEndedV1 =
     { GameId: Game.Id.Id
       Ranking: GameRanking }

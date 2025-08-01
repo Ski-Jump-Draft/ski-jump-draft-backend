@@ -1,13 +1,7 @@
 namespace App.Domain.Competition
 
-
 module Startlist =
     type Error = | StartlistEmptyDuringCreation
-
-    module EntityModule =
-        type Id = Id of System.Guid
-
-    type Entity = { Id: EntityModule.Id }
 
 type Startlist =
     private
@@ -30,11 +24,5 @@ type Startlist =
 
 
 type IStartlistProvider =
-    // abstract Provide: RoundIndex: Phase.RoundIndex -> Startlist.EntityModule.Id list
     abstract Provide: unit -> IndividualParticipant.Id list
     abstract RegisterJump: EntityId: IndividualParticipant.Id -> unit
-// abstract Provide:
-//     RoundIndex: Phase.RoundIndex *
-//     Results: ParticipantResult list *
-//     MapToStartlistEntity: (ParticipantResult -> Startlist.Entity.Id) ->
-//         Startlist.Entity.Id list

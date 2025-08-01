@@ -7,14 +7,14 @@ public class SpyCommandBus : ICommandBus
 {
     readonly List<object> _sent = new();
 
-    public Task SendAsync<TCommand>(TCommand command, CancellationToken ct)
+    public Task SendAsync<TCommand>(CommandEnvelope<TCommand> command, CancellationToken ct) where TCommand : ICommand
     {
         _sent.Add(command!);
         return Task.CompletedTask;
     }
 
     public Task<TResponse> SendAsync<TCommand, TResponse>(
-        TCommand command,
+        CommandEnvelope<TCommand, TResponse> command,
         CancellationToken ct
     ) where TCommand : ICommand<TResponse>
     {

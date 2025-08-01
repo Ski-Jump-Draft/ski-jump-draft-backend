@@ -15,7 +15,7 @@ public class SystemRandom : Domain.Shared.Random.IRandom
         return ListModule.OfSeq(list.OrderBy(_ => rnd.Next()));
     }
 
-    public int RandomInt(int min, int max)
+    public int NextInt(int min, int max)
     {
         return _random.Next(min, max + 1);
     }

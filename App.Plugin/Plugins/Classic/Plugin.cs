@@ -1,5 +1,5 @@
 using App.Application.Commanding;
-using App.Application.Factory;
+using App.Application.CompetitionEngine;
 using App.Domain.Shared;
 using App.Plugin.Engine.Classic;
 

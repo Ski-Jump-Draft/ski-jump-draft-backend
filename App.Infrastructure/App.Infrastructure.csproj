@@ -25,7 +25,6 @@
 
     <ItemGroup>
       <Folder Include="ApplicationRepository\" />
-      <Folder Include="RandomAdapters\" />
     </ItemGroup>
 
 </Project>

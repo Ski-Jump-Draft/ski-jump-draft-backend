@@ -1,12 +1,12 @@
-using App.Application.Factory;
+using App.Application.CompetitionEngine;
 using App.Domain.Competition;
 
-namespace App.Application.Commanding;
+namespace App.Application.CompetitionEngine;
 
 public interface ICompetitionEnginePlugin
 {
     string PluginId { get; }
-    Engine.Metadata Metadata { get; }
+    Engine.IMetadata Metadata { get; }
     ICompetitionEngineFactory Factory { get; }
 }
 

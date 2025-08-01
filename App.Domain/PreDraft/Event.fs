@@ -5,18 +5,18 @@ open App.Domain.PreDraft.Competitions
 open App.Domain.PreDraft.Phase
 open App.Domain.PreDraft.Settings
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type PreDraftCreatedV1 =
     { PreDraftId: Id.Id
       Settings: Settings }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type PreDraftCompetitionStartedV1 =
     { PreDraftId: Id.Id
       Index: CompetitionIndex
       CompetitionId: Competition.Id }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type PreDraftEndedV1 = { PreDraftId: Id.Id }
 
 type PreDraftEventPayload =

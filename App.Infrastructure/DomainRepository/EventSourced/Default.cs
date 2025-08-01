@@ -14,7 +14,7 @@ public abstract class DefaultEventSourcedRepository<TAggregate, TId, TPayload>(
     IClock clock,
     IGuid guid,
     IEventBus eventBus,
-    Func<IEnumerable<DomainEvent<TPayload>>, TAggregate> evolve,
+    Func<IEnumerable<DomainEvent<TPayload>>, Task<TAggregate>> evolveAsync,
     Func<TPayload, int> schemaVersion,
     Func<TAggregate, TId> id)
     :
@@ -23,10 +23,12 @@ public abstract class DefaultEventSourcedRepository<TAggregate, TId, TPayload>(
     public async Task<FSharpOption<TAggregate>> LoadAsync(TId aggregateId, CancellationToken ct = default)
     {
         var events = await store.LoadAsync(aggregateId, ct).ConfigureAwait(false);
-        return events.Count == 0
-            ? FSharpOption<TAggregate>.None
-            : FSharpOption<TAggregate>.Some(evolve(events));
+        if (events.Count == 0) return FSharpOption<TAggregate>.None;
+
+        var agg = await evolveAsync(events).ConfigureAwait(false);
+        return FSharpOption<TAggregate>.Some(agg);
     }
+
 
     public async Task SaveAsync(
         TId aggregateId,

@@ -4,7 +4,8 @@ namespace App.Infrastructure.CommandBus;
 
 public class InMemory(IServiceProvider sp) : ICommandBus
 {
-    public async Task SendAsync<TCommand>(TCommand command, CancellationToken ct)
+    public async Task SendAsync<TCommand>(CommandEnvelope<TCommand> command, CancellationToken ct)
+        where TCommand : ICommand
     {
         var handlerType = typeof(ICommandHandler<>).MakeGenericType(typeof(TCommand));
         var handler = sp.GetService(handlerType);
@@ -18,7 +19,7 @@ public class InMemory(IServiceProvider sp) : ICommandBus
     }
 
     public async Task<TResponse> SendAsync<TCommand, TResponse>(
-        TCommand command,
+        CommandEnvelope<TCommand, TResponse> command,
         CancellationToken ct
     ) where TCommand : ICommand<TResponse>
     {
@@ -40,5 +41,4 @@ public class InMemory(IServiceProvider sp) : ICommandBus
         var resultTask = (Task<TResponse>)method.Invoke(handler, [command, ct])!;
         return await resultTask.ConfigureAwait(false);
     }
-
 }

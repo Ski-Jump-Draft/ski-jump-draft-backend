@@ -4,7 +4,7 @@ using App.Domain.PreDraft.Competitions;
 using App.Domain.Repositories;
 using App.Domain.Shared;
 
-namespace App.Application.Factory.Impl.PreDraftHill;
+namespace App.Application.CompetitionEngine.Impl.PreDraftHill;
 
 public class Default(
     IGuid guid,

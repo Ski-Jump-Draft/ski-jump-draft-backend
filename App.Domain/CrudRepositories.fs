@@ -60,4 +60,4 @@ type public IPreDraftHillRepository =
 
 // --- Competition Engine ---
 type public ICompetitionEngineSnapshotRepository =
-    inherit IDomainCrudRepository<Domain.Competition.Engine.Id, Domain.Competition.Engine.EngineSnapshotBlob>
+    inherit IDomainCrudRepository<Domain.Competition.Engine.Id, Domain.Competition.Engine.Snapshot>

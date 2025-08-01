@@ -1,4 +1,4 @@
-using App.Application.Factory;
+using App.Application.CompetitionEngine;
 using App.Util;
 using App.Domain.Competition;
 using App.Domain.Competition.Results;
@@ -12,6 +12,7 @@ using App.Plugin.Competitions.NextRoundStartDecider;
 using App.Plugin.Competitions.Scorer.Classic;
 using App.Plugin.Competitions.StartlistProvider.AdvancementByLimitDecider;
 using App.Plugin.Competitions.WindPointsGrantor;
+using IndividualParticipantModule = App.Domain.Competition.IndividualParticipantModule;
 using ParticipantResultModule = App.Domain.Competition.Results.ParticipantResultModule;
 
 namespace App.Plugin.Engine.Classic;
@@ -22,11 +23,11 @@ public class Factory(
     Func<Hill, double> getTailwindPoints,
     IGuid guid) : ICompetitionEngineFactory
 {
-    public Domain.Competition.Engine.IEngine Create(Context context)
+    public Domain.Competition.Engine.IEngine Create(CreationContext context)
     {
         // TODO: Uniemożliwić wymaganie klucza niepodanego w RequiredOptions
 
-        var engineId = Domain.Competition.Engine.Id.NewId(context.EngineId);
+        var engineId = Domain.Competition.Engine.Id.NewId(guid.NewGuid());
         var rawOptions = context.RawOptions;
 
         var enableGatePoints = rawOptions["EnableGatePoints"] is bool;
@@ -75,18 +76,19 @@ public class Factory(
 
         var startlistProvider = new Competitions.StartlistProvider.Classic(roundLimits, advancementByLimitDecider,
             category, deferredResults.Provide, deferredRoundIndex.Provide, rankedResultsCreator,
-            MapParticipantResultToStartlistEntityId);
+            MapParticipantResultIdToIndividualParticipantId);
         var teamIdByIndividualId = new Dictionary<Guid, Guid>(); // TODO
 
-        var engine = new ClassicEngine(options, jumpScorer, jumpResultCreator, nextRoundStartDecider,
-            startlistProvider, teamIdByIndividualId, context.Hill.Id.Item,
-            id: engineId);
-
-        deferredResults.Set(() =>
+        if (context.RandomSeed is not ulong randomSeed)
         {
-            var resultsId = ResultsModule.Id.NewId(guid.NewGuid());
-            return ResultsModule.Results.FromState(resultsId, engine.ResultsState).ResultValue;
-        });
+            throw new InvalidOperationException("Random seed must be a ulong but got: " + context.RandomSeed + "");
+        }
+
+        var engine = new ClassicEngine(options, jumpScorer, jumpResultCreator, nextRoundStartDecider,
+            startlistProvider, teamIdByIndividualId, context.Hill,
+            id: engineId, randomSeed);
+
+        deferredResults.Set(() => engine.GenerateResults());
 
         deferredRoundIndex.Set(() =>
         {
@@ -113,10 +115,10 @@ public class Factory(
 
         return engine;
 
-        IEnumerable<StartlistModule.EntityModule.Id> MapParticipantResultToStartlistEntityId(
+        IEnumerable<IndividualParticipantModule.Id> MapParticipantResultIdToIndividualParticipantId(
             ParticipantResultModule.Id participantResultId)
         {
-            throw new NotImplementedException();
+            var participantResult = 
         }
     }
 

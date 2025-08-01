@@ -2,18 +2,18 @@ module App.Domain.Matchmaking.Event
 
 open App.Domain.Matchmaking
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type MatchmakingCreatedV1 =
     { MatchmakingId: Id
       Settings: Settings }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type MatchmakingFailedV1 =
     { MatchmakingId: Id
       Reason: MatchmakingFailReason
       ParticipantsCount: int }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type MatchmakingEndedV1 =
     { MatchmakingId: Id
       ParticipantsCount: int }
@@ -22,12 +22,12 @@ type MatchmakingParticipantDtoV1 =
     { Id: Participant.Id
       Nick: Participant.Nick }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type MatchmakingParticipantJoinedV1 =
     { MatchmakingId: Id
       Participant: MatchmakingParticipantDtoV1 }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type MatchmakingParticipantLeftV1 =
     { MatchmakingId: Id
       ParticipantId: Participant.Id }

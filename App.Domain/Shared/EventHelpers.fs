@@ -4,7 +4,7 @@ open System
 
 type EventTimestamp = System.DateTimeOffset
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type EventHeader =
     {
         EventId: Guid

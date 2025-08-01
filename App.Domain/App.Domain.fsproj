@@ -46,10 +46,11 @@
         <Compile Include="Competition\Results\Abstractions.fs" />
         <Compile Include="Competition\Results\Results.fs" />
         <Compile Include="Competition\Startlist.fs" />
-        <Compile Include="Competition\Event.fs" />
         <Compile Include="Competition\Engine.fs" />
+        <Compile Include="Competition\Event.fs" />
         <Compile Include="Competition\Competition.fs" />
         <Compile Include="Competition\Advancement.fs" />
+        <Compile Include="Competition\Evolve.fs" />
         <Compile Include="Matchmaking\Id.fs" />
         <Compile Include="Matchmaking\Participant.fs" />
         <Compile Include="Matchmaking\PhaseTag.fs" />

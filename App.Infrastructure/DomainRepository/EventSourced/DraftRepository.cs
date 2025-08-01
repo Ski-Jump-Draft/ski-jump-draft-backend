@@ -19,7 +19,7 @@ public sealed class DraftRepository(
             clock,
             guid,
             eventBus,
-            evts => App.Domain.Draft.Evolve.evolveFromEvents(OfSeq(evts)),
+            events => Task.FromResult(Domain.Draft.Evolve.evolveFromEvents(OfSeq(events))),
             p => App.Domain.Draft.Event.Versioning.schemaVersion(p),
             agg => agg.Id_),
         IDraftRepository;

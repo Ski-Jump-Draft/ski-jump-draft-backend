@@ -1,62 +1,69 @@
 module App.Domain.Competition.Event
 
+open App
 open App.Domain.Competition
 open App.Domain.Competition.Results
-open App.Domain.Competition.Results
 
-type CompetitionStartlistDto =
-    { NextIndividualParticipants: IndividualParticipant.Id list }
-
-// type CompetitionParticipantResultDto = {
+// type CompetitionStartlistDto =
+//     { NextIndividualParticipants: IndividualParticipant.Id list }
 //
-// }
+// // type CompetitionParticipantResultDto = {
+// //
+// // }
+//
+// type CompetitionResultsDto =
+//     { ParticipantResults: ParticipantResult list } // TODO: Może zrobić "czyste" DTO?
 
-type CompetitionResultsDto =
-    { ParticipantResults: ParticipantResult list } // TODO: Może zrobić "czyste" DTO?
+[<CLIMutable>]
+type CompetitionEngineConfigDto =
+    { EngineName: Engine.Metadata.Name
+      EngineVersion: Engine.Metadata.Version
+      EngineRawConfig: Map<string, obj>
+      GameWorldHillId: Domain.GameWorld.HillTypes.Id
+      RandomSeed: uint64 }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type CompetitionCreatedV1 =
     { CompetitionId: Id.Id
-      //ResultsId: ResultsModule.Id
-      Startlist: CompetitionStartlistDto }
+      EngineConfig: CompetitionEngineConfigDto }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type CompetitionStartedV1 = { CompetitionId: Id.Id }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type CompetitionRoundStartedV1 =
     { CompetitionId: Id.Id
       RoundIndex: uint }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type CompetitionRoundEndedV1 =
     { CompetitionId: Id.Id
-      RoundIndex: uint
-    //NextRoundIndex: int option }
-    }
+      RoundIndex: uint }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type CompetitionSuspendedV1 = { CompetitionId: Id.Id }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type CompetitionContinuedV1 = { CompetitionId: Id.Id }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type CompetitionCancelledV1 = { CompetitionId: Id.Id }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type CompetitionEndedV1 = { CompetitionId: Id.Id }
 
-// TODO: Przenieść to!
-[<Struct; CLIMutable>]
-type CompetitionJumpResultRegisteredV1 =
+[<CLIMutable>]
+type CompetitionJumpRegisteredV1 =
     { CompetitionId: Id.Id
-      ParticipantResultId: ParticipantResult.Id
+      IndividualParticipantId: IndividualParticipant.Id
+      //ParticipantResultId: ParticipantResult.Id
       JumpResultId: JumpResult.Id
-      Startlist: CompetitionStartlistDto
-      Results: CompetitionResultsDto }
+      Jump: Jump.Jump }
 
-// ---------- discriminated union + versioning ----------------------------------
+// [<CLIMutable>]
+// type CompetitionEngineSnapshotSavedV1 =
+//     { EngineId: Domain.Competition.Engine.Id
+//       EngineSnapshot: Domain.Competition.Engine.Snapshot }
 
 type CompetitionEventPayload =
     | CompetitionCreatedV1 of CompetitionCreatedV1
@@ -67,7 +74,8 @@ type CompetitionEventPayload =
     | CompetitionContinuedV1 of CompetitionContinuedV1
     | CompetitionCancelledV1 of CompetitionCancelledV1
     | CompetitionEndedV1 of CompetitionEndedV1
-    | CompetitionJumpResultRegisteredV1 of CompetitionJumpResultRegisteredV1
+    | CompetitionJumpRegisteredV1 of CompetitionJumpRegisteredV1
+    //| CompetitionEngineSnapshotSavedV1 of CompetitionEngineSnapshotSavedV1
 
 module Versioning =
     let schemaVersion =
@@ -80,4 +88,5 @@ module Versioning =
         | CompetitionContinuedV1 _ -> 1us
         | CompetitionCancelledV1 _ -> 1us
         | CompetitionEndedV1 _ -> 1us
-        | CompetitionJumpResultRegisteredV1 _ -> 1us
+        | CompetitionJumpRegisteredV1 _ -> 1us
+        //| CompetitionEngineSnapshotSavedV1 _ -> 1us

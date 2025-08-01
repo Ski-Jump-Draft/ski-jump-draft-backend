@@ -5,7 +5,7 @@ using App.Domain.Repositories;
 using App.Domain.Shared;
 using HillModule = App.Domain.PreDraft.Competitions.HillModule;
 
-namespace App.Application.Factory.Impl.CompetitionHill;
+namespace App.Application.CompetitionEngine.Impl.CompetitionHill;
 
 public class Default()
     : ICompetitionHillFactory

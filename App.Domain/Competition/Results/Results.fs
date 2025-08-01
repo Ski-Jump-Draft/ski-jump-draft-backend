@@ -44,7 +44,7 @@ let private validateParticipantResults (participantResults: ParticipantResult li
             match participantResult.Details with
             | Details.IndividualResultDetails individualResult -> Some individualResult
             | _ -> None)
-        |> Helpers.duplicatesBy (fun individualResult -> individualResult.IndividualId)
+        |> Helpers.duplicatesBy (fun individualResult -> individualResult.IndividualParticipantId)
         |> function
             | [] -> []
             | duplicates -> [ Error.IndividualParticipantHasManyIndividualResults duplicates ]
@@ -55,7 +55,7 @@ let private validateParticipantResults (participantResults: ParticipantResult li
             match participantResult.Details with
             | Details.TeamResultDetails teamResult ->
                 teamResult.MemberResults
-                |> List.map (fun individualResult -> individualResult.IndividualId, teamResult.TeamId)
+                |> List.map (fun individualResult -> individualResult.IndividualParticipantId, teamResult.TeamId)
             | _ -> [])
 
     let teamMembershipErrors =
@@ -97,7 +97,7 @@ type Results =
         let matching =
             this.ParticipantResults
             |> List.filter (function
-                | { Details = Details.IndividualResultDetails ir } when ir.IndividualId = individualId -> true
+                | { Details = Details.IndividualResultDetails ir } when ir.IndividualParticipantId = individualId -> true
                 | _ -> false)
 
         match matching with
@@ -144,12 +144,12 @@ type Results =
             match
                 this.ParticipantResults
                 |> List.tryFind (function
-                    | { Details = Details.IndividualResultDetails ir } when ir.IndividualId = individualId -> true
+                    | { Details = Details.IndividualResultDetails ir } when ir.IndividualParticipantId = individualId -> true
                     | _ -> false)
             with
             | None ->
                 let individualResult =
-                    { IndividualId = individualId
+                    { IndividualParticipantId = individualId
                       JumpResults = [ jumpResult ] }
 
                 let newParticipantResult =
@@ -220,7 +220,7 @@ type Results =
             with
             | None ->
                 let newIndividualResult =
-                    { IndividualId = individualId
+                    { IndividualParticipantId = individualId
                       JumpResults = [ jumpResult ] }
 
                 let newTeamResult =
@@ -243,7 +243,7 @@ type Results =
                 let updatedMemberResults =
                     match teamResult.IndividualResultOf individualId with
                     | None ->
-                        { IndividualId = individualId
+                        { IndividualParticipantId = individualId
                           JumpResults = [ jumpResult ] }
                         :: teamResult.MemberResults
                     | Some existingIndividualResult ->
@@ -252,7 +252,7 @@ type Results =
                                 JumpResults = jumpResult :: existingIndividualResult.JumpResults }
 
                         Helpers.replaceParticipantResult
-                            (fun ir -> ir.IndividualId = individualId)
+                            (fun ir -> ir.IndividualParticipantId = individualId)
                             updatedIndividualResult
                             teamResult.MemberResults
 

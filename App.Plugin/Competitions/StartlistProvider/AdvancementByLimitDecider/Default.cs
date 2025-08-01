@@ -7,6 +7,17 @@ namespace App.Plugin.Competitions.StartlistProvider.AdvancementByLimitDecider;
 
 public class Default(IAdvancementTieBreaker advancementTieBreaker) : IAdvancementByLimitDecider
 {
+    public IEnumerable<ParticipantResult> Decide(Dictionary<ParticipantResultModule.Id, RankedResults.Position> position, RoundParticipantsLimit limit)
+    {
+        return limit switch
+        {
+            
+        }
+    }
+}
+
+public class DefaultLegacy(IAdvancementTieBreaker advancementTieBreaker) : IAdvancementByLimitDecider
+{
     public IEnumerable<StartlistModule.EntityModule.Id> Decide(
         Dictionary<StartlistModule.EntityModule.Id, RankedResults.Position> positionsByEntity,
         RoundParticipantsLimit limit)

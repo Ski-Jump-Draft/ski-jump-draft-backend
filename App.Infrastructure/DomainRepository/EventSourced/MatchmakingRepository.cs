@@ -19,7 +19,7 @@ public sealed class MatchmakingRepository(
             clock,
             guid,
             eventBus,
-            evts => Domain.Matchmaking.Evolve.evolveFromEvents(ListModule.OfSeq(evts)),
+            domainEvents => Task.FromResult(Domain.Matchmaking.Evolve.evolveFromEvents(ListModule.OfSeq(domainEvents))),
             p => Domain.Matchmaking.Event.Versioning.schemaVersion(p),
             agg => agg.Id_),
         IMatchmakingRepository;

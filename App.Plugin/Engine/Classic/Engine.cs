@@ -6,6 +6,7 @@ using App.Domain.Competition.Rules;
 using Microsoft.FSharp.Collections;
 using Microsoft.FSharp.Core;
 using App.Domain;
+using App.Infrastructure.Utility.Rng;
 using static App.Domain.Competition.Phase;
 using static Microsoft.FSharp.Collections.ListModule;
 using Abstractions = App.Domain.Competition.Results.Abstractions;
@@ -22,27 +23,30 @@ public sealed class ClassicEngine : Competition.Engine.IEngine
 {
     private readonly Options _options;
 
-    //private readonly ClassicConfig _config;
     private readonly Abstractions.IJumpScorer _jumpScorer;
     private readonly Abstractions.IJumpResultCreator _jumpResultCreator;
     private readonly Advancement.INextRoundStartDecider _nextRoundStartDecider;
     private readonly IStartlistProvider _startlistProvider;
     private readonly Dictionary<Guid, Guid>? _teamIdByIndividualId;
-    private readonly Guid _hillId;
+    private readonly Hill _hill;
+    private readonly ulong _seed;
 
     private ClassicState _state;
+    private Competition.Engine.IRng<ulong> _rng;
 
     public ClassicEngine(Options options, Abstractions.IJumpScorer jumpScorer,
         Abstractions.IJumpResultCreator jumpResultCreator, Advancement.INextRoundStartDecider nextRoundStartDecider,
         IStartlistProvider startlistProvider,
-        Dictionary<Guid, Guid>? teamIdByIndividualId, Guid hillId, Competition.Engine.Id id)
+        Dictionary<Guid, Guid>? teamIdByIndividualId, Hill hill, Competition.Engine.Id id, ulong seed)
     {
         _options = options;
         _jumpScorer = jumpScorer;
         _teamIdByIndividualId = teamIdByIndividualId;
         _jumpResultCreator = jumpResultCreator;
-        _hillId = hillId;
+        _hill = hill;
         Id = id;
+        _seed = seed;
+        _rng = new XorShift64Star(seed);
         _nextRoundStartDecider = nextRoundStartDecider;
         _startlistProvider = startlistProvider;
         _state = ClassicState.CreateInitial();
@@ -58,21 +62,22 @@ public sealed class ClassicEngine : Competition.Engine.IEngine
         get
         {
             var isLastRound = _state.CurrentRoundIndex + 1 >= _options.RoundLimits.Count;
-            var noMoreJumpers = !FSharpOption<StartlistModule.Entity>.get_IsSome(Startlist?.NextParticipant);
+            var noMoreJumpers =
+                !FSharpOption<IndividualParticipantModule.Id>.get_IsSome(_state.Startlist?.NextParticipant);
             return isLastRound && noMoreJumpers;
         }
     }
 
     public Competition.Engine.Phase Phase => _state.Phase;
 
-    public Competition.Engine.EngineSnapshotBlob RegisterJump(Jump jump)
+    public Tuple<Competition.Engine.Snapshot, FSharpList<Competition.Engine.Event>> RegisterJump(Jump jump)
     {
-        if (jump.HillId.Item != _hillId)
+        if (!jump.Hill.Equals(_hill))
         {
             throw new InvalidOperationException("ClassicEngine requires same hill for every jump");
         }
 
-        var individualParticipantId = jump.IndividualParticipantId.Item;
+        var individualParticipantId = jump.IndividualParticipantId;
         if (_state.Phase.IsEnded)
             throw new InvalidOperationException("Competition already ended");
 
@@ -85,10 +90,19 @@ public sealed class ClassicEngine : Competition.Engine.IEngine
 
         round.RegisterJump(individualParticipantId, jumpResult);
 
-        return ToSnapshot();
+        var events = new List<Competition.Engine.Event>()
+        {
+            Competition.Engine.Event.NewJumpRegistered(
+                individualParticipantId,
+                jumpResult.Id
+            )
+        };
+
+        return new Tuple<Competition.Engine.Snapshot, FSharpList<Competition.Engine.Event>>(ToSnapshot(),
+            OfSeq(events));
     }
 
-    public FSharpOption<Competition.Engine.EngineSnapshotBlob> SetUpNextRound()
+    private FSharpOption<Competition.Engine.Snapshot> SetUpNextRound()
     {
         if (!_state.Phase.IsWaitingForNextRound)
             throw new InvalidOperationException("Engine must be in WaitingForNextRound state to set up next round");
@@ -96,7 +110,7 @@ public sealed class ClassicEngine : Competition.Engine.IEngine
         var nextRoundIndex = _state.CurrentRoundIndex + 1;
         _state = _state with
         {
-            Startlist = this.Startlist,
+            Startlist = _state.Startlist,
             CurrentRoundIndex = nextRoundIndex,
             RoundResults = _state.RoundResults
                 .Append(new RoundResults { Index = nextRoundIndex })
@@ -105,7 +119,7 @@ public sealed class ClassicEngine : Competition.Engine.IEngine
         return ToSnapshot();
     }
 
-    public FSharpOption<Competition.Engine.EngineSnapshotBlob> EndRound()
+    private FSharpOption<Competition.Engine.Snapshot> EndRound()
     {
         if (!_state.Phase.IsRunning)
             throw new InvalidOperationException("Engine must be in Running state to end the round");
@@ -113,14 +127,14 @@ public sealed class ClassicEngine : Competition.Engine.IEngine
         if (ShouldEndCompetition)
         {
             _state = _state with { Phase = Competition.Engine.Phase.Ended };
-            return FSharpOption<Competition.Engine.EngineSnapshotBlob>.Some(ToSnapshot());
+            return FSharpOption<Competition.Engine.Snapshot>.Some(ToSnapshot());
         }
 
         var nextRoundStartDecision = _nextRoundStartDecider.Decide(CurrentRoundIndex);
 
         return nextRoundStartDecision.StartNextRound
             ? SetUpNextRound()
-            : FSharpOption<Competition.Engine.EngineSnapshotBlob>.None;
+            : FSharpOption<Competition.Engine.Snapshot>.None;
     }
 
     private Subround Subround =>
@@ -139,9 +153,17 @@ public sealed class ClassicEngine : Competition.Engine.IEngine
         return _options.RoundLimits[roundIndex];
     }
 
-    public FSharpList<ParticipantResult> ResultsState
+    public ResultsModule.Results GenerateResults()
     {
-        get
+        var creationResult = ResultsModule.Results.FromState(State());
+        if (creationResult.IsError)
+        {
+            throw new InvalidOperationException("Failed to create results");
+        }
+
+        return creationResult.ResultValue;
+
+        FSharpList<ParticipantResult> State()
         {
             if (Category.IsIndividual && _teamIdByIndividualId is not null)
                 throw new InvalidOperationException("Individual competition should not define teamIdByIndividualId.");
@@ -184,6 +206,16 @@ public sealed class ClassicEngine : Competition.Engine.IEngine
 
             throw new ArgumentOutOfRangeException();
         }
+    }
+
+    public Startlist GenerateStartlist()
+    {
+        if (_state.Startlist is null)
+        {
+            throw new InvalidOperationException("Startlist is not generated yet");
+        }
+
+        return _state.Startlist;
     }
 
     private IEnumerable<ParticipantResult> BuildIndividualResults(IEnumerable<JumpResult> jumpResults)
@@ -231,7 +263,7 @@ public sealed class ClassicEngine : Competition.Engine.IEngine
 
         foreach (var teamGroup in groupedByTeam)
         {
-            var teamId = Domain.Competition.TeamParticipantModule.Id.NewId(teamGroup.Key);
+            var teamId = TeamParticipantModule.Id.NewId(teamGroup.Key);
 
             var memberResults = teamGroup.Select(kvp =>
             {
@@ -261,57 +293,60 @@ public sealed class ClassicEngine : Competition.Engine.IEngine
         }
     }
 
-    public Startlist? Startlist => _state.Startlist;
-
-    public Competition.Engine.EngineSnapshotBlob ToSnapshot()
+    public Competition.Engine.Snapshot ToSnapshot()
     {
         var bytes = JsonSerializer.SerializeToUtf8Bytes(_state);
-        return Competition.Engine.EngineSnapshotBlob.NewEngineSnapshotBlob(bytes);
+        return Competition.Engine.Snapshot.NewSnapshot(bytes);
     }
 
-    public void LoadSnapshot(Competition.Engine.EngineSnapshotBlob blob)
+    public void LoadSnapshot(Competition.Engine.Snapshot blob)
     {
         var bytes = blob.Item;
         _state = JsonSerializer.Deserialize<ClassicState>(bytes)
                  ?? throw new InvalidOperationException("Corrupted snapshot");
+        _rng = new XorShift64Star(_state.RngState);
     }
 }
 
 internal sealed record RoundResults
 {
     public int Index { get; init; }
-    public Dictionary<Guid, JumpResult> JumpResultsByRound { get; init; } = new();
 
-    public void RegisterJump(Guid participantId, JumpResult score)
+    public Dictionary<IndividualParticipantModule.Id, JumpResult> JumpResultsByRound { get; init; } =
+        new();
+
+    public void RegisterJump(IndividualParticipantModule.Id individualParticipantId, JumpResult score)
     {
-        JumpResultsByRound[participantId] = score;
+        JumpResultsByRound[individualParticipantId] = score;
     }
 
-    public bool Contains(Guid participantId) => JumpResultsByRound.ContainsKey(participantId);
+    public bool Contains(IndividualParticipantModule.Id individualParticipantId) =>
+        JumpResultsByRound.ContainsKey(individualParticipantId);
 }
 
 internal sealed record ClassicState
 {
+    public ulong RngState;
     public int CurrentRoundIndex { get; init; }
     public List<RoundResults> RoundResults { get; init; } = new();
     public Competition.Engine.Phase Phase { get; init; } = Competition.Engine.Phase.Ended;
     public Startlist? Startlist { get; init; }
 
-    public double? GetPointsByRound(Guid participantId, int roundIndex)
+    public double? GetIndividualPointsByRound(IndividualParticipantModule.Id individualParticipantId, int roundIndex)
     {
         if (roundIndex < 0 || roundIndex >= RoundResults.Count) return null;
         var roundResults = RoundResults[roundIndex];
-        roundResults.JumpResultsByRound.TryGetValue(participantId, out var result);
+        roundResults.JumpResultsByRound.TryGetValue(individualParticipantId, out var result);
         return result?.Score.Points.Item;
     }
 
-    public double GetTotalPoints(Guid participantId) =>
+    public double GetIndividualTotalPoints(IndividualParticipantModule.Id individualParticipantId) =>
         RoundResults
-            .Select((_, roundIndex) => GetPointsByRound(participantId, roundIndex) ?? 0)
+            .Select((_, roundIndex) => GetIndividualPointsByRound(individualParticipantId, roundIndex) ?? 0)
             .Sum();
 
     public static ClassicState CreateInitial() =>
-        new() { CurrentRoundIndex = 0, RoundResults = new(), Startlist = null };
+        new() { CurrentRoundIndex = 0, RoundResults = [], Startlist = null };
 
     public RoundResults CurrentRound => RoundResults.FirstOrDefault(r => r.Index == CurrentRoundIndex)
                                         ?? throw new InvalidOperationException("No current round");

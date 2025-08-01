@@ -38,7 +38,7 @@ type Competition =
           Version: AggregateVersion.AggregateVersion
           Phase: Phase.Phase
           Engine: IEngine }
-        
+
     member this.Id_ = this.Id
     member this.Phase_ = this.Phase
     member this.Version_ = this.Version
@@ -55,9 +55,7 @@ type Competition =
     member this.InvalidPhaseError expected =
         InvalidPhase(expected, Competition.TagOfPhase(this.Phase))
 
-    static member Create id version (engine: IEngine) =
-        let startlist = engine.GenerateStartlist()
-
+    static member Create id version (engine: IEngine) (engineConfigDto: Event.CompetitionEngineConfigDto) =
         let state =
             { Id = id
               Version = version
@@ -67,13 +65,15 @@ type Competition =
         let event =
             Event.CompetitionCreatedV1
                 { CompetitionId = id
-                  Startlist = { NextIndividualParticipants = startlist.NextIndividualParticipants } }
+                  EngineConfig = engineConfigDto
+                //Startlist = { NextIndividualParticipants = startlist.NextIndividualParticipants }
+                }
 
         Ok(state, [ event ])
 
-    member this.GenerateResults(): Results = this.Engine.GenerateResults()
+    member this.GenerateResults() : Results = this.Engine.GenerateResults()
 
-    member this.GenerateStartlist(): Startlist = this.Engine.GenerateStartlist()
+    member this.GenerateStartlist() : Startlist = this.Engine.GenerateStartlist()
 
     member this.RegisterJump
         (jump: Competition.Jump.Jump)
@@ -98,17 +98,20 @@ type Competition =
                                 Event.CompetitionEventPayload.CompetitionRoundEndedV1
                                     { CompetitionId = this.Id
                                       RoundIndex = index }
-                            | JumpRegistered(participantResultId, jumpResultId) ->
+                            | JumpRegistered(individualParticipantId, jumpResultId) ->
                                 let startlist = this.Engine.GenerateStartlist()
                                 let results = this.Engine.GenerateResults()
 
-                                Event.CompetitionEventPayload.CompetitionJumpResultRegisteredV1
+                                Event.CompetitionEventPayload.CompetitionJumpRegisteredV1
                                     { CompetitionId = this.Id
-                                      ParticipantResultId = participantResultId
+                                      IndividualParticipantId = individualParticipantId
+                                      // ParticipantResultId = participantResultId
                                       JumpResultId = jumpResultId
-                                      Startlist = { NextIndividualParticipants = startlist.NextIndividualParticipants }
-                                      Results = { ParticipantResults = results.ParticipantResults } }
-                            | ParticipantDisqualified -> failwith "todo"
+                                      Jump = jump
+                                    // Startlist = { NextIndividualParticipants = startlist.NextIndividualParticipants }
+                                    // Results = { ParticipantResults = results.ParticipantResults }
+                                    }
+                            | ParticipantDisqualified -> failwith "ParticipantDisqualified EngineEvent is not supported yet"
                             | CompetitionEnded ->
                                 Event.CompetitionEventPayload.CompetitionEndedV1 { CompetitionId = this.Id }
 
@@ -119,7 +122,7 @@ type Competition =
             let jumpResultHasBeenRegistered =
                 competitionEvents
                 |> List.exists (function
-                    | Event.CompetitionEventPayload.CompetitionJumpResultRegisteredV1 _ -> true
+                    | Event.CompetitionEventPayload.CompetitionJumpRegisteredV1 _ -> true
                     | _ -> false)
 
             let roundHasStarted =

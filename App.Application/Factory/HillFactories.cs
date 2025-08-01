@@ -1,6 +1,6 @@
 using App.Util;
 
-namespace App.Application.Factory;
+namespace App.Application.CompetitionEngine;
 
 public interface ICompetitionHillFactory
 {

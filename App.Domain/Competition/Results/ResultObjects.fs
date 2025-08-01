@@ -40,7 +40,7 @@ type JumpResult =
       Score: JumpScore }
 
 type IndividualResult =
-    { IndividualId: IndividualParticipant.Id
+    { IndividualParticipantId: IndividualParticipant.Id
       JumpResults: JumpResult list }
 
 type TeamResult =
@@ -48,10 +48,10 @@ type TeamResult =
       MemberResults: IndividualResult list }
 
     member this.IndividualResultOf id =
-        this.MemberResults |> List.tryFind (fun ir -> ir.IndividualId = id)
+        this.MemberResults |> List.tryFind (fun ir -> ir.IndividualParticipantId = id)
 
     member this.ContainsIndividualResult id =
-        this.MemberResults |> List.exists (fun ir -> ir.IndividualId = id)
+        this.MemberResults |> List.exists (fun ir -> ir.IndividualParticipantId = id)
 
 module ParticipantResult =
     type Id = Id of System.Guid

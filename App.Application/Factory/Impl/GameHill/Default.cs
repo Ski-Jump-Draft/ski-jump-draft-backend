@@ -4,7 +4,7 @@ using App.Domain.Game;
 using App.Domain.Repositories;
 using App.Domain.Shared;
 
-namespace App.Application.Factory.Impl.GameHill;
+namespace App.Application.CompetitionEngine.Impl.GameHill;
 
 // public class Default(
 //     IGuid guid,

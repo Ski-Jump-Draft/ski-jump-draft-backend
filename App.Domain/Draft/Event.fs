@@ -28,7 +28,7 @@ type DraftSettingsDto =
       UniqueJumpers: bool
       PickTimeout: Picks.PickTimeout }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type DraftCreatedV1 =
     { DraftId: Draft.Id.Id
       Settings: DraftSettingsDto
@@ -36,19 +36,19 @@ type DraftCreatedV1 =
       Subjects: DraftSubjectDto list
       Seed: uint64 }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type DraftStartedV1 = { DraftId: Draft.Id.Id }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type DraftEndedV1 = { DraftId: Draft.Id.Id }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type DraftSubjectPickedV1 =
     { DraftId: Draft.Id.Id
       ParticipantId: Participant.Id
       SubjectId: Subject.Id }
 
-[<Struct; CLIMutable>]
+[<CLIMutable>]
 type DraftSubjectPickedV2 =
     { DraftId: Draft.Id.Id
       ParticipantId: Participant.Id

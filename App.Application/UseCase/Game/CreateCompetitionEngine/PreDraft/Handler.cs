@@ -1,7 +1,7 @@
 using App.Application.Commanding;
 using App.Application.Exception;
 using App.Application.Ext;
-using App.Application.Factory;
+using App.Application.CompetitionEngine;
 using App.Domain.Competition;
 using App.Domain.Repositories;
 using App.Domain.Shared;

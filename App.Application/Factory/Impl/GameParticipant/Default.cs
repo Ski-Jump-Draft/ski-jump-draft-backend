@@ -4,7 +4,7 @@ using App.Application.UseCase.Helper;
 using App.Domain.Game;
 using App.Domain.Shared;
 
-namespace App.Application.Factory.Impl.GameParticipant;
+namespace App.Application.CompetitionEngine.Impl.GameParticipant;
 
 public class Default(IGuid guid) : IGameParticipantsFactory
 {

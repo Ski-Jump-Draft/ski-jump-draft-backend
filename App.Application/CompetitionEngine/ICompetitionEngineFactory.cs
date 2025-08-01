@@ -1,10 +1,10 @@
 using App.Domain.Competition;
 
-namespace App.Application.Factory;
+namespace App.Application.CompetitionEngine;
 
 public interface ICompetitionEngineFactory
 {
-    Domain.Competition.Engine.IEngine Create(Context context);
+    Engine.IEngine Create(CreationContext context);
     IEnumerable<Option> RequiredOptions { get; }
 }
 
@@ -19,4 +19,7 @@ public enum OptionType
 
 public sealed record Option(string Key, OptionType Type);
 
-public sealed record Context(Guid EngineId, Dictionary<string, object> RawOptions, Hill Hill);
+public sealed record CreationContext(
+    Dictionary<string, object> RawOptions,
+    Hill Hill,
+    object RandomSeed);

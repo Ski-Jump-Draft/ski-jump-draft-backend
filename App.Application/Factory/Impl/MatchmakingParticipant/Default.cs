@@ -2,7 +2,7 @@ using App.Application.UseCase.Helper;
 using App.Domain.Matchmaking;
 using App.Domain.Shared;
 
-namespace App.Application.Factory.Impl.MatchmakingParticipant;
+namespace App.Application.CompetitionEngine.Impl.MatchmakingParticipant;
 
 public class Default(IGuid guid) : IMatchmakingParticipantFactory
 {
