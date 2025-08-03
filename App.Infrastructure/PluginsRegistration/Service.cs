@@ -1,4 +1,5 @@
 using App.Application.Commanding;
+using App.Application.CompetitionEngine;
 using Microsoft.Extensions.Hosting;
 
 namespace App.Infrastructure.PluginsRegistration;

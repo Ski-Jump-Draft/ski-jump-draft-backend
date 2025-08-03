@@ -1,5 +1,4 @@
 using App.Application.Commanding;
-using App.Application.Projection;
 using App.Application.ReadModel.Projection;
 
 namespace App.Web.DependencyInjection;

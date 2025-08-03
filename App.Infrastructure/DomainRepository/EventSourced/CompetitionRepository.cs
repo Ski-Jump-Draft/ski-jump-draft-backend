@@ -1,5 +1,6 @@
 using App.Application.Commanding;
 using App.Application.CompetitionEngine;
+using App.Application.Factory;
 using App.Domain.Competition;
 using App.Domain.Repositories;
 using App.Domain.Shared;
@@ -67,6 +68,5 @@ public sealed class CompetitionRepository(
             eventBus,
             events => CompetitionEvolver.FoldAsync(factoryProvider, hillRepo, hillFactory,
                 OfSeq(events.Select(@event => @event.Payload))),
-            p => App.Domain.Competition.Event.Versioning.schemaVersion(p),
-            agg => agg.Id_),
+            p => App.Domain.Competition.Event.Versioning.schemaVersion(p)),
         ICompetitionRepository;

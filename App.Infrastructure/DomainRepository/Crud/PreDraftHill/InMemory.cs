@@ -1,4 +1,4 @@
-using App.Domain.PreDraft.Competitions;
+using App.Domain.PreDraft.Competition;
 using App.Domain.Repositories;
 
 namespace App.Infrastructure.DomainRepository.Crud.PreDraftHill;

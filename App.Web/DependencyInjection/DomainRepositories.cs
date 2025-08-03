@@ -14,25 +14,19 @@ public static class DomainRepositoriesDependencyInjection
         services
             .AddSingleton<ICompetitionEngineSnapshotRepository,
                 Infrastructure.DomainRepository.Crud.CompetitionEngineSnapshot.InMemory>();
-        services
-            .AddSingleton<ICompetitionEnginePluginRepository,
-                Infrastructure.ApplicationRepository.CompetitionEnginePlugin.InMemory>();
-        services
-            .AddSingleton<IGameParticipantRepository, Infrastructure.DomainRepository.Crud.GameParticipant.InMemory>();
-        services
-            .AddSingleton<IMatchmakingParticipantRepository,
-                Infrastructure.DomainRepository.Crud.MatchmakingParticipant.InMemory>();
+        // services
+        //     .AddSingleton<ICompetitionEnginePluginRepository,
+        //         Infrastructure.ApplicationRepository.CompetitionEnginePlugin.InMemory>();
 
-        services.AddSingleton(new InMemoryCrudDomainRepositoryStarter<Domain.GameWorld.HillId, Domain.GameWorld.Hill>(
-            StarterItems:
-            Infrastructure.Temporaries.GameWorld.ConstructHills(),
-            MapToId: hill => hill.Id_
-        ));
+        services.AddSingleton(
+            new InMemoryCrudDomainRepositoryStarter<Domain.GameWorld.HillTypes.Id, Domain.GameWorld.Hill>(
+                StarterItems:
+                Infrastructure.Temporaries.GameWorld.ConstructHills(),
+                MapToId: hill => hill.Id_
+            ));
 
         services.AddSingleton<IGameWorldHillRepository, Infrastructure.DomainRepository.Crud.GameWorldHill.InMemory>();
         services.AddSingleton<IPreDraftHillRepository, Infrastructure.DomainRepository.Crud.PreDraftHill.InMemory>();
-        services
-            .AddSingleton<ICompetitionHillRepository, Infrastructure.DomainRepository.Crud.CompetitionHill.InMemory>();
 
         // Event-Sourced
         services

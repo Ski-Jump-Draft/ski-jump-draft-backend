@@ -1,10 +1,9 @@
-using App.Application.Commanding.Mappers;
 using App.Application.ReadModel.Projection;
 using App.Application.UseCase.Helper;
 using App.Domain.Game;
 using App.Domain.Shared;
 
-namespace App.Application.CompetitionEngine.Impl.GameParticipant;
+namespace App.Application.Factory.Impl.GameParticipants;
 
 public class Default(IGuid guid) : IGameParticipantsFactory
 {

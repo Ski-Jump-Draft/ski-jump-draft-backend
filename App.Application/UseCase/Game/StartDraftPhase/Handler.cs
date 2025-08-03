@@ -1,6 +1,7 @@
 using App.Application.Commanding;
 using App.Application.Exception;
 using App.Application.Ext;
+using App.Application.ReadModel.Projection;
 using App.Application.UseCase.Game.Exception;
 using App.Application.UseCase.Helper;
 using App.Domain.Game;
@@ -16,8 +17,10 @@ public record Command(Id.Id GameId, Domain.Draft.Settings.Settings DraftSettings
 public class Handler(
     IGuid guid,
     Random.IRandom random,
+    IQuickGameJumpersSelector jumpersSelector,
     IGameRepository games,
     IDraftRepository drafts,
+    IGameParticipantsProjection gameParticipantsProjection,
     IDraftParticipantsFactory draftParticipantsFactory,
     IDraftSubjectsFactory draftSubjectsFactory)
     : ICommandHandler<Command>
@@ -26,12 +29,16 @@ public class Handler(
     {
         var game = await games.LoadAsync(command.GameId, ct)
             .AwaitOrWrap(_ => new IdNotFoundException<Guid>(command.GameId.Item));
-        var gameParticipants = game.Participants_;
-        var draftParticipants = draftParticipantsFactory.Create(gameParticipants);
-        var draftSubjects = draftSubjectsFactory.CreateIndividuals();
+
+        var gameParticipants = await gameParticipantsProjection.GetParticipantsByGameIdAsync(game.Id_);
+
+        var draftParticipants = draftParticipantsFactory.CreateFromDtos(gameParticipants);
+
+        var gameWorldJumpers = jumpersSelector.Select();
+        var draftSubjects = draftSubjectsFactory.CreateIndividuals(gameWorldJumpers);
 
         var draftId = Domain.Draft.Id.Id.NewId(guid.NewGuid());
-        var initialAggregateVersion = AggregateVersion.AggregateVersion.NewAggregateVersion(0u);
+        var initialAggregateVersion = AggregateVersion.zero;
         var draftSeed = random.NextUInt64();
         var newDraftResult = Domain.Draft.Draft.Create(draftId, initialAggregateVersion, command.DraftSettings,
             ListModule.OfSeq(draftParticipants), ListModule.OfSeq(draftSubjects), draftSeed);

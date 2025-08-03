@@ -1,13 +1,14 @@
 using App.Application.Commanding;
 using App.Application.UseCase.Game.Exception;
 using App.Domain.Matchmaking;
+using App.Domain.Shared;
 using Microsoft.AspNetCore.Mvc;
 
 namespace App.Web.Controller;
 
 [ApiController]
 [Route("quickGame")]
-public class QuickGameController(ICommandBus commandBus) : ControllerBase
+public class QuickGameController(ICommandBus commandBus, IGuid guid) : ControllerBase
 {
     /// <summary>
     /// Quick Join na potrzeby MVP.
@@ -21,19 +22,27 @@ public class QuickGameController(ICommandBus commandBus) : ControllerBase
     {
         var findOrCreateCommand =
             new Application.UseCase.Game.QuickGame.FindOrCreateMatchmaking.Command(matchmakingDto.Nick);
+        var findOrCreateEnvelope =
+            new CommandEnvelope<Application.UseCase.Game.QuickGame.FindOrCreateMatchmaking.Command,
+                Domain.Matchmaking.Id>(findOrCreateCommand,
+                MessageContext.New(guid.NewGuid()));
         var matchmakingId =
-            await commandBus.SendAsync<Application.UseCase.Game.QuickGame.FindOrCreateMatchmaking.Command, Guid>(
-                findOrCreateCommand, ct);
+            await commandBus
+                .SendAsync(
+                    findOrCreateEnvelope, ct);
+
         var joinCommand =
             new Application.UseCase.Game.QuickGame.JoinMatchmaking.Command(matchmakingId,
                 matchmakingDto.Nick);
+        var joinEnvelope =
+            new CommandEnvelope<Application.UseCase.Game.QuickGame.JoinMatchmaking.Command,
+                Domain.Matchmaking.ParticipantModule.Id>(joinCommand, MessageContext.New(guid.NewGuid()));
         var matchmakingParticipantId =
             await commandBus
-                .SendAsync<Application.UseCase.Game.QuickGame.JoinMatchmaking.Command,
-                    App.Domain.Matchmaking.ParticipantModule.Id>(
-                    joinCommand, ct);
+                .SendAsync(
+                    joinEnvelope, ct);
 
-        return Ok(new { matchmakingId, participantId = matchmakingParticipantId });
+        return Ok(new { matchmakingId = matchmakingId, participantId = matchmakingParticipantId });
     }
 
     [HttpPost("leaveMatchmaking")]
@@ -43,9 +52,12 @@ public class QuickGameController(ICommandBus commandBus) : ControllerBase
         var matchmakingParticipantId = ParticipantModule.Id.NewId(dto.MatchmakingParticipantId);
         var leaveMatchmakingCommand =
             new Application.UseCase.Game.Matchmaking.Leave.Command(matchmakingId, matchmakingParticipantId);
+        var leaveMatchmakingEnvelope = new
+            CommandEnvelope<Application.UseCase.Game.Matchmaking.Leave.Command>(leaveMatchmakingCommand,
+                MessageContext.New(guid.NewGuid()));
         try
         {
-            await commandBus.SendAsync(leaveMatchmakingCommand, ct);
+            await commandBus.SendAsync(leaveMatchmakingEnvelope, ct);
             return Ok();
         }
         catch (MatchmakingParticipantNotInMatchmakingException)

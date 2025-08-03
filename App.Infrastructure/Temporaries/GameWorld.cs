@@ -28,19 +28,45 @@ public static class GameWorld
         // TODO: Licencyjna kwestia nazw skoczni
 
         return new[]
-        {
-            Hill.Create(HillId.NewHillId(Guid.Parse("bdb53387-47ee-4180-9fbb-e2e6c8fd6001")),
-                HillModule.Location.NewLocation("Zakopane"), HillModule.Name.NewName("Wielka Krokiew"),
-                GetCountry("POL"), HillModule.KPointModule.tryCreate(125).Value,
-                HillModule.HsPointModule.tryCreate(140).Value),
-            Hill.Create(HillId.NewHillId(Guid.Parse("41c03a25-9d24-4ec0-8237-94df208e1642")),
-                HillModule.Location.NewLocation("Oberstdorf"), HillModule.Name.NewName("Orlen Arena"),
-                GetCountry("POL"), HillModule.KPointModule.tryCreate(120).Value,
-                HillModule.HsPointModule.tryCreate(137).Value),
-            Hill.Create(HillId.NewHillId(Guid.Parse("a4ffb647-5023-4418-adac-d0ad07346eb8")),
-                HillModule.Location.NewLocation("Vikersund"), HillModule.Name.NewName("Vikersundbakken"),
-                GetCountry("NOR"), HillModule.KPointModule.tryCreate(200).Value,
-                HillModule.HsPointModule.tryCreate(240).Value),
-        }.Select(result => result.ResultValue.Item1).ToReadOnlyCollection();
+            {
+                Hill.Create(
+                    HillTypes.Id.NewId(Guid.Parse("bdb53387-47ee-4180-9fbb-e2e6c8fd6001")),
+                    HillTypes.Location.NewLocation("Zakopane"),
+                    HillTypes.Name.NewName("Wielka Krokiew"),
+                    GetCountry("POL"),
+                    HillTypes.KPointModule.tryCreate(125).Value,
+                    HillTypes.HsPointModule.tryCreate(140).Value,
+                    new HillTypes.Record(
+                        HillTypes.RecordModule.SetterReference.NewSimple("Yukiya Sato"),
+                        HillTypes.RecordModule.DistanceModule.tryCreate(147).ResultValue
+                    )
+                ),
+                Hill.Create(
+                    HillTypes.Id.NewId(Guid.Parse("41c03a25-9d24-4ec0-8237-94df208e1642")),
+                    HillTypes.Location.NewLocation("Oberstdorf"),
+                    HillTypes.Name.NewName("Orlen Arena"),
+                    GetCountry("POL"),
+                    HillTypes.KPointModule.tryCreate(120).Value,
+                    HillTypes.HsPointModule.tryCreate(137).Value,
+                    new HillTypes.Record(
+                        HillTypes.RecordModule.SetterReference.NewSimple("Sigurd Pettersen"),
+                        HillTypes.RecordModule.DistanceModule.tryCreate(143).ResultValue
+                    )
+                ),
+                Hill.Create(
+                    HillTypes.Id.NewId(Guid.Parse("a4ffb647-5023-4418-adac-d0ad07346eb8")),
+                    HillTypes.Location.NewLocation("Vikersund"),
+                    HillTypes.Name.NewName("Vikersundbakken"),
+                    GetCountry("NOR"),
+                    HillTypes.KPointModule.tryCreate(200).Value,
+                    HillTypes.HsPointModule.tryCreate(240).Value,
+                    new HillTypes.Record(
+                        HillTypes.RecordModule.SetterReference.NewSimple("Daniel Huber"),
+                        HillTypes.RecordModule.DistanceModule.tryCreate(147.5).ResultValue
+                    )
+                ),
+            }
+            .Select(result => result.ResultValue.Item1)
+            .ToReadOnlyCollection();
     }
 }

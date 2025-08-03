@@ -8,7 +8,7 @@ namespace App.Infrastructure.Projection.GameWorld.Hill;
 
 public class InMemory : IGameWorldHillProjection, IEventHandler<Event.HillEventPayload>
 {
-    private readonly ConcurrentDictionary<HillId, GameWorldHillDto> _state = new();
+    private readonly ConcurrentDictionary<HillTypes.Id, GameWorldHillDto> _state = new();
 
     public Task<IEnumerable<GameWorldHillDto>> GetAllAsync()
     {
@@ -23,10 +23,10 @@ public class InMemory : IGameWorldHillProjection, IEventHandler<Event.HillEventP
             case Event.HillEventPayload.HillCreatedV1 payload:
                 var dto = new GameWorldHillDto(
                     payload.Item.HillId.Item,
-                    payload.Item.Location,
-                    payload.Item.CountryId,
-                    payload.Item.KPoint,
-                    payload.Item.HsPoint
+                    payload.Item.Location.Item,
+                    payload.Item.CountryId.Item.ToString(),
+                    HillTypes.KPointModule.value(payload.Item.KPoint),
+                    HillTypes.HsPointModule.value(payload.Item.HsPoint)
                 );
                 _state[payload.Item.HillId] = dto;
                 break;

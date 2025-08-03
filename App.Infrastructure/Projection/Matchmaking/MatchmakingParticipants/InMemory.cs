@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using App.Application.Commanding;
-using App.Application.Projection;
 using App.Application.ReadModel.Projection;
 using App.Domain.Matchmaking;
 using App.Domain.Shared;
@@ -10,37 +9,51 @@ namespace App.Infrastructure.Projection.Matchmaking.MatchmakingParticipants;
 
 public class InMemory : IMatchmakingParticipantsProjection, IEventHandler<Event.MatchmakingEventPayload>
 {
-    private readonly ConcurrentDictionary<System.Guid, IEnumerable<MatchmakingParticipantDto>> _store = new();
+    private readonly ConcurrentDictionary<Guid, ConcurrentDictionary<Guid, MatchmakingParticipantDto>> _store = new();
+    private readonly ConcurrentDictionary<Guid, MatchmakingParticipantDto> _participantsIndex = new();
 
-    public Task<IEnumerable<MatchmakingParticipantDto>> GetParticipantsByMatchmakingIdAsync(Id matchmakingId) =>
-        Task.FromResult(_store.GetValueOrDefault(matchmakingId.Item) ?? []);
+    public Task<MatchmakingParticipantDto?> GetParticipantById(ParticipantModule.Id id)
+        => Task.FromResult(_participantsIndex.GetValueOrDefault(id.Item));
+
+    public Task<IEnumerable<MatchmakingParticipantDto>> GetParticipantsByMatchmakingIdAsync(Id matchmakingId)
+        => Task.FromResult<IEnumerable<MatchmakingParticipantDto>>(
+            _store.GetValueOrDefault(matchmakingId.Item)?.Values ?? Array.Empty<MatchmakingParticipantDto>()
+        );
 
     public Task HandleAsync(DomainEvent<Event.MatchmakingEventPayload> ev, CancellationToken ct)
     {
-        var occurredAt = ev.Header.OccurredAt;
-
         switch (ev.Payload)
         {
             case Event.MatchmakingEventPayload.MatchmakingCreatedV1 payload:
-                _store[payload.Item.MatchmakingId.Item] = [];
+                _store[payload.Item.MatchmakingId.Item] = new ConcurrentDictionary<Guid, MatchmakingParticipantDto>();
                 break;
 
             case Event.MatchmakingEventPayload.MatchmakingParticipantJoinedV1 payload:
             {
-                var id = payload.Item.MatchmakingId.Item;
-                var existing = _store.GetValueOrDefault(id) ?? [];
-                var newParticipant = new MatchmakingParticipantDto(
-                    payload.Item.ParticipantId.Item
+                var mmId = payload.Item.MatchmakingId.Item;
+                var participantId = payload.Item.Participant.Id.Item;
+
+                var participantDto = new MatchmakingParticipantDto(
+                    participantId,
+                    ParticipantModule.NickModule.value(payload.Item.Participant.Nick)
                 );
-                _store[id] = existing.Append(newParticipant);
+
+                var participants =
+                    _store.GetOrAdd(mmId, _ => new ConcurrentDictionary<Guid, MatchmakingParticipantDto>());
+                participants[participantId] = participantDto;
+                _participantsIndex[participantId] = participantDto;
                 break;
             }
 
             case Event.MatchmakingEventPayload.MatchmakingParticipantLeftV1 payload:
             {
-                var id = payload.Item.MatchmakingId.Item;
-                var existing = _store.GetValueOrDefault(id) ?? [];
-                _store[id] = existing.Where(participantDto => participantDto.Id != payload.Item.ParticipantId.Item);
+                var mmId = payload.Item.MatchmakingId.Item;
+                var participantId = payload.Item.ParticipantId.Item;
+
+                if (_store.TryGetValue(mmId, out var participants))
+                    participants.TryRemove(participantId, out _);
+
+                _participantsIndex.TryRemove(participantId, out _);
                 break;
             }
         }

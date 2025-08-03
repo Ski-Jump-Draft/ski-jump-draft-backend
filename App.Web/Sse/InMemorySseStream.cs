@@ -31,11 +31,9 @@ public class InMemorySseStream(ILogger<InMemorySseStream> log) : ISseStream
 
         // znajdź parę Channel, której Reader pasuje do przekazanego
         var toRemove = set.FirstOrDefault(c => c.Reader == reader);
-        if (toRemove is not null)
-        {
-            set.Remove(toRemove);
-            log.LogDebug("SSE unsubscribe: {Channel}, remaining subs = {Count}", channel, set.Count);
-        }
+        if (toRemove is null) return;
+        set.Remove(toRemove);
+        log.LogDebug("SSE unsubscribe: {Channel}, remaining subs = {Count}", channel, set.Count);
     }
 
     public Task PublishAsync(string channel, string eventName, object payload, CancellationToken ct = default)

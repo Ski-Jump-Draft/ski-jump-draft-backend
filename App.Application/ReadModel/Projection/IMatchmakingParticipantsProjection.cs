@@ -2,8 +2,10 @@ namespace App.Application.ReadModel.Projection;
 
 public interface IMatchmakingParticipantsProjection
 {
+    Task<MatchmakingParticipantDto?> GetParticipantById(Domain.Matchmaking.ParticipantModule.Id id);
+
     Task<IEnumerable<MatchmakingParticipantDto>> GetParticipantsByMatchmakingIdAsync(
-        App.Domain.Matchmaking.Id matchmakingId);
+        Domain.Matchmaking.Id matchmakingId);
 }
 
 public record MatchmakingParticipantDto(Guid Id, string Nick);

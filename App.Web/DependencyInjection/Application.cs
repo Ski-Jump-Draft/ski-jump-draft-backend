@@ -8,22 +8,23 @@ public static class ApplicationDependencyInjection
         this IServiceCollection services)
     {
         services
-            .AddScoped<ICommandHandler<Application.UseCase.Game.Matchmaking.Leave.Command,
-                Domain.Matchmaking.ParticipantModule.Id>, Application.UseCase.Game.Matchmaking.Leave.Handler>();
+            .AddScoped<ICommandHandler<Application.UseCase.Game.Matchmaking.Leave.Command>,
+                Application.UseCase.Game.Matchmaking.Leave.Handler>();
+        // services
+        //     .AddScoped<ICommandHandler<Application.UseCase.Game.CreateCompetitionEngine.Command,
+        //         Domain.Competition.Engine.Id>, Application.UseCase.Game.CreateCompetitionEngine.Handler>();
         services
-            .AddScoped<ICommandHandler<Application.UseCase.Game.CreateCompetitionEngine.Command,
-                Domain.Competition.Engine.Id>, Application.UseCase.Game.CreateCompetitionEngine.Handler>();
-        services
-            .AddScoped<ICommandHandler<Application.UseCase.Game.QuickGame.Create.Command, Domain.Game.Game>,
+            .AddScoped<ICommandHandler<Application.UseCase.Game.QuickGame.Create.Command, Domain.Game.Id.Id>,
                 Application.UseCase.Game.QuickGame.Create.Handler>();
         services
             .AddScoped<ICommandHandler<Application.UseCase.Game.EndDraftPhase.Command>,
                 Application.UseCase.Game.EndDraftPhase.Handler>();
         services
             .AddScoped<ICommandHandler<Application.UseCase.Game.QuickGame.ChooseHill.Command,
-                Domain.GameWorld.HillId>, Application.UseCase.Game.QuickGame.ChooseHill.Handler>();
+                Domain.GameWorld.HillTypes.Id>, Application.UseCase.Game.QuickGame.ChooseHill.Handler>();
         services
-            .AddScoped<ICommandHandler<Application.UseCase.Game.QuickGame.FindOrCreateMatchmaking.Command, Guid>,
+            .AddScoped<ICommandHandler<Application.UseCase.Game.QuickGame.FindOrCreateMatchmaking.Command,
+                    Domain.Matchmaking.Id>,
                 Application.UseCase.Game.QuickGame.FindOrCreateMatchmaking.Handler>();
         services
             .AddScoped<ICommandHandler<Application.UseCase.Game.QuickGame.JoinMatchmaking.Command,

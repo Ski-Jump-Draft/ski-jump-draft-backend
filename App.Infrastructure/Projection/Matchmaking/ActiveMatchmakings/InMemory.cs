@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using App.Application.Commanding;
-using App.Application.Projection;
+using App.Application.ReadModel.Projection;
 using App.Domain.Matchmaking;
 using App.Domain.Shared;
 using GameModule = App.Domain.Game.GameModule;

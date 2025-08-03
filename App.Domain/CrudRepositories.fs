@@ -37,12 +37,10 @@ type public IServerRepository =
 //     inherit IDomainCrudRepository<Domain.Game.Competition.Id, Domain.Game.Competition>
 
 // --- Matchmaking ---
-type public IMatchmakingParticipantRepository =
-    inherit IDomainCrudRepository<Domain.Matchmaking.Participant.Id, Domain.Matchmaking.Participant>
 
 // --- Pre‑Draft ---
 type public IPreDraftHillRepository =
-    inherit IDomainCrudRepository<Domain.PreDraft.Competitions.Hill.Id, Domain.PreDraft.Competitions.Hill>
+    inherit IDomainCrudRepository<Domain.PreDraft.Competition.Hill.Id, Domain.PreDraft.Competition.Hill>
 
 // --- Competition ---
 

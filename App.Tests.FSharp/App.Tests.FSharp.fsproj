@@ -4,7 +4,6 @@
     <TargetFramework>net9.0</TargetFramework>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IsTestProject>true</IsTestProject>
-    <RootNamespace>App.Domain.Tests</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

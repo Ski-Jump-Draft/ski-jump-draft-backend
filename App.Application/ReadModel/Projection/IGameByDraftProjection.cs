@@ -1,4 +1,4 @@
-namespace App.Application.Projection;
+namespace App.Application.ReadModel.Projection;
 
 public interface IGameByDraftProjection
 {

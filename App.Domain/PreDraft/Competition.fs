@@ -1,24 +1,13 @@
-namespace App.Domain.PreDraft.Competitions
-
-open App.Domain
+namespace App.Domain.PreDraft.Competition
 
 module Hill =
     type Id = Id of System.Guid
 
 type Hill = { Id: Hill.Id }
 
-module Competition =
-     type Id = App.Domain.Competition.Id.Id
-     //type Id = Id of System.Guid
 
-     type Settings =
-         { //HillId: Hill.Id
-           CompetitionEnginePluginId: string
-           EngineRawOptions: Map<string, obj> }
+type Id = App.Domain.Competition.Id.Id
 
-// type Competition =
-//     { Id: Competition.Id
-//       CompetitionId: App.Domain.Competition.Id.Id }
-
-// module Competition =
-//     
+type Settings =
+    { CompetitionEnginePluginId: string
+      EngineRawOptions: Map<string, obj> }

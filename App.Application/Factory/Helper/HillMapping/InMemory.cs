@@ -1,6 +1,7 @@
+using App.Application.Factory;
 using App.Util;
 
-namespace App.Application.CompetitionEngine.Helper.HillMapping;
+namespace App.Application.Factory.Helper.HillMapping;
 
 // public class
 //     InMemoryGameHillMapping : InMemoryBiDirectionalIdMap<Domain.GameWorld.HillId, Domain.Game.Hill.Id>,
@@ -8,7 +9,7 @@ namespace App.Application.CompetitionEngine.Helper.HillMapping;
 
 public class
     InMemoryPreDraftHillMapping : InMemoryBiDirectionalIdMap<Domain.GameWorld.HillTypes.Id,
-        Domain.PreDraft.Competitions.HillModule.Id>,
+        Domain.PreDraft.Competition.HillModule.Id>,
     IPreDraftHillMapping;
 
 // public class
@@ -18,7 +19,7 @@ public class
 //
 // public class
 //     InMemoryPreDraftHillMapping : InMemoryBiDirectionalIdMap<Domain.Game.Hill.Id,
-//         Domain.PreDraft.Competitions.HillModule.Id>,
+//         Domain.PreDraft.Competition.HillModule.Id>,
 //     IPreDraftHillMapping;
 //
 // public class

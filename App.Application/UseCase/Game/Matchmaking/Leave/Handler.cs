@@ -1,6 +1,7 @@
 using App.Application.Commanding;
 using App.Application.Exception;
 using App.Application.Ext;
+using App.Application.ReadModel.Projection;
 using App.Application.UseCase.Game.Exception;
 using App.Domain.Matchmaking;
 using App.Domain.Shared;
@@ -11,14 +12,14 @@ namespace App.Application.UseCase.Game.Matchmaking.Leave;
 public record Command(
     App.Domain.Matchmaking.Id MatchmakingId,
     ParticipantModule.Id MatchmakingParticipantId
-) : ICommand<App.Domain.Matchmaking.ParticipantModule.Id>;
+) : ICommand;
 
 public class Handler(
     IMatchmakingRepository matchmakings,
-    IGuid guid
-) : ICommandHandler<Command, App.Domain.Matchmaking.ParticipantModule.Id>
+    IMatchmakingParticipantsProjection matchmakingParticipantsProjection
+) : ICommandHandler<Command>
 {
-    public async Task<App.Domain.Matchmaking.ParticipantModule.Id> HandleAsync(Command command,
+    public async Task HandleAsync(Command command,
         MessageContext messageContext, CancellationToken ct)
     {
         var matchmakingId = command.MatchmakingId;
@@ -26,10 +27,16 @@ public class Handler(
             .AwaitOrWrap(_ => new IdNotFoundException<Guid>(matchmakingId.Item));
 
         var matchmakingParticipantId = command.MatchmakingParticipantId;
-        var matchmakingParticipant = await matchmakingParticipants.GetByIdAsync(matchmakingParticipantId)
-            .AwaitOrWrap(_ => new IdNotFoundException<Guid>(matchmakingId.Item));
+        var matchmakingParticipant =
+            await matchmakingParticipantsProjection.GetParticipantById(matchmakingParticipantId);
 
-        var leaveResult = matchmaking.Leave(matchmakingParticipant.Id);
+        if (matchmakingParticipant is null)
+        {
+            throw new MatchmakingParticipantNotInMatchmakingException(matchmaking,
+                matchmakingParticipant);
+        }
+
+        var leaveResult = matchmaking.Leave(matchmakingParticipantId);
 
         if (leaveResult.IsOk)
         {
@@ -41,7 +48,6 @@ public class Handler(
                     messageContext.CausationId, ct).AwaitOrWrap(_ =>
                     new LeavingMatchmakingFailedException(matchmaking, matchmakingParticipant,
                         LeavingMatchmakingFailReason.ErrorDuringUpdatingMatchmaking));
-            return matchmakingParticipant.Id;
         }
 
         var error = leaveResult.ErrorValue;

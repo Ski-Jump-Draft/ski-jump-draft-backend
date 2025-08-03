@@ -20,6 +20,5 @@ public sealed class GameRepository(
             guid,
             eventBus,
             evts => Task.FromResult(Domain.Game.Evolve.evolveFromEvents(OfSeq(evts))),
-            p => Domain.Game.Event.Versioning.schemaVersion(p),
-            agg => agg.Id_),
+            p => Domain.Game.Event.Versioning.schemaVersion(p)),
         IGameRepository;

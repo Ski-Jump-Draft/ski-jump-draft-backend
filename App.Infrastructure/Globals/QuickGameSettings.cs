@@ -1,5 +1,4 @@
 using App.Application.Commanding;
-using App.Application.CompetitionEngine;
 using App.Application.UseCase.Helper;
 using App.Domain.Draft;
 using App.Domain.Draft.Order;
@@ -9,8 +8,7 @@ using Settings = App.Domain.Game.Settings;
 namespace App.Infrastructure.Globals;
 
 public class DefaultQuickGameSettingsProvider(
-    IQuickGameHillSelector hillSelector,
-    IPreDraftHillMapping preDraftHillMapping)
+    IQuickGameHillSelector hillSelector)
     : IQuickGameSettingsProvider
 {
     public Task<Settings.Settings> Provide()
@@ -26,16 +24,14 @@ public class DefaultQuickGameSettingsProvider(
         var gameWorldHill = hillSelector.Select();
         var gameWorldHillId = gameWorldHill.Id_;
 
-        // var gameHillId = gameHillMapping.Map(gameWorldHillId);
-        var preDraftHillId = preDraftHillMapping.Map(gameWorldHillId);
-
-        var preDraftCompetitionSettings = new List<App.Domain.PreDraft.Competitions.CompetitionModule.Settings>()
+        var preDraftCompetitionSettings = new List<Domain.PreDraft.Competition.Settings>()
         {
-            new(preDraftHillId, "classic",
+            new("classic",
                 classicEngineOptions),
-            new(preDraftHillId, "classic",
+            new("classic",
                 classicEngineOptions)
         };
+        // TODO: Co z subsettingsami wewnątrz Game?
         var preDraftSettings = new Domain.PreDraft.Settings.Settings(ListModule.OfSeq(preDraftCompetitionSettings));
         var pickTimeoutFixedTime =
             Picks.PickTimeoutModule.FixedTimeModule.tryCreate(TimeSpan.FromSeconds(15)).ResultValue;
@@ -44,10 +40,10 @@ public class DefaultQuickGameSettingsProvider(
         var competitionSettings =
             new App.Domain.Game.CompetitionModule.Settings("classic", classicEngineOptions);
 
-        return Task.FromResult(new Settings.Settings(participantLimit, preDraftSettings, draftSettings,
-            competitionSettings, Settings.PhaseTransitionPolicy.StartingPreDraft.NewAutoAfter(TimeSpan.FromSeconds(15)),
+        return Task.FromResult(new Settings.Settings(participantLimit,
+            Settings.PhaseTransitionPolicy.StartingPreDraft.NewAutoAfter(TimeSpan.FromSeconds(15)),
             Settings.PhaseTransitionPolicy.StartingDraft.NewAutoAfter(TimeSpan.FromSeconds(15)),
-            Settings.PhaseTransitionPolicy.StartingSimulating.NewAutoAfter(TimeSpan.FromSeconds(20)),
+            Settings.PhaseTransitionPolicy.StartingCompetition.NewAutoAfter(TimeSpan.FromSeconds(20)),
             Settings.PhaseTransitionPolicy.EndingGame.NewAutoAfter(TimeSpan.FromSeconds(25))));
     }
 }

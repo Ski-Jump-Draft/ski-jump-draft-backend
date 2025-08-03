@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using App.Application.Commanding;
+using App.Application.CompetitionEngine;
 
 namespace App.Infrastructure.ApplicationRepository.CompetitionEnginePlugin;
 

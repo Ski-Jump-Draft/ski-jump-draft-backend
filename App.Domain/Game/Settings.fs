@@ -70,7 +70,7 @@ module PhaseTransitionPolicy =
         | HostDecides of HostDecisionTimeout
         | AutoAfter of TimeSpan option
 
-    type StartingSimulating =
+    type StartingCompetition =
         | HostDecides of HostDecisionTimeout
         | AutoAfter of TimeSpan option
 
@@ -82,5 +82,5 @@ type Settings =
     { ParticipantLimit: ParticipantLimit
       StartingPreDraftPolicy: PhaseTransitionPolicy.StartingPreDraft
       StartingDraftPolicy: PhaseTransitionPolicy.StartingDraft
-      StartingCompetitionPolicy: PhaseTransitionPolicy.StartingSimulating
+      StartingCompetitionPolicy: PhaseTransitionPolicy.StartingCompetition
       EndingGamePolicy: PhaseTransitionPolicy.EndingGame }

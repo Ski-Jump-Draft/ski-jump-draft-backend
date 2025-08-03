@@ -1,7 +1,7 @@
 module App.Domain.PreDraft.Event
 
 open App.Domain
-open App.Domain.PreDraft.Competitions
+open App.Domain.PreDraft.Competition
 open App.Domain.PreDraft.Phase
 open App.Domain.PreDraft.Settings
 

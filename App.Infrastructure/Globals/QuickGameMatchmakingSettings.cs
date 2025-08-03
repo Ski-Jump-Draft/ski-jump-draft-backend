@@ -8,7 +8,8 @@ public class DefaultQuickGameMatchmakingSettingsProvider : IQuickGameMatchmaking
     public Task<Settings> Provide()
     {
         return Task.FromResult(new Settings(
-            PlayersCountModule.tryCreate(1).ResultValue,
-            PlayersCountModule.tryCreate(10).ResultValue));
+            minParticipants: PlayersCountModule.tryCreate(1),
+            maxParticipants: PlayersCountModule.tryCreate(10),
+            maxDuration: Duration.NewDuration(TimeSpan.FromMinutes(2))));
     }
 }

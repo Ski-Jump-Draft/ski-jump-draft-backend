@@ -15,8 +15,7 @@ public abstract class DefaultEventSourcedRepository<TAggregate, TId, TPayload>(
     IGuid guid,
     IEventBus eventBus,
     Func<IEnumerable<DomainEvent<TPayload>>, Task<TAggregate>> evolveAsync,
-    Func<TPayload, int> schemaVersion,
-    Func<TAggregate, TId> id)
+    Func<TPayload, int> schemaVersion)
     :
         IEventSourcedRepository<TAggregate, TId, TPayload>
 {

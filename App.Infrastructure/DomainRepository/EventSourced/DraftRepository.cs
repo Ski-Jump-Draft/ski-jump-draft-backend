@@ -20,6 +20,5 @@ public sealed class DraftRepository(
             guid,
             eventBus,
             events => Task.FromResult(Domain.Draft.Evolve.evolveFromEvents(OfSeq(events))),
-            p => App.Domain.Draft.Event.Versioning.schemaVersion(p),
-            agg => agg.Id_),
+            p => App.Domain.Draft.Event.Versioning.schemaVersion(p)),
         IDraftRepository;

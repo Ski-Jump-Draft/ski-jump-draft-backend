@@ -3,13 +3,12 @@ using App.Application.Exception;
 using App.Application.Ext;
 using App.Domain.Game;
 using App.Domain.Repositories;
-using App.Domain.Shared;
 
 namespace App.Application.UseCase.Game.EndDraftPhase;
 
 public record Command(Id.Id GameId) : ICommand;
 
-public class Handler(IGameRepository games, IGuid guid) : ICommandHandler<Command>
+public class Handler(IGameRepository games) : ICommandHandler<Command>
 {
     public async Task HandleAsync(Command command, MessageContext messageContext, CancellationToken ct)
     {

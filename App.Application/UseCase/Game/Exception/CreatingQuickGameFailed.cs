@@ -2,20 +2,21 @@ namespace App.Application.UseCase.Game.Exception;
 
 public class CreatingQuickGameFailedException : System.Exception
 {
-    public Domain.Matchmaking.Matchmaking Matchmaking { get; }
-    
-    public CreatingQuickGameFailedException(Domain.Matchmaking.Matchmaking matchmaking)
+    public Domain.Matchmaking.Id MatchmakingId { get; }
+
+    public CreatingQuickGameFailedException(Domain.Matchmaking.Id matchmakingId)
     {
-        Matchmaking = matchmaking;
+        MatchmakingId = matchmakingId;
     }
 
-    public CreatingQuickGameFailedException(string message, Domain.Matchmaking.Matchmaking matchmaking) : base(message)
+    public CreatingQuickGameFailedException(string message, Domain.Matchmaking.Id matchmakingId) : base(message)
     {
-        Matchmaking = matchmaking;
+        MatchmakingId = matchmakingId;
     }
 
-    public CreatingQuickGameFailedException(string message, System.Exception inner, Domain.Matchmaking.Matchmaking matchmaking) : base(message, inner)
+    public CreatingQuickGameFailedException(string message, System.Exception inner, Domain.Matchmaking.Id matchmakingId)
+        : base(message, inner)
     {
-        Matchmaking = matchmaking;
+        MatchmakingId = matchmakingId;
     }
 }

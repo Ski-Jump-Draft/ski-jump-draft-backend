@@ -20,7 +20,7 @@ builder.Services
     .AddCommandsInfrastructure()
     .AddUtilities()
     .AddFactories()
-    .AddPluginsInfrastructure()
+    //.AddPluginsInfrastructure()
     .AddApplication()
     .AddQuickGameApplicationHelpers()
     .AddSseInfrastructure();

@@ -1,6 +1,6 @@
 namespace App.Domain.PreDraft.Settings
 
-open App.Domain.PreDraft.Competitions
+open App
 
 type Settings =
-    { CompetitionSettings: Competition.Settings list }
+    { CompetitionSettings: Domain.PreDraft.Competition.Settings list }

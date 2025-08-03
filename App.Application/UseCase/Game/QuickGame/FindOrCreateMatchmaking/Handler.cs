@@ -1,19 +1,18 @@
+using App.Application.ReadModel.Projection;
 using App.Application.UseCase.Helper;
 
 namespace App.Application.UseCase.Game.QuickGame.FindOrCreateMatchmaking;
 
 using Commanding;
 using Ext;
-using Projection;
 using Exception;
-using App.Domain.Matchmaking;
 using Domain.Shared;
 using Domain.Repositories;
 
 // TODO: Walidacja i nie raw string!
 public record Command(
     string Nick
-) : ICommand<Guid>;
+) : ICommand<Domain.Matchmaking.Id>;
 
 public class Handler(
     IMatchmakingRepository matchmakings,
@@ -21,9 +20,10 @@ public class Handler(
     IActiveMatchmakingsProjection activeMatchmakingsProjection,
     IQuickGameMatchmakingSettingsProvider matchmakingSettingsProvider,
     IGuid guid
-) : ICommandHandler<Command, Guid>
+) : ICommandHandler<Command, Domain.Matchmaking.Id>
 {
-    public async Task<Guid> HandleAsync(Command command, CancellationToken ct)
+    public async Task<Domain.Matchmaking.Id> HandleAsync(Command command, MessageContext messageContext,
+        CancellationToken ct)
     {
         var activeGames = (await activeGamesProjection.GetActiveGamesAsync(ct)).ToArray();
         if (activeGames.Length > 0)
@@ -38,37 +38,35 @@ public class Handler(
             case 1:
             {
                 var activeMatchmaking = activeMatchmakings.Single();
-                var matchmakingId = App.Domain.Matchmaking.Id.NewId(activeMatchmaking.MatchmakingId);
-                return matchmakingId.Item;
+                var matchmakingId = Domain.Matchmaking.Id.NewId(activeMatchmaking.MatchmakingId);
+                return matchmakingId;
             }
             case > 1:
                 // TODO: Dynamicznie wybieramy serwer - wg dostępności, regionu
-                throw new NotImplementedException("Multiple active matchmakings not supported yet.");
+                throw new NotImplementedException("Multiple active matchmakings aren't supported yet.");
             default:
             {
-                var matchmakingId = Id.NewId(guid.NewGuid());
-                var aggregateVersion = AggregateVersion.AggregateVersion.NewAggregateVersion(0u);
-                // TODO: Może hosty do matchmakingów?
-                // 
-                // var hostId = App.Domain.Matchmaking.Hosting.HostModule.Id.NewId(getGlobalHostId());
+                var newMatchmakingId = Domain.Matchmaking.Id.NewId(guid.NewGuid());
+                var aggregateVersion = AggregateVersion.zero;
+
                 var settings = await matchmakingSettingsProvider.Provide();
-                var matchmaking =
-                    Matchmaking.Create(matchmakingId, aggregateVersion, settings);
-                if (!matchmaking.IsOk)
+
+                var matchmakingResult =
+                    Domain.Matchmaking.Matchmaking.Create(newMatchmakingId, aggregateVersion, settings);
+                if (!matchmakingResult.IsOk)
                     throw new JoiningQuickMatchmakingFailedException(command.Nick,
                         JoiningQuickMatchmakingFailReason.ErrorDuringSettingUp);
 
-                var (matchmakingAggregate, events) = matchmaking.ResultValue;
+                var (matchmaking, events) = matchmakingResult.ResultValue;
 
-                var correlationId = guid.NewGuid();
-                var causationId = correlationId;
-                var expectedVersion = matchmakingAggregate.Version_;
+                var expectedVersion = matchmaking.Version_;
                 await
-                    matchmakings.SaveAsync(matchmakingAggregate, events, expectedVersion, correlationId, causationId,
+                    matchmakings.SaveAsync(matchmaking.Id_, events, expectedVersion, messageContext.CorrelationId,
+                            messageContext.CausationId,
                             ct)
                         .AwaitOrWrap(_ => new JoiningQuickMatchmakingFailedException(command.Nick,
                             JoiningQuickMatchmakingFailReason.ErrorDuringSettingUp));
-                return matchmakingId.Item;
+                return matchmaking.Id_;
             }
         }
     }

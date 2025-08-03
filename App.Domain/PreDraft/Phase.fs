@@ -1,6 +1,6 @@
 module App.Domain.PreDraft.Phase
 
-open App.Domain.PreDraft.Competitions
+open App.Domain.PreDraft.Competition
 
 [<Struct>]
 type CompetitionIndex = CompetitionIndex of uint

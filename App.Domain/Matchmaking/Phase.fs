@@ -11,12 +11,11 @@ module PlayersCount =
         // if v < 0 then Error(Error.BelowZero v)
         // elif v > 10 then Error(Error.TooMany(v, 10))
         // else Ok(PlayersCount v)
-        Ok(PlayersCount v)
-        
-    let value (PlayersCount v ) = v
+        PlayersCount v
+
+    let value (PlayersCount v) = v
 
 type Phase =
     | Active
     | Ended
     | Failed of Reason: MatchmakingFailReason
-

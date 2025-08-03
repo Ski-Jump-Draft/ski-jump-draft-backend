@@ -20,6 +20,11 @@ public class SystemRandom : Domain.Shared.Random.IRandom
         return _random.Next(min, max + 1);
     }
 
+    public double NextDouble()
+    {
+        return _random.NextDouble();
+    }
+
     public ulong NextUInt64()
     {
         Span<byte> buffer = stackalloc byte[8];

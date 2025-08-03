@@ -1,11 +1,12 @@
 using App.Application.Exception;
 using App.Application.Ext;
+using App.Application.Factory;
 using App.Domain.Competition;
 using App.Domain.Repositories;
 using App.Domain.Shared;
-using HillModule = App.Domain.PreDraft.Competitions.HillModule;
+using HillModule = App.Domain.PreDraft.Competition.HillModule;
 
-namespace App.Application.CompetitionEngine.Impl.CompetitionHill;
+namespace App.Application.Factory.Impl.CompetitionHill;
 
 public class Default()
     : ICompetitionHillFactory

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using App.Application.Commanding;
 using App.Application.Exception;
 using App.Application.Ext;
@@ -11,60 +12,51 @@ namespace App.Application.UseCase.Game.QuickGame.JoinMatchmaking;
 
 // TODO: Walidacja i nie raw string!
 public record Command(
-    Guid MatchmakingId,
+    Domain.Matchmaking.Id MatchmakingId,
     string Nick
 ) : ICommand<App.Domain.Matchmaking.ParticipantModule.Id>;
 
 public class Handler(
     IMatchmakingRepository matchmakings,
-    IMatchmakingParticipantRepository matchmakingParticipants,
-    IMatchmakingParticipantFactory matchmakingParticipantFactory,
-    IGuid guid
+    IMatchmakingParticipantFactory matchmakingParticipantFactory
 ) : ICommandHandler<Command, App.Domain.Matchmaking.ParticipantModule.Id>
 {
-    public async Task<App.Domain.Matchmaking.ParticipantModule.Id> HandleAsync(Command command, CancellationToken ct)
+    public async Task<App.Domain.Matchmaking.ParticipantModule.Id> HandleAsync(Command command,
+        MessageContext messageContext, CancellationToken ct)
     {
-        var matchmakingId = Id.NewId(command.MatchmakingId);
+        var matchmakingId = command.MatchmakingId;
         var matchmaking = await matchmakings.LoadAsync(matchmakingId, ct)
             .AwaitOrWrap(_ => new IdNotFoundException<Guid>(matchmakingId.Item));
 
         var matchmakingParticipant = matchmakingParticipantFactory.CreateFromNick(command.Nick);
-        var joinResult = matchmaking.Join(matchmakingParticipant.Id);
 
-        if (joinResult.IsOk)
+        var matchmakingJoinResult = matchmaking.Join(matchmakingParticipant);
+
+        if (matchmakingJoinResult.IsOk)
         {
-            var (aggregate, events) = joinResult.ResultValue;
+            var (matchmakingAfterJoin, events) = matchmakingJoinResult.ResultValue;
 
-            var correlationId = guid.NewGuid();
-            var causationId = correlationId;
-
-            var expectedVersion = aggregate.Version_;
+            var expectedVersion = matchmakingAfterJoin.Version_;
 
             await
-                matchmakings.SaveAsync(aggregate, events, expectedVersion, correlationId, causationId, ct)
+                matchmakings.SaveAsync(matchmakingAfterJoin.Id_, events, expectedVersion, messageContext.CorrelationId,
+                        messageContext.CausationId, ct)
                     .AwaitOrWrap(_ =>
                         new JoiningQuickMatchmakingFailedException(command.Nick,
                             JoiningQuickMatchmakingFailReason.Unknown));
-
-            await matchmakingParticipants.SaveAsync(matchmakingParticipant.Id, matchmakingParticipant).AwaitOrWrap(_ =>
-                new JoiningQuickMatchmakingFailedException(command.Nick,
-                    JoiningQuickMatchmakingFailReason.ErrorDuringPreservingParticipant));
             return matchmakingParticipant.Id;
         }
 
-        var error = joinResult.ErrorValue;
+        var error = matchmakingJoinResult.ErrorValue;
 
         throw error switch
         {
             Error.ParticipantAlreadyJoined => new MatchmakingParticipantAlreadyJoinedException(matchmaking,
                 matchmakingParticipant),
-            Error.ParticipantNotInMatchmaking => new MatchmakingParticipantNotInMatchmakingException(matchmaking,
-                matchmakingParticipant),
             Error.RoomFull => new MatchmakingRoomFullException(matchmaking),
             Error.InvalidPhase invalidPhaseError => new JoiningMatchmakingInvalidPhaseException(
                 invalidPhaseError.Expected.ToList(), invalidPhaseError.Actual),
-            _ => new JoiningQuickMatchmakingFailedException(command.Nick,
-                JoiningQuickMatchmakingFailReason.NoServerAvailable)
+            _ => new UnreachableException(error.ToString())
         };
     }
 }

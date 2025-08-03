@@ -2,8 +2,6 @@ namespace App.Domain.PreDraft
 
 open App.Domain
 open App.Domain.PreDraft.Event
-open App.Domain.PreDraft.Id
-open App.Domain.PreDraft.Competitions
 
 open App.Domain.PreDraft.Phase
 
@@ -13,7 +11,7 @@ module PreDraft =
 open PreDraft
 
 type PreDraft =
-    { Id: Id
+    { Id: Id.Id
       Phase: Phase
       Settings: PreDraft.Settings.Settings }
 
@@ -22,7 +20,7 @@ type PreDraft =
         | InProgress _ -> InProgressTag
         | Ended -> EndedTag
 
-    static member Create id settings firstCompetitionId : Result<PreDraft * PreDraftEventPayload list, Error> =
+    static member Create (id: Id.Id) settings firstCompetitionId : Result<PreDraft * PreDraftEventPayload list, Error> =
         let state =
             { Id = id
               Phase = InProgress(CompetitionIndex 0u, firstCompetitionId)

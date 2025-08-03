@@ -1,3 +1,5 @@
+using App.Application.ReadModel.Projection;
+
 namespace App.Infrastructure.Projection.Game.ActiveGames;
 using System;
 using System.Collections.Generic;
@@ -5,7 +7,6 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Application.Commanding;
-using App.Application.Projection;
 using App.Domain.Game;
 using App.Domain.Shared;
 using StackExchange.Redis;

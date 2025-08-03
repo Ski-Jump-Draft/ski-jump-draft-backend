@@ -2,6 +2,7 @@ namespace App.Domain.GameWorld
 
 open App.Domain.GameWorld.Event
 
+open App.Domain.GameWorld.HillTypes.Record
 open HillTypes
 
 module Hill =
@@ -21,7 +22,7 @@ type Hill =
           KPoint: KPoint
           HsPoint: HsPoint
           RealRecord: Record
-          InGameRecord: Record }
+          InGameRecord: Record option }
 
     member this.Id_ = this.Id
     member this.KPoint_ = this.KPoint
@@ -29,18 +30,14 @@ type Hill =
 
     static member Create
         id
-        //status
         location
         name
         countryId
         kPoint
         hsPoint
         realRecord
-        inGameRecord // TODO: Na pewno tutaj?
         : Result<Hill * Event.HillEventPayload list, Error> =
-        if inGameRecord.SetterReference.IsSimple then
-            Error(Error.InGameRecordIsSimpleReference)
-        elif KPoint.value kPoint > HsPoint.value hsPoint then
+        if KPoint.value kPoint > HsPoint.value hsPoint then
             Error(Error.HsPointNotGreaterThanKPoint(KPoint.value kPoint, HsPoint.value hsPoint))
         else
             let state =
@@ -51,18 +48,17 @@ type Hill =
                   KPoint = kPoint
                   HsPoint = hsPoint
                   RealRecord = realRecord
-                  InGameRecord = inGameRecord }
+                  InGameRecord = None }
 
             let event =
                 { HillId = id
-                  //Status = status
                   Location = location
                   Name = name
                   CountryId = countryId
                   KPoint = kPoint
                   HsPoint = hsPoint
                   RealRecord = realRecord
-                  InGameRecord = inGameRecord }
+                  InGameRecord = None }
                 : Event.HillCreatedV1
 
             Ok(state, [ HillEventPayload.HillCreatedV1 event ])
@@ -136,14 +132,31 @@ type Hill =
     //         else
     //             Ok(this, [])
 
-    member this.TryUpdateInGameRecord(distance: Record.Distance) =
-        if (Record.Distance.value distance) > (Record.Distance.value this.InGameRecord.Distance) then
-            let inGameRecord =
-                { this.InGameRecord with
-                    Distance = distance }
+    member this.TryUpdateInGameRecord
+        (setterReference: Record.SetterReference, distance: Record.Distance)
+        : Result<Hill * Event.HillEventPayload list, Error> =
+        match setterReference with
+        | Simple _ -> Error Error.InGameRecordIsSimpleReference
+        | GameWorldJumper gameWorldJumperId ->
+            let shouldUpdate =
+                this.InGameRecord.IsNone
+                || Distance.value distance > Distance.value this.InGameRecord.Value.Distance
 
-            Some
-                { this with
-                    InGameRecord = inGameRecord }
-        else
-            None
+            if not shouldUpdate then
+                Ok(this, [])
+            else
+                let inGameRecord =
+                    { SetterReference = setterReference
+                      Distance = distance }
+
+                let recordUpdatedEvent =
+                    HillEventPayload.HillInGameRecordUpdatedV1
+                        { HillId = this.Id
+                          GameWorldJumperId = gameWorldJumperId
+                          Distance = Distance.value distance }
+
+                Ok(
+                    { this with
+                        InGameRecord = Some inGameRecord },
+                    [ recordUpdatedEvent ]
+                )

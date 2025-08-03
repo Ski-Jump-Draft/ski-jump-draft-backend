@@ -38,7 +38,7 @@
 //         }
 //
 //         var gameId = Domain.Game.Id.Id.NewId(guid.NewGuid());
-//         var gameVersion = AggregateVersion.AggregateVersion.NewAggregateVersion(0u);
+//         var gameVersion = AggregateVersion.zero;
 //
 //         var gameCreationResult = App.Domain.Game.Game.Create(gameId,
 //             gameVersion,

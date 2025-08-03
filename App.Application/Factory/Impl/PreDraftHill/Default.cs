@@ -1,10 +1,11 @@
+using App.Application.CompetitionEngine;
 using App.Application.Exception;
 using App.Application.Ext;
-using App.Domain.PreDraft.Competitions;
+using App.Domain.PreDraft.Competition;
 using App.Domain.Repositories;
 using App.Domain.Shared;
 
-namespace App.Application.CompetitionEngine.Impl.PreDraftHill;
+namespace App.Application.Factory.Impl.PreDraftHill;
 
 public class Default(
     IGuid guid,
@@ -24,6 +25,6 @@ public class Default(
 
         preDraftHillMapping.Add(gameHill.Id_, id);
 
-        return new Domain.PreDraft.Competitions.Hill(id);
+        return new Domain.PreDraft.Competition.Hill(id);
     }
 }
