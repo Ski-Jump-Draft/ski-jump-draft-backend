@@ -11,14 +11,17 @@ module JumpResult =
             if v >= 0 then Ok(JudgePoints v) else Error(Error.BelowZero)
 
     type GatePoints = GatePoints of double
+
     module GatePointsModule =
         let value (GatePoints v) = v
-        
+
     type WindPoints = WindPoints of double
+
     module WindPointsModule =
         let value (WindPoints v) = v
-        
+
     type TotalPoints = TotalPoints of double
+
     module TotalPointsModule =
         let value (TotalPoints v) = v
 
@@ -28,7 +31,7 @@ type JumpResult =
     { Id: JumpResult.Id
       Jump: Jump
       CompetitorId: Competitor.Id
-      TeamId: Team.Id
+      TeamId: Team.Id option
       RoundIndex: RoundIndex
       GroupIndex: GroupIndex option
       JudgePoints: JudgePoints option

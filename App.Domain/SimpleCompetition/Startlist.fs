@@ -27,7 +27,10 @@ type Startlist =
     private
         { Remaining: Startlist.CompetitorEntry list
           Done: Startlist.CompetitorEntry list }
-
+        
+    member this.Remaining_ = this.Remaining
+    member this.Done_ = this.Done
+    
     static member Create(entries: Startlist.CompetitorEntry list) =
         let duplicates =
             entries

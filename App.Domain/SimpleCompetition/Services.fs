@@ -73,6 +73,7 @@ module JumpResultCreator =
                 Ok
                     { Id = id
                       Jump = jump
+                      CompetitorId = competitor.Id
                       TeamId = competitor.TeamId
                       RoundIndex = roundIndex
                       GroupIndex = groupIndex

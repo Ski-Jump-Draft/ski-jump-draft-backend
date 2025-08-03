@@ -14,8 +14,10 @@ type CompetitorStatus =
 type Competitor =
     private
         { Id: Competitor.Id
-          TeamId: Team.Id
+          TeamId: Team.Id option
           Status: CompetitorStatus }
+
+    member this.Id_ = this.Id
 
     static member Create id teamId =
         { Id = id
@@ -35,4 +37,4 @@ type Team =
         { Id: Team.Id
           Competitors: Competitor list }
 
-    member this.Create id competitors = { Id = id; Competitors = competitors }
+    static member Create id competitors = { Id = id; Competitors = competitors }

@@ -37,6 +37,108 @@ type Competition =
           Competitors: Competitor list option
           Teams: Team list option }
 
+    member this.Id_ = this.Id
+    member this.Type_ = this.Type
+    member this.Status_ = this.Status
+    member this.Hill_ = this.Hill
+    member this.Startlist_ = this.Startlist
+    member this.Results_ = this.Results
+
+    static member CreateIndividual
+        (id: CompetitionId, settings: Settings, hill: Hill, competitors: Competitor list)
+        : Result<Competition, Competition.Error> =
+
+        if List.isEmpty competitors then
+            Error(Competition.Error.CompetitorsEmpty)
+        else
+            let rec buildEntries (competitors: Competitor list) order acc =
+                match (competitors: Competitor list) with
+                | [] -> Ok(List.rev acc)
+                | competitor :: tail ->
+                    match Startlist.Order.tryCreate order with
+                    | Error _ -> Error(Competition.Error.Internal "Error when creating a Startlist.Order")
+                    | Ok orderVo ->
+                        let entry: Startlist.CompetitorEntry =
+                            { CompetitorId = competitor.Id
+                              TeamId = Option.None
+                              Order = orderVo }
+
+                        buildEntries tail (order + 1) (entry :: acc)
+
+            match buildEntries competitors 1 [] with
+            | Error e -> Error e
+            | Ok entries ->
+                let startlist = Startlist.Create entries
+
+                match startlist with
+                | Ok startlist ->
+
+                    Ok
+                        { Id = id
+                          Type = Competition.Individual
+                          Settings = settings
+                          Hill = hill
+                          Status = Competition.NotStarted
+                          Startlist = startlist
+                          Results = Results.Empty
+                          Competitors = Some competitors
+                          Teams = Option.None }
+                | Error e -> Error(Competition.Error.Internal $"Error during creating a Startlist: {e}")
+
+    static member CreateTeam
+        (id: CompetitionId, settings: Settings, hill: Hill, teams: Team list)
+        : Result<Competition, Competition.Error> =
+
+        if List.isEmpty teams then
+            Error Competition.Error.TeamsEmpty
+        elif settings.RoundSettings |> List.exists (fun rs -> rs.GroupSettings.IsNone) then
+            Error(Competition.Error.GroupSettingsMissing)
+        else
+            let counts = teams |> List.map (fun t -> t.Competitors.Length) |> Set.ofList
+
+            if counts.Count <> 1 then
+                Error(Competition.Error.TeamMemberCountsNotEqual counts.Count)
+            else
+                let teamCount = teams.Length
+                let membersPerTeam = teams.Head.Competitors.Length
+
+                let rec buildEntries groupIndex teamIndex acc =
+                    if groupIndex >= membersPerTeam then
+                        Ok(List.rev acc)
+                    else if teamIndex >= teamCount then
+                        buildEntries (groupIndex + 1) 0 acc
+                    else
+                        let team = teams[teamIndex]
+                        let competitor = team.Competitors[groupIndex]
+                        let globalOrder = acc.Length + 1
+
+                        match Startlist.Order.tryCreate globalOrder with
+                        | Error _ -> Error(Competition.Error.Internal "Error creating Startlist.Order")
+                        | Ok orderVo ->
+                            let entry: Startlist.CompetitorEntry =
+                                { CompetitorId = competitor.Id
+                                  TeamId = Some team.Id
+                                  Order = orderVo }
+
+                            buildEntries groupIndex (teamIndex + 1) (entry :: acc)
+
+                match buildEntries 0 0 [] with
+                | Error e -> Error e
+                | Ok entries ->
+                    match Startlist.Create entries with
+                    | Error _ -> Error(Competition.Error.Internal "Error creating Startlist")
+                    | Ok startlist ->
+                        Ok
+                            { Id = id
+                              Type = Competition.Team
+                              Settings = settings
+                              Hill = hill
+                              Status = Competition.NotStarted
+                              Startlist = startlist
+                              Results = Results.Empty
+                              Competitors = Option.None
+                              Teams = Some teams }
+
     member this.AddJump
         (jumpResultId: JumpResult.Id, competitorId: Competitor.Id, jump: Jump, referenceGate: Jump.Gate)
         : Result<Competition * CompetitionEventPayload list, Competition.Error> =
@@ -136,6 +238,13 @@ type Competition =
 
             Ok(cancelled, [ ev ])
 
+    member this.NextCompetitor =
+        this.Startlist.NextJumper()
+        |> Option.map (fun entry -> this.findCompetitor entry.CompetitorId)
+
+
+    // ------- HELPERS START ------- //
+
     member private this.handleAction
         (competitorId: Competitor.Id)
         (domainAction: RoundIndex -> GroupIndex option -> Result<JumpResult option, Competition.Error>)
@@ -202,8 +311,11 @@ type Competition =
             match this.Startlist.NextJumper() with
             | Some nextEntry when nextEntry.CompetitorId <> competitorId ->
                 Error(Competition.Error.JumperNotNextInStartlist(nextEntry, competitorId))
-            | _ when not (this.competitorExists competitorId) ->
-                Error(Competition.Error.Internal $"Competitor {competitorId} not found in competition")
+            | None ->
+                if this.competitorExists competitorId then
+                    proceed rnd grp
+                else
+                    Error(Competition.Error.Internal $"Competitor {competitorId} not found")
             | _ -> proceed rnd grp
         | Competition.Suspended _
         | Competition.Cancelled
@@ -222,6 +334,11 @@ type Competition =
         : CompetitionEventPayload list * CompetitionEventPayload list * Competition.Status * Startlist =
 
         let groupFinished = this.Type = Competition.Team && updatedStartlist.RoundIsFinished
+
+        let baseStatus =
+            match this.Status with
+            | Competition.NotStarted -> Competition.Status.RoundInProgress(roundIdx, groupIdx)
+            | _ -> this.Status
 
         let groupEvents, statusAfterGroup, startlistAfterGroup =
             if groupFinished && this.Type = Competition.Team then
@@ -290,7 +407,7 @@ type Competition =
                 else
                     [ groupEnded ], Competition.Status.RoundInProgress(roundIdx, None), updatedStartlist
             else
-                [], this.Status, updatedStartlist
+                [], baseStatus, updatedStartlist
 
         let roundFinished =
             match this.Type with
@@ -486,10 +603,23 @@ type Competition =
                 |> Map.ofList
                 |> Map.map (fun _ js -> js |> List.sumBy (fun j -> let (TotalPoints p) = j.TotalPoints in p))
 
+            let prevRound =
+                let (RoundIndex i) = roundIdx
+                RoundIndex(i - 1u)
+
             let ranked =
-                this.roundClassification currentResults roundIdx
-                |> List.map (fun (cid, _, dist, judge) -> let pts = Map.find cid pointsMap in cid, pts, dist, judge)
+                this.roundClassification currentResults prevRound
+                |> List.map (fun (cid, _, dist, judge) ->
+                    let pts = Map.tryFind cid pointsMap |> Option.defaultValue 0.0
+                    cid, pts, dist, judge)
                 |> List.sortByDescending (fun (_, pts, _, _) -> pts)
+
+            // let ranked =
+            //     this.roundClassification currentResults roundIdx
+            //     |> List.map (fun (cid, _, dist, judge) ->
+            //         let pts = Map.tryFind cid pointsMap |> Option.defaultValue 0.0
+            //         cid, pts, dist, judge)
+            //     |> List.sortByDescending (fun (_, pts, _, _) -> pts)
 
             let advanced, _ =
                 match roundSettings.RoundLimit with
@@ -527,17 +657,17 @@ type Competition =
 
             let entries =
                 ordered
-                |> List.indexed
-                |> List.map (fun (i, (cid, _, _, _)) ->
-                    let comp = this.findCompetitor cid
+                |> List.mapi (fun i (cid, _, _, _) ->
+                    let competitor = this.findCompetitor cid
                     let order = Startlist.Order.tryCreate (i + 1) |> Result.toOption |> Option.get
 
                     { CompetitorId = cid
-                      TeamId = Some comp.TeamId
+                      TeamId = competitor.TeamId
                       Order = order }
                     : Startlist.CompetitorEntry)
 
             Startlist.Create entries |> Result.toOption |> Option.get
+
 
     // ... reszta helperów (findCompetitor, competitorExists, roundClassification,
     //     applyTieBreaker, isLastRound, toJumpDto, buildTeamGroupStartlist,
@@ -559,7 +689,7 @@ type Competition =
 
     member private this.isLastRound(roundIndex: RoundIndex) =
         let (RoundIndex current) = roundIndex
-        current = uint this.Settings.RoundSettings.Length
+        current = uint this.Settings.RoundSettings.Length - 1u
 
     member private this.toJumpDto(jumpResult: JumpResult) : Event.JumpDtoV1 =
         { Id = jumpResult.Jump.Id
@@ -614,6 +744,11 @@ type Competition =
                 this.Teams.Value
                 |> List.sortBy (fun t -> Map.tryFind t.Id teamPointsMap |> Option.defaultValue 0.0)
             | _ -> this.Teams.Value
+
+        let idxInt = int (GroupIndexModule.value groupIdx)
+
+        if idxInt >= this.membersPerTeam then
+            invalidOp "Group index out of range"
 
         let entries =
             teamsOrdered
