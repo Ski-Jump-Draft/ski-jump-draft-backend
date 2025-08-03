@@ -27,6 +27,7 @@ open JumpResult
 type JumpResult =
     { Id: JumpResult.Id
       Jump: Jump
+      CompetitorId: Competitor.Id
       TeamId: Team.Id
       RoundIndex: RoundIndex
       GroupIndex: GroupIndex option

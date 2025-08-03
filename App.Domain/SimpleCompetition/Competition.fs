@@ -37,10 +37,6 @@ type Competition =
           Competitors: Competitor list option
           Teams: Team list option }
 
-    // --------------------------------------------------------------------------------
-    //  ------------------------------  PUBLIC API  -----------------------------------
-    // --------------------------------------------------------------------------------
-
     member this.AddJump
         (jumpResultId: JumpResult.Id, competitorId: Competitor.Id, jump: Jump, referenceGate: Jump.Gate)
         : Result<Competition * CompetitionEventPayload list, Competition.Error> =
@@ -71,7 +67,6 @@ type Competition =
                           Jump = this.toJumpDto jr }
                     |> List.singleton
                 | None -> [])
-
 
     member this.Disqualify
         (competitorId: Competitor.Id, reason: DisqualificationReason)
@@ -121,7 +116,6 @@ type Competition =
                     Status = Competition.Status.RoundInProgress(rnd, grp) }
 
             let ev = CompetitionEventPayload.CompetitionContinuedV1 { CompetitionId = this.Id }
-
             Ok(continued, [ ev ])
         | _ ->
             Error(Competition.Error.InvalidStatus(this.Status, [ Competition.Status.Suspended(RoundIndex 0u, None) ]))
@@ -142,10 +136,6 @@ type Competition =
 
             Ok(cancelled, [ ev ])
 
-    // --------------------------------------------------------------------------------
-    //  -----------  WSPÓLNA ŚCIEŻKA DLA ADDJUMP / DSQ / DNS  -------------------------
-    // --------------------------------------------------------------------------------
-
     member private this.handleAction
         (competitorId: Competitor.Id)
         (domainAction: RoundIndex -> GroupIndex option -> Result<JumpResult option, Competition.Error>)
@@ -155,7 +145,6 @@ type Competition =
         let proceed roundIdx groupIdx =
             domainAction roundIdx groupIdx
             |> Result.bind (fun maybeJumpResult ->
-
                 let resultsAfter =
                     match maybeJumpResult with
                     | Some jr ->
@@ -166,7 +155,6 @@ type Competition =
 
                 resultsAfter
                 |> Result.bind (fun newResults ->
-
                     let startlistAfterAction =
                         if this.Startlist.Remaining |> List.exists (fun e -> e.CompetitorId = competitorId) then
                             match this.Startlist.MarkJumpDone competitorId with
@@ -176,13 +164,11 @@ type Competition =
                             Ok this.Startlist
 
                     startlistAfterAction
-                    |> Result.map (fun newStartlist -> newResults, newStartlist, maybeJumpResult))
-
-            )
+                    |> Result.map (fun newStartlist -> newResults, newStartlist, maybeJumpResult)))
             |> Result.bind (fun (resultsAfter, startlistAfter, maybeJumpResult) ->
                 let baseEvents = baseEventsFn maybeJumpResult
 
-                let (grpEvents, roundEvents, finalStatus, finalStartlist) =
+                let grpEvents, roundEvents, finalStatus, finalStartlist =
                     this.processProgression startlistAfter roundIdx groupIdx
 
                 let allEvents = baseEvents @ grpEvents @ roundEvents
@@ -203,7 +189,7 @@ type Competition =
                 let firstRound = RoundIndex 0u
 
                 let firstGroup =
-                    if this.Type = Competition.Team then
+                    if this.Type = Competition.Type.Team then
                         Some(GroupIndex 0u)
                     else
                         None
@@ -212,7 +198,6 @@ type Competition =
 
                 proceed firstRound firstGroup
                 |> Result.map (fun (comp, evs) -> comp, startEvents @ evs)
-
         | Competition.RoundInProgress(rnd, grp) ->
             match this.Startlist.NextJumper() with
             | Some nextEntry when nextEntry.CompetitorId <> competitorId ->
@@ -220,7 +205,6 @@ type Competition =
             | _ when not (this.competitorExists competitorId) ->
                 Error(Competition.Error.Internal $"Competitor {competitorId} not found in competition")
             | _ -> proceed rnd grp
-
         | Competition.Suspended _
         | Competition.Cancelled
         | Competition.Ended ->
@@ -231,21 +215,16 @@ type Competition =
                 )
             )
 
-    // --------------------------------------------------------------------------------
-    //  -----------------  LOGIKA GRUP / RUND / KOŃCA KONKURSU  -----------------------
-    // --------------------------------------------------------------------------------
-
     member private this.processProgression
         (updatedStartlist: Startlist)
         (roundIdx: RoundIndex)
         (groupIdx: GroupIndex option)
         : CompetitionEventPayload list * CompetitionEventPayload list * Competition.Status * Startlist =
 
-        // --- zakończenie grupy (tylko drużynówka) ---
         let groupFinished = this.Type = Competition.Team && updatedStartlist.RoundIsFinished
 
         let groupEvents, statusAfterGroup, startlistAfterGroup =
-            if groupFinished then
+            if groupFinished && this.Type = Competition.Team then
                 let (GroupIndex g) = groupIdx.Value
                 let totalGroups = uint this.membersPerTeam
 
@@ -255,9 +234,49 @@ type Competition =
                           RoundIndex = roundIdx
                           GroupIndex = groupIdx.Value }
 
-                if g + 1u < totalGroups then
-                    let nextGroup = GroupIndex(g + 1u)
-                    let nextStart = this.buildTeamGroupStartlist nextGroup
+                let currentRoundSettings =
+                    this.Settings.RoundSettings[int (RoundIndexModule.value roundIdx)]
+
+                let nextGroupIndex = g + 1u
+
+                if nextGroupIndex < totalGroups then
+                    let nextGroup = GroupIndex nextGroupIndex
+
+                    // teamMap: CompetitorId -> TeamId
+                    let teamMap =
+                        this.Teams.Value
+                        |> List.collect (fun t -> t.Competitors |> List.map (fun c -> c.Id, t.Id))
+                        |> Map.ofList
+
+                    // liczymy punkty drużyn z uwzględnieniem ResetPoints
+                    let lastResetRound =
+                        this.Settings.RoundSettings
+                        |> List.take (int (RoundIndexModule.value roundIdx + 1u))
+                        |> List.rev
+                        |> List.tryFindIndex (fun rs -> rs.ResetPoints)
+                        |> Option.map uint
+
+                    let teamPointsMap = this.calculateTeamPointsMap roundIdx
+
+                    let mutable teamOrder =
+                        match currentRoundSettings.GroupSettings with
+                        | Some gs when gs.GroupIndexesToSort.Contains groupIdx.Value ->
+                            // najgorsza drużyna pierwsza (FIS) – rosnąco po punktach
+                            this.Teams.Value
+                            |> List.sortBy (fun t -> Map.tryFind t.Id teamPointsMap |> Option.defaultValue 0.0)
+                        | _ ->
+                            // zostaw dotychczasową kolejność
+                            this.Teams.Value
+
+                    match currentRoundSettings.GroupSettings with
+                    | Some gs when gs.GroupIndexesToSort.Contains groupIdx.Value ->
+                        teamOrder <-
+                            teamOrder
+                            |> List.sortByDescending (fun t ->
+                                Map.tryFind t.Id teamPointsMap |> Option.defaultValue 0.0)
+                    | _ -> ()
+
+                    let nextStartlist = this.buildTeamGroupStartlist (roundIdx, nextGroup)
 
                     let groupStarted =
                         CompetitionEventPayload.CompetitionGroupStartedV1
@@ -267,13 +286,12 @@ type Competition =
 
                     [ groupEnded; groupStarted ],
                     Competition.Status.RoundInProgress(roundIdx, Some nextGroup),
-                    nextStart
+                    nextStartlist
                 else
                     [ groupEnded ], Competition.Status.RoundInProgress(roundIdx, None), updatedStartlist
             else
                 [], this.Status, updatedStartlist
 
-        // --- zakończenie rundy ---
         let roundFinished =
             match this.Type with
             | Competition.Team ->
@@ -282,7 +300,7 @@ type Competition =
                 | _ -> startlistAfterGroup.RoundIsFinished
             | _ -> startlistAfterGroup.RoundIsFinished
 
-        let roundEvents, finalStatus =
+        let roundEvents, finalStatus, finalStartlist =
             if roundFinished then
                 let roundEnded =
                     CompetitionEventPayload.CompetitionRoundEndedV1
@@ -291,8 +309,7 @@ type Competition =
 
                 if this.isLastRound roundIdx then
                     let ended = CompetitionEventPayload.CompetitionEndedV1 { CompetitionId = this.Id }
-
-                    [ roundEnded; ended ], Competition.Status.Ended
+                    [ roundEnded; ended ], Competition.Status.Ended, startlistAfterGroup
                 else
                     let nextRound = let (RoundIndex i) = roundIdx in RoundIndex(i + 1u)
 
@@ -301,24 +318,230 @@ type Competition =
                             { CompetitionId = this.Id
                               RoundIndex = nextRound }
 
-                    let nextStatus =
+                    let settings = this.Settings.RoundSettings[int (RoundIndexModule.value nextRound)]
+
+                    let nextStatus, nextStartlist =
                         if this.Type = Competition.Team then
-                            Competition.Status.RoundInProgress(nextRound, Some(GroupIndex 0u))
+                            Competition.Status.RoundInProgress(nextRound, Some(GroupIndex 0u)),
+                            this.buildNextRoundStartlist (settings, nextRound, this.Results)
                         else
-                            Competition.Status.RoundInProgress(nextRound, None)
+                            Competition.Status.RoundInProgress(nextRound, None),
+                            this.buildNextRoundStartlist (settings, nextRound, this.Results)
 
-                    [ roundEnded; roundStarted ], nextStatus
+                    [ roundEnded; roundStarted ], nextStatus, nextStartlist
             else
-                [], statusAfterGroup
+                [], statusAfterGroup, startlistAfterGroup
 
-        groupEvents, roundEvents, finalStatus, startlistAfterGroup
+        groupEvents, roundEvents, finalStatus, finalStartlist
 
-    // --------------------------------------------------------------------------------
-    //  -------------------  RESZTA HELPERÓW (bez zmian)  ------------------------------
-    // --------------------------------------------------------------------------------
-    // ... (findCompetitor, competitorExists, isLastRound, toJumpDto, buildTeamGroupStartlist,
-    //      startCompetitionEvents, resultsErrorToInternal, membersPerTeam, etc.)
+    member private this.buildNextRoundStartlist
+        (roundSettings: RoundSettings, roundIdx: RoundIndex, currentResults: Results)
+        : Startlist =
 
+        match this.Type with
+        | Competition.Team ->
+            let teamMap =
+                this.Teams.Value
+                |> List.collect (fun t -> t.Competitors |> List.map (fun c -> c.Id, t.Id))
+                |> Map.ofList
+
+            let lastReset =
+                this.Settings.RoundSettings
+                |> List.take (int (RoundIndexModule.value roundIdx + 1u))
+                |> List.rev
+                |> List.tryFindIndex (fun rs -> rs.ResetPoints)
+                |> Option.map uint
+
+            let teamPointsMap =
+                currentResults.JumpResults
+                |> List.filter (fun jr ->
+                    match lastReset with
+                    | Some off -> let (RoundIndex i) = jr.RoundIndex in i > off
+                    | None -> true)
+                |> List.groupBy (fun jr -> Map.find jr.CompetitorId teamMap)
+                |> Map.ofList
+                |> Map.map (fun _ js -> js |> List.sumBy (fun j -> let (TotalPoints p) = j.TotalPoints in p))
+
+            let rankedTeams =
+                teamPointsMap
+                |> Map.toList
+                |> List.map (fun (tid, pts) ->
+                    let teamJumps =
+                        currentResults.JumpResults
+                        |> List.filter (fun jr -> Map.find jr.CompetitorId teamMap = tid)
+
+                    let bestDist =
+                        teamJumps
+                        |> List.maxBy _.Jump.Distance
+                        |> fun jr -> jr.Jump.Distance |> Distance.value
+
+                    let bestJudge =
+                        teamJumps
+                        |> List.maxBy (fun jr -> JudgeNotes.value jr.Jump.JudgeNotes |> List.sum)
+                        |> fun jr -> JudgeNotes.value jr.Jump.JudgeNotes |> List.sum
+
+                    tid, pts, bestDist, bestJudge)
+                |> List.sortByDescending (fun (_, pts, _, _) -> pts)
+
+            let advancedTeams, droppedTeams =
+                match roundSettings.RoundLimit with
+                | RoundLimit.NoneLimit -> rankedTeams, []
+
+                | RoundLimit.Soft(RoundLimitValue n) ->
+                    let topN, rest = rankedTeams |> List.splitAt n
+
+                    let lastScoreOpt =
+                        topN |> List.tryLast |> Option.map (fun (_, score, _, _) -> score)
+
+                    let advanced =
+                        match lastScoreOpt with
+                        | Some lastScore ->
+                            let extras = rest |> List.takeWhile (fun (_, s, _, _) -> s = lastScore)
+                            topN @ extras
+                        | None -> rankedTeams
+
+                    let dropped = rankedTeams |> List.except advanced
+                    advanced, dropped
+
+                | RoundLimit.Exact(RoundLimitValue n, criteria) ->
+                    let topN, rest = rankedTeams |> List.splitAt n
+
+                    let lastScoreOpt =
+                        topN |> List.tryLast |> Option.map (fun (_, score, _, _) -> score)
+
+                    let advanced, dropped =
+                        match lastScoreOpt with
+                        | Some lastScore ->
+                            let ties = topN |> List.filter (fun (_, s, _, _) -> s = lastScore)
+
+                            if List.isEmpty ties then
+                                topN, rest
+                            else
+                                let candidates = ties @ rest
+
+                                let resolved =
+                                    match criteria with
+                                    | TieBreakerCriteria.LongestJump ->
+                                        candidates |> List.sortByDescending (fun (_, _, dist, _) -> dist)
+                                    | TieBreakerCriteria.BestJudgePoints ->
+                                        candidates |> List.sortByDescending (fun (_, _, _, j) -> j)
+                                    | TieBreakerCriteria.HighestBib ->
+                                        candidates |> List.sortByDescending (fun (tid, _, _, _) -> tid)
+                                    | TieBreakerCriteria.LowestBib ->
+                                        candidates |> List.sortBy (fun (tid, _, _, _) -> tid)
+                                    | TieBreakerCriteria.Random -> candidates
+
+                                let keep =
+                                    (topN |> List.take (n - List.length ties))
+                                    @ (resolved |> List.take (List.length ties))
+
+                                let drop = resolved |> List.skip (List.length ties)
+                                keep, drop
+                        | None -> rankedTeams, []
+
+                    advanced, dropped
+
+
+            let orderedTeams =
+                if roundSettings.SortStartlist then
+                    advancedTeams |> List.rev
+                else
+                    advancedTeams
+
+            let members = this.membersPerTeam
+
+            let entries =
+                [ for grp in 0 .. members - 1 do
+                      for idx, (tid, _, _, _) in orderedTeams |> List.indexed do
+                          let comp =
+                              this.Teams.Value |> List.find (fun t -> t.Id = tid) |> _.Competitors.[grp]
+
+                          let order =
+                              Startlist.Order.tryCreate (idx * members + grp + 1)
+                              |> Result.toOption
+                              |> Option.get
+
+                          { CompetitorId = comp.Id
+                            TeamId = Some tid
+                            Order = order }
+                          : Startlist.CompetitorEntry ]
+
+            Startlist.Create entries |> Result.toOption |> Option.get
+
+        | Competition.Individual ->
+            let pointsMap =
+                let lastReset =
+                    this.Settings.RoundSettings
+                    |> List.take (int (RoundIndexModule.value roundIdx + 1u))
+                    |> List.rev
+                    |> List.tryFindIndex (fun rs -> rs.ResetPoints)
+                    |> Option.map uint
+
+                currentResults.JumpResults
+                |> List.filter (fun jr ->
+                    match lastReset with
+                    | Some off -> let (RoundIndex i) = jr.RoundIndex in i > off
+                    | None -> true)
+                |> List.groupBy (fun jr -> jr.CompetitorId)
+                |> Map.ofList
+                |> Map.map (fun _ js -> js |> List.sumBy (fun j -> let (TotalPoints p) = j.TotalPoints in p))
+
+            let ranked =
+                this.roundClassification currentResults roundIdx
+                |> List.map (fun (cid, _, dist, judge) -> let pts = Map.find cid pointsMap in cid, pts, dist, judge)
+                |> List.sortByDescending (fun (_, pts, _, _) -> pts)
+
+            let advanced, _ =
+                match roundSettings.RoundLimit with
+                | RoundLimit.NoneLimit -> ranked, []
+                | RoundLimit.Soft(RoundLimitValue n) ->
+                    let split = ranked |> List.splitAt n
+                    let lastPts = split |> fst |> List.tryLast |> Option.map (fun (_, p, _, _) -> p)
+
+                    match lastPts with
+                    | Some p ->
+                        let extra = split |> snd |> List.takeWhile (fun (_, q, _, _) -> q = p)
+                        fst split @ extra, snd split |> List.skip (List.length extra)
+                    | None -> ranked, []
+                | RoundLimit.Exact(RoundLimitValue n, crit) ->
+                    let firstN, tails = ranked |> List.splitAt n
+
+                    let ties =
+                        match firstN |> List.tryLast with
+                        | Some(_, p, _, _) -> firstN |> List.filter (fun (_, q, _, _) -> q = p)
+                        | None -> []
+
+                    if ties.IsEmpty then
+                        firstN, tails
+                    else
+                        let resolved = ties @ tails |> this.applyTieBreaker crit
+
+                        (firstN |> List.take (n - ties.Length)) @ (resolved |> List.take ties.Length),
+                        resolved |> List.skip ties.Length
+
+            let ordered =
+                if roundSettings.SortStartlist then
+                    advanced |> List.rev
+                else
+                    advanced
+
+            let entries =
+                ordered
+                |> List.indexed
+                |> List.map (fun (i, (cid, _, _, _)) ->
+                    let comp = this.findCompetitor cid
+                    let order = Startlist.Order.tryCreate (i + 1) |> Result.toOption |> Option.get
+
+                    { CompetitorId = cid
+                      TeamId = Some comp.TeamId
+                      Order = order }
+                    : Startlist.CompetitorEntry)
+
+            Startlist.Create entries |> Result.toOption |> Option.get
+
+    // ... reszta helperów (findCompetitor, competitorExists, roundClassification,
+    //     applyTieBreaker, isLastRound, toJumpDto, buildTeamGroupStartlist,
+    //     startCompetitionEvents, resultsErrorToInternal, membersPerTeam) bez zmian.
     member private this.competitorExists(competitorId: Competitor.Id) =
         match this.Type, this.Competitors, this.Teams with
         | Competition.Individual, Some competitors, _ -> competitors |> List.exists (fun c -> c.Id = competitorId)
@@ -356,46 +579,109 @@ type Competition =
         | Competition.Team, Some ts -> ts.Head.Competitors.Length
         | _ -> 0
 
-    member private this.buildTeamGroupStartlist(groupIdx: GroupIndex) =
-        let teams = this.Teams.Value
+    member private this.calculateTeamPointsMap(currentRoundIdx: RoundIndex) =
+        let teamMap =
+            this.Teams.Value
+            |> List.collect (fun t -> t.Competitors |> List.map (fun c -> c.Id, t.Id))
+            |> Map.ofList
 
-        let order =
-            teams
-            |> List.collect (fun t -> [ t.Competitors[int (GroupIndexModule.value groupIdx)] ])
-            |> List.mapi (fun i competitor ->
-                match Startlist.Order.tryCreate (i + 1) with
-                | Ok orderOnStartlist ->
-                    { CompetitorId = competitor.Id
-                      TeamId = Some teams[i].Id
-                      Order = orderOnStartlist }
-                    : Startlist.CompetitorEntry
-                | Error _ -> invalidOp "Internal error")
+        let lastReset =
+            this.Settings.RoundSettings
+            |> List.take (int (RoundIndexModule.value currentRoundIdx + 1u))
+            |> List.rev
+            |> List.tryFindIndex (fun rs -> rs.ResetPoints)
+            |> Option.map uint
 
-        let startlistResult = Startlist.Create order
+        this.Results.JumpResults
+        |> List.filter (fun jr ->
+            match lastReset with
+            | Some off -> let (RoundIndex i) = jr.RoundIndex in i > off
+            | None -> true)
+        |> List.groupBy (fun jr -> Map.find jr.CompetitorId teamMap)
+        |> Map.ofList
+        |> Map.map (fun _ js -> js |> List.sumBy (fun j -> let (TotalPoints p) = j.TotalPoints in p))
 
-        match startlistResult with
-        | Ok startlist -> startlist
-        | Error error -> invalidOp (error.ToString())
+
+    member private this.buildTeamGroupStartlist(roundIdx: RoundIndex, groupIdx: GroupIndex) =
+        let teamPointsMap = this.calculateTeamPointsMap roundIdx
+
+        let roundSettings =
+            this.Settings.RoundSettings[int (RoundIndexModule.value roundIdx)]
+
+        let teamsOrdered =
+            match roundSettings.GroupSettings with
+            | Some gs when gs.GroupIndexesToSort.Contains groupIdx ->
+                this.Teams.Value
+                |> List.sortBy (fun t -> Map.tryFind t.Id teamPointsMap |> Option.defaultValue 0.0)
+            | _ -> this.Teams.Value
+
+        let entries =
+            teamsOrdered
+            |> List.mapi (fun idx team ->
+                let competitor = team.Competitors[int (GroupIndexModule.value groupIdx)]
+                let order = Startlist.Order.tryCreate (idx + 1) |> Result.toOption |> Option.get
+
+                { CompetitorId = competitor.Id
+                  TeamId = Some team.Id
+                  Order = order }
+                : Startlist.CompetitorEntry)
+
+        Startlist.Create entries |> Result.toOption |> Option.get
 
     member private this.resultsErrorToInternal(e: Results.Error) =
         Competition.Error.Internal(e.ToString())
 
     member private this.startCompetitionEvents firstRound firstGroup =
         let started =
-            Event.CompetitionEventPayload.CompetitionStartedV1 { CompetitionId = this.Id }
+            CompetitionEventPayload.CompetitionStartedV1 { CompetitionId = this.Id }
 
         let roundEvt =
-            Event.CompetitionEventPayload.CompetitionRoundStartedV1
+            CompetitionEventPayload.CompetitionRoundStartedV1
                 { CompetitionId = this.Id
                   RoundIndex = firstRound }
 
         match this.Type with
         | Competition.Team ->
             let groupEvt =
-                Event.CompetitionEventPayload.CompetitionGroupStartedV1
+                CompetitionEventPayload.CompetitionGroupStartedV1
                     { CompetitionId = this.Id
                       RoundIndex = firstRound
                       GroupIndex = firstGroup.Value }
 
             [ started; roundEvt; groupEvt ]
         | _ -> [ started; roundEvt ]
+
+    // ======================  RANKING  ===============================
+
+    /// klasyfikacja rundy; zwraca listę (CompetitorId * TotalPts * BestDistance * BestJudgeSum)
+    member private this.roundClassification (results: Results) (roundIdx: RoundIndex) =
+        results.JumpResults
+        |> List.filter (fun jr -> jr.RoundIndex = roundIdx)
+        |> List.groupBy (fun jr -> jr.CompetitorId)
+        |> List.map (fun (cid, jumps) ->
+            let total =
+                jumps |> List.sumBy (fun jr -> let (TotalPoints p) = jr.TotalPoints in p)
+
+            let bestDist =
+                jumps
+                |> List.maxBy (fun jr -> jr.Jump.Distance)
+                |> fun jr -> jr.Jump.Distance |> Distance.value
+
+            let bestJudge =
+                jumps
+                |> List.maxBy (fun jr -> JudgeNotes.value jr.Jump.JudgeNotes |> List.sum)
+                |> fun jr -> JudgeNotes.value jr.Jump.JudgeNotes |> List.sum
+
+            cid, total, bestDist, bestJudge) // bestDist = float
+        |> List.sortByDescending (fun (_, pts, _, _) -> pts)
+
+    member private this.applyTieBreaker
+        (criteria: TieBreakerCriteria)
+        (ties: (Competitor.Id * float * float * float) list)
+        =
+        match criteria with
+        | TieBreakerCriteria.LongestJump -> ties |> List.sortByDescending (fun (_, _, dist, _) -> dist)
+        | TieBreakerCriteria.BestJudgePoints -> ties |> List.sortByDescending (fun (_, _, _, judge) -> judge)
+        | TieBreakerCriteria.HighestBib -> ties |> List.sortByDescending (fun (cid, _, _, _) -> cid) // Id ma w sobie BIB
+        | TieBreakerCriteria.LowestBib -> ties |> List.sortBy (fun (cid, _, _, _) -> cid)
+        | Random -> failwith "todo"
