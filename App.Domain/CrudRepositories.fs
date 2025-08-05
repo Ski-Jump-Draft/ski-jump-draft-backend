@@ -1,10 +1,24 @@
 namespace App.Domain.Repositories
 
+open System.Threading
+open System.Threading.Tasks
 open App
 
 type IDomainCrudRepository<'TId, 'T> =
     abstract member GetByIdAsync: id: 'TId -> System.Threading.Tasks.Task<'T option>
     abstract member SaveAsync: id: 'TId * value: 'T -> System.Threading.Tasks.Task
+
+type IDomainCrudEventsRepository<'T, 'TId, 'TPayload> =
+    abstract member GetByIdAsync: id: 'TId -> System.Threading.Tasks.Task<'T option>
+
+    abstract SaveAsync:
+        id: 'TId *
+        value: 'T *
+        events: 'TPayload list *
+        correlationId: System.Guid *
+        causationId: System.Guid *
+        ct: CancellationToken ->
+            Task
 
 // --- User ---
 type public IUserRepository =
@@ -15,7 +29,11 @@ type public IGameWorldCountryRepository =
     inherit IDomainCrudRepository<Domain.GameWorld.Country.Id, Domain.GameWorld.Country>
 
 type public IGameWorldHillRepository =
-    inherit IDomainCrudRepository<Domain.GameWorld.HillTypes.Id, Domain.GameWorld.Hill>
+    inherit IDomainCrudEventsRepository<
+        Domain.GameWorld.Hill,
+        Domain.GameWorld.HillTypes.Id,
+        Domain.GameWorld.Event.HillEventPayload
+     >
 
 type public IGameWorldJumperRepository =
     inherit IDomainCrudRepository<Domain.GameWorld.JumperTypes.Id, Domain.GameWorld.Jumper>

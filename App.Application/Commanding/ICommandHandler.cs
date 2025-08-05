@@ -1,4 +1,4 @@
-namespace App.Application.Commanding;
+namespace App.Application.Abstractions;
 
 public interface ICommandHandler<in TCommand>
 {

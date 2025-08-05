@@ -3,7 +3,6 @@ namespace App.Domain.Repositories
 open System.Threading
 open System.Threading.Tasks
 open App.Domain
-open App.Domain.Competition
 open App.Domain.Draft
 open App.Domain.Game
 open App.Domain.PreDraft
@@ -28,11 +27,18 @@ type IEventSourcedRepository<'TAggregate, 'TId, 'TPayload> =
 
     abstract LoadHistoryAsync: Id: 'TId * Ct: CancellationToken -> Task<'TPayload list>
 
+// type ICompetitionRepository =
+//     inherit IEventSourcedRepository<
+//         Competition.Competition,
+//         Competition.Id.Id,
+//         Competition.Event.CompetitionEventPayload
+//      >
+
 type ICompetitionRepository =
     inherit IEventSourcedRepository<
-        Competition.Competition,
-        Competition.Id.Id,
-        Competition.Event.CompetitionEventPayload
+        SimpleCompetition.Competition,
+        SimpleCompetition.CompetitionId,
+        SimpleCompetition.Event.CompetitionEventPayload
      >
 
 type IDraftRepository =

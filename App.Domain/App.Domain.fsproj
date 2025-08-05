@@ -98,10 +98,13 @@
         <Compile Include="SimpleCompetition\Jump.fs" />
         <Compile Include="SimpleCompetition\Results.fs" />
         <Compile Include="SimpleCompetition\Services.fs" />
+        <Compile Include="SimpleCompetition\Gate.fs" />
         <Compile Include="SimpleCompetition\Event.fs" />
         <Compile Include="SimpleCompetition\Competition.fs" />
         <Compile Include="CrudRepositories.fs"/>
         <Compile Include="EventSourcedRepositories.fs"/>
+        <Compile Include="Simulating\Jump.fs" />
+        <Compile Include="Simulating\Simulator.fs" />
     </ItemGroup>
 
 </Project>

@@ -1,5 +1,6 @@
 namespace App.Domain.GameWorld
 
+open System.Collections.Generic
 open App.Domain.GameWorld.Event
 
 open App.Domain.GameWorld.HillTypes.Record
@@ -16,147 +17,136 @@ open Hill
 type Hill =
     private
         { Id: HillTypes.Id
+          Status: Status
           Location: Location
           Name: Name
           CountryId: Country.Id
           KPoint: KPoint
           HsPoint: HsPoint
-          RealRecord: Record
-          InGameRecord: Record option }
+          RealRecords: HillTypes.RealRecords
+          InGameRecords: HillTypes.InGameRecords }
 
     member this.Id_ = this.Id
+    member this.Status_ = this.Status
+    member this.Location_ = this.Location
+    member this.Name_ = this.Name
+    member this.CountryId_ = this.CountryId
     member this.KPoint_ = this.KPoint
     member this.HsPoint_ = this.HsPoint
+    member this.RealRecords_ = this.RealRecords
+    member this.InGameRecords_ = this.InGameRecords
 
     static member Create
         id
+        status
         location
         name
         countryId
         kPoint
         hsPoint
-        realRecord
+        realRecords
+        inGameRecords
         : Result<Hill * Event.HillEventPayload list, Error> =
         if KPoint.value kPoint > HsPoint.value hsPoint then
             Error(Error.HsPointNotGreaterThanKPoint(KPoint.value kPoint, HsPoint.value hsPoint))
         else
             let state =
                 { Id = id
+                  Status = status
                   Location = location
                   Name = name
                   CountryId = countryId
                   KPoint = kPoint
                   HsPoint = hsPoint
-                  RealRecord = realRecord
-                  InGameRecord = None }
+                  RealRecords = realRecords
+                  InGameRecords = inGameRecords }
 
-            let event =
+            let event: Event.HillCreatedV1 =
                 { HillId = id
+                  Status = status
                   Location = location
                   Name = name
                   CountryId = countryId
                   KPoint = kPoint
                   HsPoint = hsPoint
-                  RealRecord = realRecord
-                  InGameRecord = None }
-                : Event.HillCreatedV1
+                  RealRecords = realRecords
+                  InGameRecords = inGameRecords }
 
-            Ok(state, [ HillEventPayload.HillCreatedV1 event ])
+            Ok(state, [ Event.HillEventPayload.HillCreatedV1 event ])
 
-    // member this.UpdateInfo
-    //     (nameOpt: Name option)
-    //     (realRecordOpt: RealRecord option)
-    //     : Result<Hill * HillEventPayload list, Error> =
-    //
-    //     if nameOpt.IsNone && realRecordOpt.IsNone then
-    //         Ok(this, [])
-    //     else
-    //         let newName = defaultArg nameOpt this.Name
-    //         let newRecord = defaultArg realRecordOpt this.RealRecord
-    //
-    //         let updated =
-    //             { this with
-    //                 Name = newName
-    //                 RealRecord = newRecord }
-    //
-    //         let event =
-    //             { HillId = this.Id
-    //               Name = nameOpt
-    //               RealRecord = realRecordOpt }
-    //             : Event.HillInfoUpdatedV1
-    //
-    //         Ok(updated, [ HillEventPayload.HillInfoUpdatedV1 event ])
-    //
-    //
-    //
-    // member this.UpdateGeometry
-    //     (kPointOpt: KPoint option)
-    //     (hsPointOpt: HsPoint option)
-    //     : Result<Hill * Event.HillEventPayload list, Error> =
-    //
-    //     match kPointOpt, hsPointOpt with
-    //     | None, None -> Error(InvalidGeometryUpdate(kPointOpt, hsPointOpt, "Either kPoint or hsPoint must be Some"))
-    //
-    //     | Some kPoint, Some hsPoint ->
-    //         if HsPoint.value hsPoint > KPoint.value kPoint then
-    //             let event =
-    //                 { Event.HillGeometryUpdatedV1.HillId = this.Id
-    //                   KPoint = Some kPoint
-    //                   HsPoint = Some hsPoint }
-    //
-    //             Ok(
-    //                 { this with
-    //                     KPoint = kPoint
-    //                     HsPoint = hsPoint },
-    //                 [ Event.HillEventPayload.HillGeometryUpdatedV1 event ]
-    //             )
-    //         else
-    //             Ok(this, [])
-    //
-    //     | Some kPoint, None ->
-    //         let event =
-    //             { Event.HillGeometryUpdatedV1.HillId = this.Id
-    //               KPoint = Some kPoint
-    //               HsPoint = None }
-    //
-    //         Ok({ this with KPoint = kPoint }, [ Event.HillEventPayload.HillGeometryUpdatedV1 event ])
-    //
-    //     | None, Some hsPoint ->
-    //         if HsPoint.value hsPoint > KPoint.value this.KPoint then
-    //             let event =
-    //                 { Event.HillGeometryUpdatedV1.HillId = this.Id
-    //                   KPoint = None
-    //                   HsPoint = Some hsPoint }
-    //
-    //             Ok({ this with HsPoint = hsPoint }, [ Event.HillEventPayload.HillGeometryUpdatedV1 event ])
-    //         else
-    //             Ok(this, [])
+    member this.TryUpdateInGameRecords
+        (day: Record.Day)
+        (distance: Record.Distance)
+        (setter: Record.Setter)
+        : Hill * HillEventPayload list =
 
-    member this.TryUpdateInGameRecord
-        (setterReference: Record.SetterReference, distance: Record.Distance)
-        : Result<Hill * Event.HillEventPayload list, Error> =
-        match setterReference with
-        | Simple _ -> Error Error.InGameRecordIsSimpleReference
-        | GameWorldJumper gameWorldJumperId ->
-            let shouldUpdate =
-                this.InGameRecord.IsNone
-                || Distance.value distance > Distance.value this.InGameRecord.Value.Distance
+        let dateTime = Day.value day
 
-            if not shouldUpdate then
-                Ok(this, [])
+        let month =
+            HillTypes.Record.Month.Create dateTime.Month dateTime.Year
+            |> Option.defaultWith (fun () -> failwith "Invalid month number")
+
+        let currentInGameRecords = this.InGameRecords
+        let newRecord: HillTypes.Record = { Setter = setter; Distance = distance }
+
+        let mutable globalChanged = false
+        let mutable dailyChanged = false
+        let mutable monthlyChanged = false
+
+        // Global
+        let updatedGlobalRecord =
+            match currentInGameRecords.Global with
+            | Some existingGlobalRecord when existingGlobalRecord.Distance >= distance -> currentInGameRecords.Global
+            | _ ->
+                globalChanged <- true
+                Some newRecord
+
+        // Daily
+        let updatedDailyDictionary =
+            Dictionary<Record.Day, Record>(currentInGameRecords.Daily)
+
+        match updatedDailyDictionary.TryGetValue day with
+        | true, existingDailyRecord when existingDailyRecord.Distance >= distance -> ()
+        | _ ->
+            updatedDailyDictionary.[day] <- newRecord
+            dailyChanged <- true
+
+        // Monthly
+        let updatedMonthlyDictionary =
+            Dictionary<Record.Month, Record>(currentInGameRecords.Monthly)
+
+        match updatedMonthlyDictionary.TryGetValue month with
+        | true, existingMonthlyRecord when existingMonthlyRecord.Distance >= distance -> ()
+        | _ ->
+            updatedMonthlyDictionary.[month] <- newRecord
+            monthlyChanged <- true
+
+        let updatedInGameRecords: HillTypes.InGameRecords =
+            { Global = updatedGlobalRecord
+              Daily = updatedDailyDictionary
+              Monthly = updatedMonthlyDictionary }
+
+        let updatedHill: Hill =
+            { this with
+                InGameRecords = updatedInGameRecords }
+
+        let events =
+            if globalChanged || dailyChanged || monthlyChanged then
+                let gameWorldJumperId =
+                    match setter with
+                    | GameWorldJumper jumperId -> jumperId
+                    | Simple _ -> failwith "Global in-game records require a GameWorldJumper setter"
+
+                [ Event.HillEventPayload.HillInGameRecordUpdatedV1
+                      { HillId = this.Id_
+                        Day = day
+                        Month = month
+                        GameWorldJumperId = gameWorldJumperId
+                        Distance = distance.Value
+                        GlobalChanged = globalChanged
+                        DailyChanged = dailyChanged
+                        MonthlyChanged = monthlyChanged } ]
             else
-                let inGameRecord =
-                    { SetterReference = setterReference
-                      Distance = distance }
+                []
 
-                let recordUpdatedEvent =
-                    HillEventPayload.HillInGameRecordUpdatedV1
-                        { HillId = this.Id
-                          GameWorldJumperId = gameWorldJumperId
-                          Distance = Distance.value distance }
-
-                Ok(
-                    { this with
-                        InGameRecord = Some inGameRecord },
-                    [ recordUpdatedEvent ]
-                )
+        updatedHill, events

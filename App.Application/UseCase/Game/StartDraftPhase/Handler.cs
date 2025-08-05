@@ -1,4 +1,4 @@
-using App.Application.Commanding;
+using App.Application.Abstractions;
 using App.Application.Exception;
 using App.Application.Ext;
 using App.Application.ReadModel.Projection;
@@ -18,6 +18,7 @@ public class Handler(
     IGuid guid,
     Random.IRandom random,
     IQuickGameJumpersSelector jumpersSelector,
+    IGameWorldJumperProjection gameWorldJumperProjection,
     IGameRepository games,
     IDraftRepository drafts,
     IGameParticipantsProjection gameParticipantsProjection,
@@ -34,7 +35,8 @@ public class Handler(
 
         var draftParticipants = draftParticipantsFactory.CreateFromDtos(gameParticipants);
 
-        var gameWorldJumpers = jumpersSelector.Select();
+        var gameWorldJumperIds = await jumpersSelector.Select();
+        var gameWorldJumpers = await gameWorldJumperProjection.GetByIds(gameWorldJumperIds);
         var draftSubjects = draftSubjectsFactory.CreateIndividuals(gameWorldJumpers);
 
         var draftId = Domain.Draft.Id.Id.NewId(guid.NewGuid());

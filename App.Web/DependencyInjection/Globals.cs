@@ -1,5 +1,5 @@
-using App.Application.Commanding;
-using App.Application.Commanding.Mappers;
+using App.Application.Abstractions;
+using App.Application.Abstractions.Mappers;
 using App.Application.ReadModel.Projection;
 using App.Application.UseCase.Helper;
 using App.Application.UseCase.Helper.Impl.QuickGameHillSelector;

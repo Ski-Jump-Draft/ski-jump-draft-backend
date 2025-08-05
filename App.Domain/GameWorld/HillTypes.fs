@@ -1,8 +1,11 @@
 namespace App.Domain.GameWorld
 
+open System.Collections
+open System.Collections.Generic
+
 module HillTypes =
     type Id = Id of System.Guid
-    
+
     [<Struct>]
     type KPoint = private KPoint of double
 
@@ -22,11 +25,21 @@ module HillTypes =
         let value (HsPoint v) = v
 
     module Record =
-        type SetterReference =
+        type Setter =
             | Simple of string
             | GameWorldJumper of JumperId: JumperTypes.Id
 
-        type Distance = private Distance of double
+        [<Struct>]
+        type Distance =
+            private
+            | Distance of double
+
+            member this.Value = let (Distance v) = this in v
+
+            static member op_LessThan(Distance a, Distance b) = a < b
+            static member op_GreaterThan(Distance a, Distance b) = a > b
+            static member op_Equality(Distance a, Distance b) = a = b
+
 
         module Distance =
             type Error = ZeroOrBelow of Value: double
@@ -36,17 +49,48 @@ module HillTypes =
 
             let value (Distance v) = v
 
+        type Day = Day of System.DateTime
+
+        module Day =
+            let value (Day v) = v
+
+        type Month =
+            private
+                { Number: int
+                  Year: int }
+
+            member this.Number_ = this.Number
+            member this.Year_ = this.Year
+
+            static member Create number year =
+                if number < 1 || number > 12 then
+                    Some { Number = number; Year = year }
+                else
+                    None
+
+
     type Record =
-        { SetterReference: Record.SetterReference
+        { Setter: Record.Setter
           Distance: Record.Distance }
+
+    type RealRecords = { Summer: Record option; Winter: Record option }
+
+    type InGameRecords =
+        { Global: Record option
+          Daily: Dictionary<Record.Day, Record>
+          Monthly: Dictionary<Record.Month, Record> }
+
+        static member Empty =
+            { Global = None
+              Daily = Dictionary<_, _>()
+              Monthly = Dictionary<_, _>() }
 
     [<Struct>]
     type Name = Name of string
 
     [<Struct>]
     type Location = Location of string
-    
+
     type Status =
         | Operational
         | Retired
-

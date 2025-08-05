@@ -26,6 +26,4 @@ type Jump =
       GateStatus: Gate.GateStatus
       WindMeasurement: Wind.WindMeasurement
       JudgeMarks: Judgement.JudgeMarksList option
-      Distance: Distance
-      KPoint: Hill.KPoint
-      HsPoint: Hill.HsPoint }
+      Distance: Distance }

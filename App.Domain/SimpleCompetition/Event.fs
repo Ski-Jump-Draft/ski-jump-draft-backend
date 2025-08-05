@@ -39,6 +39,7 @@ type TeamDtoV1 =
 
 type JumpDtoV1 =
     { Id: Jump.Id
+      CompetitorId: Competitor.Id
       Distance: float
       Gate: int
       GatesLoweredByCoach: int

@@ -2,6 +2,7 @@ module App.Domain.Tests.CompetitionTests
 
 open App
 open System
+open App.Domain.Shared
 open App.Domain.SimpleCompetition.Jump
 open FsUnit.CustomMatchers
 open Xunit
@@ -20,6 +21,13 @@ let makeHill () =
       GatePoints = (Hill.GatePoints.tryCreate 6.8).Value
       HeadwindPoints = (Hill.WindPoints.tryCreate 10.8).Value
       TailwindPoints = (Hill.WindPoints.tryCreate 16.2).Value }
+
+let makeGateState () =
+    { Starting = Gate 12
+      Current = Gate 10 }
+    : Domain.SimpleCompetition.GateState
+
+let makeVersion () = AggregateVersion.zero
 
 let makeCompetitor () =
     let id = Competitor.Id(newId ())
@@ -76,7 +84,14 @@ let ``Individual flow – 2 rundy, Soft limit + reset`` () =
 
     // create
     let comp =
-        Domain.SimpleCompetition.Competition.CreateIndividual(CompetitionId(newId ()), settings, hill, competitors)
+        Domain.SimpleCompetition.Competition.CreateIndividual(
+            CompetitionId(newId ()),
+            makeVersion (),
+            settings,
+            hill,
+            competitors,
+            makeGateState ()
+        )
         |> Result.toOption
         |> Option.get
 
@@ -85,7 +100,7 @@ let ``Individual flow – 2 rundy, Soft limit + reset`` () =
     let jump = makeJump (firstJumper.Id_)
 
     let competition, events =
-        comp.AddJump(JumpResult.Id(newId ()), firstJumper.Id_, jump, referenceGate)
+        comp.AddJump(JumpResult.Id(newId ()), firstJumper.Id_, jump)
         |> Result.toOption
         |> Option.get
 
@@ -103,7 +118,7 @@ let ``Individual flow – 2 rundy, Soft limit + reset`` () =
     |> should be True
 
     competition.Status_
-    |> should equal (Competition.Status.RoundInProgress(RoundIndex 0u, None))
+    |> should equal (Competition.Status.RoundInProgress(makeGateState (), RoundIndex 0u, None))
 
 [<Fact>]
 let ``DSQ kończy grupę, sortuje wg punktów i przechodzi do następnej grupy`` () =
@@ -122,7 +137,7 @@ let ``DSQ kończy grupę, sortuje wg punktów i przechodzi do następnej grupy``
     let teams = [ for _ in 1..4 -> makeTeam 4 ]
 
     let comp =
-        Competition.CreateTeam(CompetitionId(newId ()), settings, hill, teams)
+        Competition.CreateTeam(CompetitionId(newId ()), makeVersion (), settings, hill, teams, makeGateState ())
         |> Result.toOption
         |> Option.get
 
@@ -130,12 +145,7 @@ let ``DSQ kończy grupę, sortuje wg punktów i przechodzi do następnej grupy``
     let firstEntry = comp.Startlist_.NextJumper().Value
 
     let competition1, _ =
-        comp.AddJump(
-            JumpResult.Id(newId ()),
-            firstEntry.CompetitorId,
-            makeJump (firstEntry.CompetitorId),
-            referenceGate
-        )
+        comp.AddJump(JumpResult.Id(newId ()), firstEntry.CompetitorId, makeJump firstEntry.CompetitorId)
         |> Result.toOption
         |> Option.get
 
@@ -153,9 +163,10 @@ let ``DSQ kończy grupę, sortuje wg punktów i przechodzi do następnej grupy``
             competition1 // <-- bez tuple
 
 
+    let gateState = makeGateState ()
     // asercje
     match competition.Status_ with
-    | Competition.RoundInProgress(_, Some(GroupIndex 1u)) -> ()
+    | Competition.RoundInProgress(gateState, _, Some(GroupIndex 1u)) -> ()
     | _ -> failwith "powinna rozpocząć się grupa 2"
 
 [<Fact>]
@@ -181,28 +192,38 @@ let ``Exact limit + tie-breaker HighestBib odrzuca nadmiarowych`` () =
     let competitors = [ makeCompetitor (); makeCompetitor (); makeCompetitor () ]
 
     let competition0 =
-        Competition.CreateIndividual(CompetitionId(newId ()), settings, hill, competitors)
+        Competition.CreateIndividual(
+            CompetitionId(newId ()),
+            makeVersion (),
+            settings,
+            hill,
+            competitors,
+            makeGateState ()
+        )
         |> Result.toOption
         |> Option.get
 
     // oba skoki z identycznymi punktami
     let competition1, _ =
-        competition0.AddJump(JumpResult.Id(newId ()), competitors[0].Id_, makeJump (competitors[0].Id_), referenceGate)
+        competition0.AddJump(JumpResult.Id(newId ()), competitors[0].Id_, makeJump (competitors[0].Id_))
         |> Result.toOption
         |> Option.get
 
     let competition2, _ =
-        competition1.AddJump(JumpResult.Id(newId ()), competitors[1].Id_, makeJump (competitors[1].Id_), referenceGate)
+        competition1.AddJump(JumpResult.Id(newId ()), competitors[1].Id_, makeJump (competitors[1].Id_))
         |> Result.toOption
         |> Option.get
 
     let competition3, _ =
-        competition2.AddJump(JumpResult.Id(newId ()), competitors[2].Id_, makeJump (competitors[2].Id_), referenceGate)
+        competition2.AddJump(JumpResult.Id(newId ()), competitors[2].Id_, makeJump (competitors[2].Id_))
         |> Result.toOption
         |> Option.get
 
+    let gateState = makeGateState ()
+
     match competition3.Status_ with
-    | Competition.RoundInProgress(RoundIndex 1u, _) -> competition3.Startlist_.Remaining_.Length |> should equal 2
+    | Competition.RoundInProgress(gateState, RoundIndex 1u, _) ->
+        competition3.Startlist_.Remaining_.Length |> should equal 2
     | _ -> failwith "powinna wystartować 2 runda"
 
 [<Fact>]
@@ -212,14 +233,21 @@ let ``Suspend i Continue blokują dodawanie skoków`` () =
     let competitors = [ makeCompetitor (); makeCompetitor () ]
 
     let competition0 =
-        Competition.CreateIndividual(CompetitionId(newId ()), settings, hill, competitors)
+        Competition.CreateIndividual(
+            CompetitionId(newId ()),
+            makeVersion (),
+            settings,
+            hill,
+            competitors,
+            makeGateState ()
+        )
         |> Result.toOption
         |> Option.get
 
     let firstCompetitorId = competition0.Startlist_.NextJumper().Value.CompetitorId
 
     let competition1, _ =
-        competition0.AddJump(JumpResult.Id(newId ()), firstCompetitorId, makeJump (firstCompetitorId), referenceGate)
+        competition0.AddJump(JumpResult.Id(newId ()), firstCompetitorId, makeJump (firstCompetitorId))
         |> Result.toOption
         |> Option.get
 
@@ -228,12 +256,7 @@ let ``Suspend i Continue blokują dodawanie skoków`` () =
 
     // próba skoku – błąd
     let res =
-        competitionSuspended.AddJump(
-            JumpResult.Id(newId ()),
-            competitors.Head.Id_,
-            makeJump (firstCompetitorId),
-            referenceGate
-        )
+        competitionSuspended.AddJump(JumpResult.Id(newId ()), competitors.Head.Id_, makeJump (firstCompetitorId))
 
     res.IsError |> should equal true
 
@@ -243,8 +266,7 @@ let ``Suspend i Continue blokują dodawanie skoków`` () =
     let secondCompetitorId = competitors.Tail.Head.Id_
     let jump2 = makeJump secondCompetitorId
 
-    let res =
-        compContinued.AddJump(JumpResult.Id(newId ()), secondCompetitorId, jump2, referenceGate)
+    let res = compContinued.AddJump(JumpResult.Id(newId ()), secondCompetitorId, jump2)
 
     res.IsOk |> should equal true
 

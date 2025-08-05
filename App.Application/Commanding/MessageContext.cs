@@ -1,6 +1,6 @@
 using App.Domain.Shared;
 
-namespace App.Application.Commanding;
+namespace App.Application.Abstractions;
 
 public record MessageContext(Guid CorrelationId, Guid CausationId)
 {

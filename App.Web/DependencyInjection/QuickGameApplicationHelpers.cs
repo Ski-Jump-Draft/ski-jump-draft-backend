@@ -1,5 +1,6 @@
 using App.Application.UseCase.Helper;
 using App.Application.UseCase.Helper.Impl.QuickGameHillSelector;
+using App.Application.UseCase.Helper.Impl.QuickGameJumpersSelector;
 using App.Infrastructure.Globals;
 
 namespace App.Web.DependencyInjection;
@@ -13,7 +14,9 @@ public static class QuickGameApplicationHelpers
         services.AddSingleton<IQuickGameHillSelector, RandomQuickGameHillSelector>();
         services.AddSingleton<IQuickGameSettingsProvider, DefaultQuickGameSettingsProvider>();
         services.AddSingleton<IQuickGameMatchmakingSettingsProvider, DefaultQuickGameMatchmakingSettingsProvider>();
-        
+
+        services.AddSingleton<IQuickGameJumpersSelector, AllJumpers>();
+
         return services;
     }
 }

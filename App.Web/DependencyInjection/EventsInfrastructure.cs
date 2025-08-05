@@ -1,4 +1,4 @@
-using App.Application.Commanding;
+using App.Application.Abstractions;
 
 namespace App.Web.DependencyInjection;
 

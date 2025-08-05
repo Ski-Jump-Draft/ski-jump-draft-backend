@@ -13,8 +13,9 @@ builder.Services.AddEndpointsApiExplorer();
 // builder.Services.AddMongo(builder.Configuration);
 // builder.Services.AddRedis(builder.Configuration);
 builder.Services
+    .AddPredefinedCollections()
     .AddCrudRepositories(builder.Configuration)
-    .AddProjections()
+    .AddReadModel()
     .AddReadRepositories(builder.Configuration)
     .AddEventsInfrastructure()
     .AddCommandsInfrastructure()

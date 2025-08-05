@@ -1,18 +1,14 @@
-using App.Application.Commanding;
+using App.Application.Abstractions;
+using App.Application.ReadModel.CrudQuery;
 using App.Application.ReadModel.Projection;
 
 namespace App.Web.DependencyInjection;
 
 public static class ProjectionDependencyInjection
 {
-    public static IServiceCollection AddProjections(this IServiceCollection services)
+    public static IServiceCollection AddReadModel(this IServiceCollection services)
     {
         services.AddSingleton<IServersProjection, Infrastructure.Projection.Hosting.Servers.Test>();
-
-        services.AddSingleton<IGameWorldHillProjection, Infrastructure.Projection.GameWorld.Hill.InMemory>();
-        services
-            .AddSingleton<IEventHandler<Domain.GameWorld.Event.HillEventPayload>,
-                Infrastructure.Projection.GameWorld.Hill.InMemory>();
 
         services.AddSingleton<IActiveGamesProjection, Infrastructure.Projection.Game.ActiveGames.InMemory>();
         services
@@ -37,6 +33,11 @@ public static class ProjectionDependencyInjection
         services
             .AddSingleton<IEventHandler<Domain.Game.Event.GameEventPayload.DraftPhaseStartedV1>,
                 Infrastructure.Projection.Game.GameByDraft.InMemory>();
+
+        // --- Queries --- //
+        services.AddSingleton<IGameWorldHillQuery, Infrastructure.Query.GameWorld.Hill.Predefined>();
+
+        services.AddSingleton<IGameWorldCountryQuery, Infrastructure.Query.GameWorld.Country.Predefined>();
 
         return services;
     }

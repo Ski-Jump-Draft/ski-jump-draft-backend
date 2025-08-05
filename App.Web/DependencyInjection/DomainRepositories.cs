@@ -1,4 +1,4 @@
-using App.Application.Commanding;
+using App.Application.Abstractions;
 using App.Domain.Repositories;
 using App.Infrastructure.DomainRepository.Crud;
 
@@ -26,6 +26,14 @@ public static class DomainRepositoriesDependencyInjection
             ));
 
         services.AddSingleton<IGameWorldHillRepository, Infrastructure.DomainRepository.Crud.GameWorldHill.InMemory>();
+        services
+            .AddSingleton<InMemoryCrudDomainEventsRepositoryStarter<Domain.GameWorld.HillTypes.Id,
+                Domain.GameWorld.Hill>>(sp =>
+            {
+                var hills = sp.GetRequiredService<IReadOnlyCollection<Domain.GameWorld.Hill>>();
+                return new InMemoryCrudDomainEventsRepositoryStarter<Domain.GameWorld.HillTypes.Id,
+                    Domain.GameWorld.Hill>(hills, hill => hill.Id_);
+            });
         services.AddSingleton<IPreDraftHillRepository, Infrastructure.DomainRepository.Crud.PreDraftHill.InMemory>();
 
         // Event-Sourced

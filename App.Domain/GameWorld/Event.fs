@@ -4,14 +4,14 @@ type HillStatusDto = | Retired
 
 type HillCreatedV1 =
     { HillId: HillTypes.Id
-      //Status: HillTypes.Status
+      Status: HillTypes.Status
       Location: HillTypes.Location
       Name: HillTypes.Name
       CountryId: Country.Id
       KPoint: HillTypes.KPoint
       HsPoint: HillTypes.HsPoint
-      RealRecord: HillTypes.Record
-      InGameRecord: HillTypes.Record option }
+      RealRecords: HillTypes.RealRecords
+      InGameRecords: HillTypes.InGameRecords }
 
 type HillRetiredV1 = { HillId: HillTypes.Id }
 
@@ -22,8 +22,13 @@ type HillGeometryUpdatedV1 =
     
 type HillInGameRecordUpdatedV1 = {
     HillId: HillTypes.Id
+    Day: HillTypes.Record.Day
+    Month: HillTypes.Record.Month
     GameWorldJumperId: JumperTypes.Id
     Distance: double
+    GlobalChanged: bool
+    DailyChanged: bool
+    MonthlyChanged: bool
 }
 
 type HillEventPayload =

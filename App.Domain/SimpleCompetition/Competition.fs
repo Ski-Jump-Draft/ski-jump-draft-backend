@@ -1,5 +1,6 @@
 namespace App.Domain.SimpleCompetition
 
+open App.Domain.Shared.AggregateVersion
 open App.Domain.SimpleCompetition.Jump
 open App.Domain.SimpleCompetition.JumpResult
 open App.Domain.SimpleCompetition.Event
@@ -10,11 +11,18 @@ module Competition =
         | Team
 
     type Status =
-        | NotStarted
-        | RoundInProgress of RoundIndex: RoundIndex * GroupIndex: GroupIndex option
-        | Suspended of RoundIndex: RoundIndex * GroupIndex: GroupIndex option
+        | NotStarted of GateState: GateState
+        | RoundInProgress of GateState: GateState * RoundIndex: RoundIndex * GroupIndex: GroupIndex option
+        | Suspended of GateState: GateState * RoundIndex: RoundIndex * GroupIndex: GroupIndex option
         | Cancelled
         | Ended
+
+    type StatusTag =
+        | NotStartedTag
+        | RoundInProgressTag
+        | SuspendedTag
+        | CancelledTag
+        | EndedTag
 
     type Error =
         | CompetitorsEmpty
@@ -22,14 +30,17 @@ module Competition =
         | GroupSettingsMissing
         | TeamMemberCountsNotEqual of UniqueCounts: int
         | JumperNotNextInStartlist of NextOnStartlist: Startlist.CompetitorEntry * CompetitorId: Competitor.Id
-        | InvalidStatus of Current: Status * Expected: Status list
+        | InvalidStatus of Current: StatusTag * Expected: StatusTag list
         | Internal of Message: string
+
+open Competition
 
 type Competition =
     private
         { Id: CompetitionId
+          Version: AggregateVersion
           Type: Competition.Type
-          Status: Competition.Status
+          Status: Status
           Settings: Settings
           Startlist: Startlist
           Results: Results
@@ -38,6 +49,7 @@ type Competition =
           Teams: Team list option }
 
     member this.Id_ = this.Id
+    member this.Version_ = this.Version
     member this.Type_ = this.Type
     member this.Status_ = this.Status
     member this.Hill_ = this.Hill
@@ -45,7 +57,7 @@ type Competition =
     member this.Results_ = this.Results
 
     static member CreateIndividual
-        (id: CompetitionId, settings: Settings, hill: Hill, competitors: Competitor list)
+        (id: CompetitionId, version, settings: Settings, hill: Hill, competitors: Competitor list, gateState)
         : Result<Competition, Competition.Error> =
 
         if List.isEmpty competitors then
@@ -75,10 +87,11 @@ type Competition =
 
                     Ok
                         { Id = id
+                          Version = version
                           Type = Competition.Individual
                           Settings = settings
                           Hill = hill
-                          Status = Competition.NotStarted
+                          Status = Competition.NotStarted gateState
                           Startlist = startlist
                           Results = Results.Empty
                           Competitors = Some competitors
@@ -86,7 +99,7 @@ type Competition =
                 | Error e -> Error(Competition.Error.Internal $"Error during creating a Startlist: {e}")
 
     static member CreateTeam
-        (id: CompetitionId, settings: Settings, hill: Hill, teams: Team list)
+        (id: CompetitionId, version, settings: Settings, hill: Hill, teams: Team list, gateState)
         : Result<Competition, Competition.Error> =
 
         if List.isEmpty teams then
@@ -130,45 +143,56 @@ type Competition =
                     | Ok startlist ->
                         Ok
                             { Id = id
+                              Version = version
                               Type = Competition.Team
                               Settings = settings
                               Hill = hill
-                              Status = Competition.NotStarted
+                              Status = Competition.NotStarted gateState
                               Startlist = startlist
                               Results = Results.Empty
                               Competitors = Option.None
                               Teams = Some teams }
 
     member this.AddJump
-        (jumpResultId: JumpResult.Id, competitorId: Competitor.Id, jump: Jump, referenceGate: Jump.Gate)
+        (jumpResultId: JumpResult.Id, competitorId: Competitor.Id, jump: Jump)
         : Result<Competition * CompetitionEventPayload list, Competition.Error> =
-        this.handleAction
-            competitorId
-            (fun roundIdx groupIdx ->
-                let competitor = this.findCompetitor competitorId
+        match this.Status with
+        | NotStarted gateState
+        | RoundInProgress(gateState, _, _) ->
+            this.handleAction
+                competitorId
+                (fun roundIdx groupIdx ->
+                    let competitor = this.findCompetitor competitorId
 
-                match
-                    JumpResultCreator.createFisJumpResult
-                        jumpResultId
-                        jump
-                        competitor
-                        this.Hill
-                        roundIdx
-                        groupIdx
-                        referenceGate
-                with
-                | Ok jumpResult -> Ok(Some jumpResult)
-                | Error fisErr ->
-                    let msg = fisErr.ToString()
-                    Error(Competition.Error.Internal msg))
-            (fun jumpResult ->
-                match jumpResult with
-                | Some jr ->
-                    CompetitionEventPayload.JumpAddedV1
-                        { CompetitionId = this.Id
-                          Jump = this.toJumpDto jr }
-                    |> List.singleton
-                | None -> [])
+                    match
+                        JumpResultCreator.createFisJumpResult
+                            jumpResultId
+                            jump
+                            competitor
+                            this.Hill
+                            roundIdx
+                            groupIdx
+                            gateState.Starting
+                    with
+                    | Ok jumpResult -> Ok(Some jumpResult)
+                    | Error fisErr ->
+                        let msg = fisErr.ToString()
+                        Error(Competition.Error.Internal msg))
+                (fun jumpResult ->
+                    match jumpResult with
+                    | Some jr ->
+                        CompetitionEventPayload.JumpAddedV1
+                            { CompetitionId = this.Id
+                              Jump = this.toJumpDto jr }
+                        |> List.singleton
+                    | None -> [])
+        | _ ->
+            Error(
+                Competition.Error.InvalidStatus(
+                    this.StatusTag,
+                    [ Competition.RoundInProgressTag; Competition.NotStartedTag ]
+                )
+            )
 
     member this.Disqualify
         (competitorId: Competitor.Id, reason: DisqualificationReason)
@@ -191,10 +215,10 @@ type Competition =
 
     member this.Suspend(reason: string) : Result<Competition * CompetitionEventPayload list, Competition.Error> =
         match this.Status with
-        | Competition.RoundInProgress(rnd, grp) ->
+        | Competition.RoundInProgress(gateState, rnd, grp) ->
             let suspended =
                 { this with
-                    Status = Competition.Status.Suspended(rnd, grp) }
+                    Status = Status.Suspended(gateState, rnd, grp) }
 
             let ev =
                 CompetitionEventPayload.CompetitionSuspendedV1
@@ -202,34 +226,25 @@ type Competition =
                       Reason = reason }
 
             Ok(suspended, [ ev ])
-        | _ ->
-            Error(
-                Competition.Error.InvalidStatus(
-                    this.Status,
-                    [ Competition.Status.RoundInProgress(RoundIndex 0u, None) ]
-                )
-            )
+        | _ -> Error(Competition.Error.InvalidStatus(this.StatusTag, [ Competition.RoundInProgressTag ]))
 
     member this.Continue() : Result<Competition * CompetitionEventPayload list, Competition.Error> =
         match this.Status with
-        | Competition.Suspended(rnd, grp) ->
+        | Competition.Suspended(gateState, rnd, grp) ->
             let continued =
                 { this with
-                    Status = Competition.Status.RoundInProgress(rnd, grp) }
+                    Status = Status.RoundInProgress(gateState, rnd, grp) }
 
             let ev = CompetitionEventPayload.CompetitionContinuedV1 { CompetitionId = this.Id }
             Ok(continued, [ ev ])
-        | _ ->
-            Error(Competition.Error.InvalidStatus(this.Status, [ Competition.Status.Suspended(RoundIndex 0u, None) ]))
+        | _ -> Error(Competition.Error.InvalidStatus(this.StatusTag, [ Competition.SuspendedTag ]))
 
     member this.Cancel(reason: string) : Result<Competition * CompetitionEventPayload list, Competition.Error> =
         match this.Status with
         | Competition.Ended
-        | Competition.Cancelled -> Error(Competition.Error.InvalidStatus(this.Status, []))
+        | Competition.Cancelled -> Error(Competition.Error.InvalidStatus(this.StatusTag, []))
         | _ ->
-            let cancelled =
-                { this with
-                    Status = Competition.Status.Cancelled }
+            let cancelled = { this with Status = Status.Cancelled }
 
             let ev =
                 CompetitionEventPayload.CompetitionCancelledV1
@@ -291,7 +306,7 @@ type Competition =
                 ))
 
         match this.Status with
-        | Competition.NotStarted ->
+        | Competition.NotStarted gateState ->
             if not (this.competitorExists competitorId) then
                 Error(Competition.Error.Internal $"Competitor {competitorId} not found in competition")
             else
@@ -307,7 +322,7 @@ type Competition =
 
                 proceed firstRound firstGroup
                 |> Result.map (fun (comp, evs) -> comp, startEvents @ evs)
-        | Competition.RoundInProgress(rnd, grp) ->
+        | RoundInProgress(gateState, rnd, grp) ->
             match this.Startlist.NextJumper() with
             | Some nextEntry when nextEntry.CompetitorId <> competitorId ->
                 Error(Competition.Error.JumperNotNextInStartlist(nextEntry, competitorId))
@@ -317,27 +332,27 @@ type Competition =
                 else
                     Error(Competition.Error.Internal $"Competitor {competitorId} not found")
             | _ -> proceed rnd grp
-        | Competition.Suspended _
-        | Competition.Cancelled
-        | Competition.Ended ->
-            Error(
-                Competition.Error.InvalidStatus(
-                    this.Status,
-                    [ Competition.Status.RoundInProgress(RoundIndex 0u, None) ]
-                )
-            )
+        | Suspended _
+        | Cancelled
+        | Ended -> Error(Competition.Error.InvalidStatus(this.StatusTag, [ RoundInProgressTag ]))
 
     member private this.processProgression
         (updatedStartlist: Startlist)
         (roundIdx: RoundIndex)
         (groupIdx: GroupIndex option)
-        : CompetitionEventPayload list * CompetitionEventPayload list * Competition.Status * Startlist =
+        : CompetitionEventPayload list * CompetitionEventPayload list * Status * Startlist =
+
+        let gateState =
+            match this.Status with
+            | Status.RoundInProgress(gateState, _, _) -> gateState
+            | _ -> failwith "Status is not RoundInProgress"
+
 
         let groupFinished = this.Type = Competition.Team && updatedStartlist.RoundIsFinished
 
         let baseStatus =
             match this.Status with
-            | Competition.NotStarted -> Competition.Status.RoundInProgress(roundIdx, groupIdx)
+            | Competition.NotStarted gateState -> Status.RoundInProgress(gateState, roundIdx, groupIdx)
             | _ -> this.Status
 
         let groupEvents, statusAfterGroup, startlistAfterGroup =
@@ -402,10 +417,10 @@ type Competition =
                               GroupIndex = nextGroup }
 
                     [ groupEnded; groupStarted ],
-                    Competition.Status.RoundInProgress(roundIdx, Some nextGroup),
+                    Status.RoundInProgress(gateState, roundIdx, Some nextGroup),
                     nextStartlist
                 else
-                    [ groupEnded ], Competition.Status.RoundInProgress(roundIdx, None), updatedStartlist
+                    [ groupEnded ], Status.RoundInProgress(gateState, roundIdx, None), updatedStartlist
             else
                 [], baseStatus, updatedStartlist
 
@@ -413,7 +428,7 @@ type Competition =
             match this.Type with
             | Competition.Team ->
                 match statusAfterGroup with
-                | Competition.RoundInProgress(_, Some _) -> false
+                | Competition.RoundInProgress(gateState, _, Some _) -> false
                 | _ -> startlistAfterGroup.RoundIsFinished
             | _ -> startlistAfterGroup.RoundIsFinished
 
@@ -426,7 +441,7 @@ type Competition =
 
                 if this.isLastRound roundIdx then
                     let ended = CompetitionEventPayload.CompetitionEndedV1 { CompetitionId = this.Id }
-                    [ roundEnded; ended ], Competition.Status.Ended, startlistAfterGroup
+                    [ roundEnded; ended ], Status.Ended, startlistAfterGroup
                 else
                     let nextRound = let (RoundIndex i) = roundIdx in RoundIndex(i + 1u)
 
@@ -439,10 +454,10 @@ type Competition =
 
                     let nextStatus, nextStartlist =
                         if this.Type = Competition.Team then
-                            Competition.Status.RoundInProgress(nextRound, Some(GroupIndex 0u)),
+                            Status.RoundInProgress(gateState, nextRound, Some(GroupIndex 0u)),
                             this.buildNextRoundStartlist (settings, nextRound, this.Results)
                         else
-                            Competition.Status.RoundInProgress(nextRound, None),
+                            Status.RoundInProgress(gateState, nextRound, None),
                             this.buildNextRoundStartlist (settings, nextRound, this.Results)
 
                     [ roundEnded; roundStarted ], nextStatus, nextStartlist
@@ -693,6 +708,7 @@ type Competition =
 
     member private this.toJumpDto(jumpResult: JumpResult) : Event.JumpDtoV1 =
         { Id = jumpResult.Jump.Id
+          CompetitorId = jumpResult.CompetitorId
           Distance = TotalPointsModule.value jumpResult.TotalPoints
           Gate = GateModule.value jumpResult.Jump.Gate
           GatesLoweredByCoach = GatesLoweredByCoachModule.value jumpResult.Jump.GatesLoweredByCoach
@@ -820,3 +836,13 @@ type Competition =
         | TieBreakerCriteria.HighestBib -> ties |> List.sortByDescending (fun (cid, _, _, _) -> cid) // Id ma w sobie BIB
         | TieBreakerCriteria.LowestBib -> ties |> List.sortBy (fun (cid, _, _, _) -> cid)
         | Random -> failwith "todo"
+
+    // ======================  Other Helpers  ===============================
+
+    member private this.StatusTag =
+        match this.Status with
+        | NotStarted _ -> NotStartedTag
+        | RoundInProgress _ -> RoundInProgressTag
+        | Suspended _ -> SuspendedTag
+        | Cancelled -> CancelledTag
+        | Ended -> EndedTag

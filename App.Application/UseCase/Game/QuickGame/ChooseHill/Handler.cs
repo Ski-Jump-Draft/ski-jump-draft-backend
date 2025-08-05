@@ -1,4 +1,5 @@
-using App.Application.Commanding;
+using App.Application.Abstractions;
+using App.Application.ReadModel.CrudQuery;
 using App.Application.ReadModel.Projection;
 using Random = App.Domain.Shared.Random;
 
@@ -8,7 +9,7 @@ public record Command(
 ) : ICommand<Domain.GameWorld.HillTypes.Id>;
 
 public class Handler(
-    IGameWorldHillProjection gameWorldHills,
+    IGameWorldHillQuery gameWorldHills,
     Random.IRandom random
 ) : ICommandHandler<Command, Domain.GameWorld.HillTypes.Id>
 {

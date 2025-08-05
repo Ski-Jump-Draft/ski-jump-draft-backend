@@ -1,4 +1,4 @@
-using App.Application.Commanding;
+using App.Application.Abstractions;
 using App.Domain.Shared;
 using Microsoft.Extensions.Logging;
 

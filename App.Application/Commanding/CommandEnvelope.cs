@@ -1,4 +1,4 @@
-namespace App.Application.Commanding;
+namespace App.Application.Abstractions;
 
 public record CommandEnvelope<TCommand>(TCommand Command, MessageContext MessageContext)
     where TCommand : ICommand;
