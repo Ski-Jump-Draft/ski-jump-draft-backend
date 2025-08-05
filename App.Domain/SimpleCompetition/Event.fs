@@ -41,8 +41,6 @@ type JumpDtoV1 =
     { Id: Jump.Id
       CompetitorId: Competitor.Id
       Distance: float
-      Gate: int
-      GatesLoweredByCoach: int
       WindAverage: double
       JudgeNotes: float list }
 
@@ -52,13 +50,15 @@ type IndividualCompetitionCreatedV1 =
     { CompetitionId: CompetitionId
       Settings: CompetitionSettingsDtoV1
       Hill: CompetitionHillDtoV1
-      Competitors: CompetitorDtoV1 list }
+      Competitors: CompetitorDtoV1 list
+      StartingGate: Jump.Gate }
 
 type TeamCompetitionCreatedV1 =
     { CompetitionId: CompetitionId
       Settings: CompetitionSettingsDtoV1
       Hill: CompetitionHillDtoV1
-      Teams: TeamDtoV1 list }
+      Teams: TeamDtoV1 list
+      StartingGate: Jump.Gate }
 
 type CompetitionStartedV1 = { CompetitionId: CompetitionId }
 
@@ -83,6 +83,18 @@ type CompetitionGroupEndedV1 =
 type JumpAddedV1 =
     { CompetitionId: CompetitionId
       Jump: JumpDtoV1 }
+
+type StartingGateSetV1 =
+    { CompetitionId: CompetitionId
+      Gate: int }
+
+type GateLoweredByCoachV1 =
+    { CompetitionId: CompetitionId
+      Count: int }
+
+type GateChangedByJuryV1 =
+    { CompetitionId: CompetitionId
+      Count: int }
 
 type CompetitorDisqualifiedV1 =
     { CompetitionId: CompetitionId
@@ -114,6 +126,9 @@ type CompetitionEventPayload =
     | CompetitionRoundStartedV1 of CompetitionRoundStartedV1
     | CompetitionRoundEndedV1 of CompetitionRoundEndedV1
     | JumpAddedV1 of JumpAddedV1
+    | StartingGateSetV1 of StartingGateSetV1
+    | GateLoweredByCoachV1 of GateLoweredByCoachV1
+    | GateChangedByJuryV1 of GateChangedByJuryV1
     | CompetitorDisqualifiedV1 of CompetitorDisqualifiedV1
     | CompetitorDidNotStartV1 of CompetitorDidNotStartV1
     | CompetitionCancelledV1 of CompetitionCancelledV1
@@ -132,6 +147,9 @@ module Versioning =
         | CompetitionGroupStartedV1 _ -> 1us
         | CompetitionGroupEndedV1 _ -> 1us
         | JumpAddedV1 _ -> 1us
+        | StartingGateSetV1 _ -> 1us
+        | GateLoweredByCoachV1 _ -> 1us
+        | GateChangedByJuryV1 _ -> 1us
         | CompetitorDisqualifiedV1 _ -> 1us
         | CompetitorDidNotStartV1 _ -> 1us
         | CompetitionCancelledV1 _ -> 1us

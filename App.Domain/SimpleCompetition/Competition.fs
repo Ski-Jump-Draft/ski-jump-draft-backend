@@ -32,6 +32,7 @@ module Competition =
         | JumperNotNextInStartlist of NextOnStartlist: Startlist.CompetitorEntry * CompetitorId: Competitor.Id
         | InvalidStatus of Current: StatusTag * Expected: StatusTag list
         | Internal of Message: string
+        | CoachGateIncrease
 
 open Competition
 
@@ -52,13 +53,25 @@ type Competition =
     member this.Version_ = this.Version
     member this.Type_ = this.Type
     member this.Status_ = this.Status
+
+    member this.GateState =
+        match this.Status with
+        | NotStarted gateState
+        | RoundInProgress(gateState, _, _)
+        | Suspended(gateState, _, _) -> Some gateState
+        | _ -> None
+
     member this.Hill_ = this.Hill
     member this.Startlist_ = this.Startlist
     member this.Results_ = this.Results
 
     static member CreateIndividual
-        (id: CompetitionId, version, settings: Settings, hill: Hill, competitors: Competitor list, gateState)
-        : Result<Competition, Competition.Error> =
+        (id: CompetitionId, version, settings: Settings, hill: Hill, competitors: Competitor list, startingGate) : Result<
+                                                                                                                       Competition *
+                                                                                                                       Event.CompetitionEventPayload list,
+                                                                                                                       Competition.Error
+                                                                                                                    >
+        =
 
         if List.isEmpty competitors then
             Error(Competition.Error.CompetitorsEmpty)
@@ -84,30 +97,38 @@ type Competition =
 
                 match startlist with
                 | Ok startlist ->
+                    let event: IndividualCompetitionCreatedV1 =
+                        { CompetitionId = id
+                          Settings = Competition.settingsDto settings
+                          Hill = Competition.hillDto hill
+                          Competitors = competitors |> List.map Competition.competitorDto
+                          StartingGate = startingGate }
 
-                    Ok
+                    let state: Competition =
                         { Id = id
                           Version = version
-                          Type = Competition.Individual
+                          Type = Individual
                           Settings = settings
                           Hill = hill
-                          Status = Competition.NotStarted gateState
+                          Status = NotStarted(Competition.startingGateState startingGate)
                           Startlist = startlist
                           Results = Results.Empty
                           Competitors = Some competitors
-                          Teams = Option.None }
+                          Teams = None }
+
+                    Ok(state, [ Event.CompetitionEventPayload.IndividualCompetitionCreatedV1 event ])
                 | Error e -> Error(Competition.Error.Internal $"Error during creating a Startlist: {e}")
 
     static member CreateTeam
-        (id: CompetitionId, version, settings: Settings, hill: Hill, teams: Team list, gateState)
-        : Result<Competition, Competition.Error> =
+        (id: CompetitionId, version, settings: Settings, hill: Hill, teams: Team list, startingGate)
+        : Result<Competition * Event.CompetitionEventPayload list, Competition.Error> =
 
         if List.isEmpty teams then
             Error Competition.Error.TeamsEmpty
-        elif settings.RoundSettings |> List.exists (fun rs -> rs.GroupSettings.IsNone) then
+        elif settings.RoundSettings |> List.exists _.GroupSettings.IsNone then
             Error(Competition.Error.GroupSettingsMissing)
         else
-            let counts = teams |> List.map (fun t -> t.Competitors.Length) |> Set.ofList
+            let counts = teams |> List.map _.Competitors.Length |> Set.ofList
 
             if counts.Count <> 1 then
                 Error(Competition.Error.TeamMemberCountsNotEqual counts.Count)
@@ -141,17 +162,26 @@ type Competition =
                     match Startlist.Create entries with
                     | Error _ -> Error(Competition.Error.Internal "Error creating Startlist")
                     | Ok startlist ->
-                        Ok
+                        let event: TeamCompetitionCreatedV1 =
+                            { CompetitionId = id
+                              Settings = Competition.settingsDto settings
+                              Hill = Competition.hillDto hill
+                              Teams = teams |> List.map Competition.teamDto
+                              StartingGate = startingGate }
+
+                        let state =
                             { Id = id
                               Version = version
-                              Type = Competition.Team
+                              Type = Team
                               Settings = settings
                               Hill = hill
-                              Status = Competition.NotStarted gateState
+                              Status = NotStarted(Competition.startingGateState startingGate)
                               Startlist = startlist
                               Results = Results.Empty
                               Competitors = Option.None
                               Teams = Some teams }
+
+                        Ok(state, [ Event.CompetitionEventPayload.TeamCompetitionCreatedV1 event ])
 
     member this.AddJump
         (jumpResultId: JumpResult.Id, competitorId: Competitor.Id, jump: Jump)
@@ -172,6 +202,8 @@ type Competition =
                             this.Hill
                             roundIdx
                             groupIdx
+                            gateState.CurrentReal
+                            gateState.CoachChange
                             gateState.Starting
                     with
                     | Ok jumpResult -> Ok(Some jumpResult)
@@ -180,19 +212,106 @@ type Competition =
                         Error(Competition.Error.Internal msg))
                 (fun jumpResult ->
                     match jumpResult with
-                    | Some jr ->
+                    | Some jumpResult ->
                         CompetitionEventPayload.JumpAddedV1
                             { CompetitionId = this.Id
-                              Jump = this.toJumpDto jr }
+                              Jump = this.toJumpDto jumpResult }
                         |> List.singleton
                     | None -> [])
+        | _ -> Error(Competition.Error.InvalidStatus(this.StatusTag, [ RoundInProgressTag; NotStartedTag ]))
+
+
+    member this.ChangeGateByJury
+        (change: GateChange)
+        : Result<Competition * Event.CompetitionEventPayload list, Competition.Error> =
+        match this.Status with
+        | NotStarted _
+        | RoundInProgress _
+        | Suspended _ ->
+
+            let currentGateState = this.currentGateState ()
+            let (Gate currentGate) = currentGateState.CurrentJury
+
+            let newCurrent =
+                match change with
+                | Increase by -> currentGate + int by
+                | Reduction by -> currentGate - int by
+
+            let updated =
+                { currentGateState with
+                    CurrentJury = Gate newCurrent }
+
+            let rawChange =
+                match change with
+                | Increase by -> int (by)
+                | Reduction by -> - int(by)
+
+            let event =
+                { CompetitionId = this.Id
+                  Count = rawChange }
+                : GateChangedByJuryV1
+
+            let state = this.withGateState updated
+
+            Ok(state, [ CompetitionEventPayload.GateChangedByJuryV1 event ])
+
+        | _ ->
+            Error(Competition.Error.InvalidStatus(this.StatusTag, [ NotStartedTag; RoundInProgressTag; SuspendedTag ]))
+
+    member this.LowerGateByCoach
+        (change: GateChange)
+        : Result<Competition * Event.CompetitionEventPayload list, Competition.Error> =
+        let currentGateState = this.currentGateState ()
+        let (Gate currentGate) = currentGateState.CurrentJury
+
+        match change with
+        | Increase _ -> Error(Error.CoachGateIncrease)
+        | Reduction by ->
+            let newGateState =
+                { currentGateState with
+                    CoachChange = Some change }
+
+            let event =
+                { CompetitionId = this.Id
+                  Count = int (by) }
+                : Event.GateLoweredByCoachV1
+
+            let state = this.withGateState newGateState
+
+            Ok(state, [ CompetitionEventPayload.GateLoweredByCoachV1 event ])
+
+    member this.SetStartingGate
+        (gate: Jump.Gate)
+        : Result<Competition * Event.CompetitionEventPayload list, Competition.Error> =
+
+        let startlistIsEmpty = this.Startlist.Done.IsEmpty
+
+        let newGateState: GateState =
+            { Starting = gate
+              CurrentJury = gate
+              CoachChange = None }
+
+        let ev: Event.StartingGateSetV1 =
+            { CompetitionId = this.Id
+              Gate = GateModule.value gate }
+
+        match this.Status with
+        | NotStarted _ ->
+            let newState = this.withGateState newGateState
+            Ok(newState, [ CompetitionEventPayload.StartingGateSetV1 ev ])
+
+        | RoundInProgress _ when startlistIsEmpty ->
+            let newState = this.withGateState newGateState
+            Ok(newState, [ CompetitionEventPayload.StartingGateSetV1 ev ])
+
         | _ ->
             Error(
                 Competition.Error.InvalidStatus(
                     this.StatusTag,
-                    [ Competition.RoundInProgressTag; Competition.NotStartedTag ]
+                    [ Competition.NotStartedTag; Competition.RoundInProgressTag ]
                 )
             )
+
 
     member this.Disqualify
         (competitorId: Competitor.Id, reason: DisqualificationReason)
@@ -215,7 +334,7 @@ type Competition =
 
     member this.Suspend(reason: string) : Result<Competition * CompetitionEventPayload list, Competition.Error> =
         match this.Status with
-        | Competition.RoundInProgress(gateState, rnd, grp) ->
+        | RoundInProgress(gateState, rnd, grp) ->
             let suspended =
                 { this with
                     Status = Status.Suspended(gateState, rnd, grp) }
@@ -297,16 +416,17 @@ type Competition =
 
                 let allEvents = baseEvents @ grpEvents @ roundEvents
 
-                Ok(
+                let compBeforeClear =
                     { this with
                         Results = resultsAfter
                         Startlist = finalStartlist
-                        Status = finalStatus },
-                    allEvents
-                ))
+                        Status = finalStatus }
+
+                let competitionFinal = compBeforeClear.clearCoachChange
+                Ok(competitionFinal, allEvents))
 
         match this.Status with
-        | Competition.NotStarted gateState ->
+        | NotStarted gateState ->
             if not (this.competitorExists competitorId) then
                 Error(Competition.Error.Internal $"Competitor {competitorId} not found in competition")
             else
@@ -428,7 +548,7 @@ type Competition =
             match this.Type with
             | Competition.Team ->
                 match statusAfterGroup with
-                | Competition.RoundInProgress(gateState, _, Some _) -> false
+                | Competition.RoundInProgress(_, _, Some _) -> false
                 | _ -> startlistAfterGroup.RoundIsFinished
             | _ -> startlistAfterGroup.RoundIsFinished
 
@@ -710,8 +830,6 @@ type Competition =
         { Id = jumpResult.Jump.Id
           CompetitorId = jumpResult.CompetitorId
           Distance = TotalPointsModule.value jumpResult.TotalPoints
-          Gate = GateModule.value jumpResult.Jump.Gate
-          GatesLoweredByCoach = GatesLoweredByCoachModule.value jumpResult.Jump.GatesLoweredByCoach
           WindAverage = jumpResult.Jump.WindAverage.ToDouble()
           JudgeNotes = JudgeNotes.value jumpResult.Jump.JudgeNotes }
 
@@ -846,3 +964,77 @@ type Competition =
         | Suspended _ -> SuspendedTag
         | Cancelled -> CancelledTag
         | Ended -> EndedTag
+
+    // === gate helpers === //
+    static member private startingGateState(startingGate) =
+        { Starting = startingGate
+          CurrentJury = startingGate
+          CoachChange = None }
+        : GateState
+
+    member private this.withGateState(newGate: GateState) =
+        let newStatus =
+            match this.Status with
+            | NotStarted _ -> NotStarted newGate
+            | RoundInProgress(_, r, g) -> RoundInProgress(newGate, r, g)
+            | Suspended(_, r, g) -> Suspended(newGate, r, g)
+            | s -> s // Cancelled / Ended
+
+        { this with Status = newStatus }
+
+    member private this.currentGateState() =
+        match this.Status with
+        | NotStarted gs
+        | RoundInProgress(gs, _, _)
+        | Suspended(gs, _, _) -> gs
+        | _ -> invalidOp "Gate state unavailable in this status."
+
+    member private this.clearCoachChange: Competition =
+        let newStatus =
+            match this.Status with
+            | NotStarted gateState -> NotStarted { gateState with CoachChange = None }
+            | RoundInProgress(gateState, r, g) -> RoundInProgress({ gateState with CoachChange = None }, r, g)
+            | Suspended(gateState, r, g) -> Suspended({ gateState with CoachChange = None }, r, g)
+            | s -> s
+
+        { this with Status = newStatus }
+
+
+
+    // DTO helpers //
+    // ---------- DTO MAPPERS ------------------------------------------------
+
+    static member private toRoundLimitDto =
+        function
+        | RoundLimit.NoneLimit -> RoundLimitDtoV1.NoneLimit
+        | RoundLimit.Soft(RoundLimitValue v) -> RoundLimitDtoV1.Soft v
+        | RoundLimit.Exact(RoundLimitValue v, crit) -> RoundLimitDtoV1.Exact(v, crit.ToString())
+
+    static member private toRoundSettingsDto(rs: RoundSettings) =
+        { RoundLimit = Competition.toRoundLimitDto rs.RoundLimit
+          SortStartlist = rs.SortStartlist
+          ResetPoints = rs.ResetPoints
+          GroupIndexesToSort =
+            rs.GroupSettings
+            |> Option.map (fun gs ->
+                gs.GroupIndexesToSort
+                |> Seq.map (fun x -> int (GroupIndexModule.value x))
+                |> Seq.toList) }
+
+    static member private settingsDto(s: Settings) =
+        { Rounds = s.RoundSettings.Length
+          RoundSettings = s.RoundSettings |> List.map Competition.toRoundSettingsDto }
+
+    static member private hillDto(h: Hill) =
+        { Id = h.Id
+          KPoint = Hill.KPoint.value h.KPoint
+          HsPoint = Hill.HsPoint.value h.HsPoint
+          GatePoints = Hill.GatePoints.value h.GatePoints
+          HeadwindPoints = Hill.WindPoints.value h.HeadwindPoints
+          TailwindPoints = Hill.WindPoints.value h.TailwindPoints }
+
+    static member private competitorDto(c: Competitor) = { Id = c.Id; TeamId = c.TeamId }
+
+    static member private teamDto(t: Team) =
+        { Id = t.Id
+          Competitors = t.Competitors |> List.map (fun c -> { Id = c.Id }) }

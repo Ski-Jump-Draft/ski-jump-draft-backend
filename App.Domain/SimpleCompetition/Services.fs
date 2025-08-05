@@ -19,7 +19,9 @@ module JumpResultCreator =
         (hill: Hill)
         (roundIndex: RoundIndex)
         (groupIndex: GroupIndex option)
-        (referenceGate: Jump.Gate)
+        (gate: Jump.Gate)
+        (coachGateChange: GateChange option)
+        (startingGate: Jump.Gate)
         : Result<JumpResult, FisError> =
 
         let judgeNotes = JudgeNotes.value jump.JudgeNotes
@@ -38,20 +40,28 @@ module JumpResultCreator =
             match JumpResult.JudgePoints.tryCreate judgePointsSum with
             | Error _ -> failwith "Invalid judge points"
             | Ok judgePoints ->
-                let (Gate gate) = jump.Gate
-                let (Gate refGate) = referenceGate
+                let (Gate gate) = gate
+                let (Gate startingGate) = startingGate
                 let pointsPerGate = GatePoints.value hill.GatePoints
-                let gateDiff = float (refGate - gate)
+                let gateDiff = float (startingGate - gate)
                 let baseGatePoints = gateDiff * pointsPerGate
 
                 let hs = HsPoint.value hill.HsPoint
                 let distance95 = 0.95 * hs
                 let baseDistance = Distance.value jump.Distance
 
-                let (GatesLoweredByCoach coachReduction) = jump.GatesLoweredByCoach
+                let coachReduction =
+                    match coachGateChange with
+                    | Some coachGateChange ->
+                        match coachGateChange with
+                        | Reduction by -> by
+                        | Increase _ ->
+                            invalidOp "Coach cannot increase the gate. It should not happen, please report the bug."
+                    | None ->
+                        0u 
 
                 let coachPoints =
-                    if coachReduction > 0 && baseDistance >= distance95 then
+                    if coachReduction > 0u && baseDistance >= distance95 then
                         float coachReduction * pointsPerGate
                     else
                         0.0

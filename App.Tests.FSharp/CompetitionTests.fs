@@ -24,7 +24,7 @@ let makeHill () =
 
 let makeGateState () =
     { Starting = Gate 12
-      Current = Gate 10 }
+      CurrentJury = Gate 10 }
     : Domain.SimpleCompetition.GateState
 
 let makeVersion () = AggregateVersion.zero

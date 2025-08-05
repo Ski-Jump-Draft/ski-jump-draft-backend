@@ -69,6 +69,4 @@ type Jump =
       CompetitorId: Competitor.Id
       Distance: Jump.Distance
       JudgeNotes: Jump.JudgeNotes
-      Gate: Jump.Gate
-      GatesLoweredByCoach: Jump.GatesLoweredByCoach
       WindAverage: Jump.WindAverage }
