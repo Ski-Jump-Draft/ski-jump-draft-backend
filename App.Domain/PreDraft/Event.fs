@@ -1,7 +1,6 @@
 module App.Domain.PreDraft.Event
 
 open App.Domain
-open App.Domain.PreDraft.Competition
 open App.Domain.PreDraft.Phase
 open App.Domain.PreDraft.Settings
 
@@ -14,7 +13,13 @@ type PreDraftCreatedV1 =
 type PreDraftCompetitionStartedV1 =
     { PreDraftId: Id.Id
       Index: CompetitionIndex
-      CompetitionId: Competition.Id }
+      CompetitionId: SimpleCompetition.CompetitionId }
+
+[<CLIMutable>]
+type PreDraftCompetitionEndedV1 =
+    { PreDraftId: Id.Id
+      Index: CompetitionIndex
+      CompetitionId: SimpleCompetition.CompetitionId }
 
 [<CLIMutable>]
 type PreDraftEndedV1 = { PreDraftId: Id.Id }
@@ -22,6 +27,7 @@ type PreDraftEndedV1 = { PreDraftId: Id.Id }
 type PreDraftEventPayload =
     | PreDraftCreatedV1 of PreDraftCreatedV1
     | PreDraftCompetitionStartedV1 of PreDraftCompetitionStartedV1
+    | PreDraftCompetitionEndedV1 of PreDraftCompetitionEndedV1
     | PreDraftEndedV1 of PreDraftEndedV1
 
 module Versioning =
@@ -29,4 +35,5 @@ module Versioning =
         function
         | PreDraftCreatedV1 _ -> 1us
         | PreDraftCompetitionStartedV1 _ -> 1us
+        | PreDraftCompetitionEndedV1 _ -> 1us
         | PreDraftEndedV1 _ -> 1us

@@ -4,25 +4,41 @@ open App.Domain
 open App.Domain.PreDraft.Event
 
 open App.Domain.PreDraft.Phase
+open App.Domain.Shared.AggregateVersion
 
 module PreDraft =
-    type Error = InvalidPhase of Expected: PhaseTag list * Actual: PhaseTag
+    type Error =
+        | InvalidPhase of Expected: PhaseTag list * Actual: PhaseTag
+        | TooFewCompetitionsPlayedForEnd of CurrentIndex: CompetitionIndex * CompetitionsCount: int
 
 open PreDraft
 
 type PreDraft =
-    { Id: Id.Id
-      Phase: Phase
-      Settings: PreDraft.Settings.Settings }
+    private
+        { Id: Id.Id
+          Version: AggregateVersion
+          Phase: Phase
+          Settings: PreDraft.Settings.Settings }
+
+    member this.Id_ = this.Id
+    member this.Version_ = this.Version
+    member this.Phase_ = this.Phase
+    member this.Settings_ = this.Settings
 
     static member TagOfPhase phase =
         match phase with
         | InProgress _ -> InProgressTag
         | Ended -> EndedTag
 
-    static member Create (id: Id.Id) settings firstCompetitionId : Result<PreDraft * PreDraftEventPayload list, Error> =
+    static member Create
+        (id: Id.Id)
+        version
+        settings
+        firstCompetitionId
+        : Result<PreDraft * PreDraftEventPayload list, Error> =
         let state =
             { Id = id
+              Version = version
               Phase = InProgress(CompetitionIndex 0u, firstCompetitionId)
               Settings = settings }
 
@@ -39,29 +55,35 @@ type PreDraft =
               PreDraftEventPayload.PreDraftCompetitionStartedV1 preDraftCompetitionStarted ]
         )
 
-    member this.Advance(maybeCompetitionId: Competition.Id option) =
+    member this.Advance(nextCompetitionId) =
         match this.Phase with
         | InProgress(index, competitionId) ->
-            match maybeCompetitionId with
-            | None ->
-                let state = { this with Phase = Ended }
-                let event = PreDraftEndedV1 { PreDraftId = this.Id }
-                Ok(state, [ event ])
+            let nextCompetitionIndex =
+                let (CompetitionIndex i) = index in CompetitionIndex(i + 1u) // lol
 
-            | Some nextCompetitionId ->
-                let nextCompetitionIndex =
-                    let (CompetitionIndex i) = index in CompetitionIndex(i + 1u) // lol
+            let state =
+                { this with
+                    Phase = InProgress(nextCompetitionIndex, nextCompetitionId); Version = increment this.Version }
 
-                let state =
-                    { this with
-                        Phase = InProgress(nextCompetitionIndex, nextCompetitionId) }
+            let event =
+                PreDraftCompetitionStartedV1
+                    { PreDraftId = this.Id
+                      CompetitionId = nextCompetitionId
+                      Index = nextCompetitionIndex }
 
-                let event =
-                    PreDraftCompetitionStartedV1
-                        { PreDraftId = this.Id
-                          CompetitionId = nextCompetitionId
-                          Index = nextCompetitionIndex }
+            Ok(state, [ event ])
 
-                Ok(state, [ event ])
+        | Ended -> Error(InvalidPhase([ PhaseTag.InProgressTag ], PreDraft.TagOfPhase(this.Phase)))
 
+    member this.End =
+        match this.Phase with
+        | InProgress(index, _) ->
+            let (CompetitionIndex intIndex) = index
+
+            if int (intIndex) + 1 = this.Settings.CompetitionsCount then
+                let state = { this with Phase = Ended; Version = increment this.Version }
+                let event = { PreDraftId = this.Id }: PreDraftEndedV1
+                Ok(state, [ PreDraftEventPayload.PreDraftEndedV1 event ])
+            else
+                Error(Error.TooFewCompetitionsPlayedForEnd(index, this.Settings.CompetitionsCount))
         | Ended -> Error(InvalidPhase([ PhaseTag.InProgressTag ], PreDraft.TagOfPhase(this.Phase)))

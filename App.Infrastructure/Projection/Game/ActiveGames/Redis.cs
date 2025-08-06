@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Application.Abstractions;
+using Application.Commanding;
 using App.Domain.Game;
 using App.Domain.Shared;
 using StackExchange.Redis;
@@ -40,7 +40,7 @@ public class RedisActiveGamesProjection(IConnectionMultiplexer connectionMultipl
         return list;
     }
 
-    public async Task<ActiveGameDto?> GetActiveGameAsync(Guid gameId, CancellationToken ct)
+    public async Task<ActiveGameDto?> GetByIdAsync(Guid gameId, CancellationToken ct)
     {
         var json = await _db.StringGetAsync(Key(gameId));
         return json.IsNullOrEmpty
@@ -94,7 +94,7 @@ public class RedisActiveGamesProjection(IConnectionMultiplexer connectionMultipl
 
     private async Task UpdatePhaseAsync(Guid id, GamePhase phase)
     {
-        var dto = await GetActiveGameAsync(id, CancellationToken.None);
+        var dto = await GetByIdAsync(id, CancellationToken.None);
         if (dto is null) return;
 
         var updated = dto with { Phase = phase };

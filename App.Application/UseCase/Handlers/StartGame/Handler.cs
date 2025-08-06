@@ -1,0 +1,58 @@
+using App.Application.Commanding;
+using App.Application.Ext;
+using App.Application.ReadModel.Projection;
+using App.Application.UseCase.Game.Exception;
+using App.Application.UseCase.Helper;
+using App.Domain.Game;
+using App.Domain.Shared;
+using App.Domain.Repositories;
+using Microsoft.FSharp.Collections;
+
+namespace App.Application.UseCase.Handlers.StartGame;
+
+public record Command(
+    Domain.Matchmaking.Id MatchmakingId
+) : ICommand<App.Domain.Game.Id.Id>;
+
+public class Handler(
+    IGameRepository games,
+    IGameParticipantsFactory gameParticipantsFactory,
+    IMatchmakingParticipantsProjection matchmakingParticipantsProjection,
+    IQuickGameSettingsProvider quickGameSettingsProvider,
+    IGuid guid
+) : ICommandHandler<Command, App.Domain.Game.Id.Id>
+{
+    public async Task<App.Domain.Game.Id.Id> HandleAsync(Command command, MessageContext messageContext,
+        CancellationToken ct)
+    {
+        var matchmakingId = command.MatchmakingId;
+
+        var matchmakingParticipantDtos =
+            (await matchmakingParticipantsProjection.GetParticipantsByMatchmakingIdAsync(matchmakingId)).ToArray();
+
+        var gameParticipants = gameParticipantsFactory.CreateFromDto(matchmakingParticipantDtos).ToArray();
+
+        var newGameId = Id.Id.NewId(guid.NewGuid());
+        var settings = await quickGameSettingsProvider.Provide();
+
+        var gameCreationResult = Domain.Game.Game.Create(newGameId, AggregateVersion.zero, ListModule.OfSeq(gameParticipants),
+            settings);
+
+        if (gameCreationResult.IsOk)
+        {
+            var (game, events) = gameCreationResult.ResultValue;
+            var expectedVersion = game.Version_;
+            await games.SaveAsync(game.Id_, events, expectedVersion, messageContext.CorrelationId,
+                    messageContext.CausationId, ct)
+                .AwaitOrWrap(_ => new CreatingQuickGameFailedException(matchmakingId));
+            return game.Id_;
+        }
+
+        var error = gameCreationResult.ErrorValue;
+
+        throw error switch
+        {
+            _ => new CreatingQuickGameFailedException(matchmakingId)
+        };
+    }
+}

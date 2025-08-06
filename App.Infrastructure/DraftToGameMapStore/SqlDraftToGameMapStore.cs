@@ -1,6 +1,6 @@
 using Dapper;
 using System.Data;
-using App.Application.Abstractions;
+using App.Application.Commanding;
 using App.Domain.Draft;
 
 namespace App.Infrastructure.DraftToGameMapStore;
@@ -14,7 +14,7 @@ public class SqlDraftToGameMapStore : IDraftToGameMapStore
         _conn = conn;
     }
 
-    public async Task<MapResult> TryGetGameIdByDraftIdAsync(Id.Id draftId, CancellationToken ct)
+    public async Task<MapResult> TryGetGameIdAsync(Id.Id draftId, CancellationToken ct)
     {
         var sql = "SELECT GameId FROM DraftToGameMap WHERE DraftId = @DraftId";
         var gameId =

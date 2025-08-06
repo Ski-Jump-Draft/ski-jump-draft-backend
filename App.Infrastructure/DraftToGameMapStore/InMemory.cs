@@ -1,4 +1,4 @@
-using App.Application.Abstractions;
+using App.Application.Commanding;
 using App.Domain;
 using App.Domain.Draft;
 using App.Domain.Game;
@@ -10,7 +10,7 @@ public class InMemoryDraftToGameMapStore : IDraftToGameMapStore
 {
     private readonly Dictionary<Id.Id, Domain.Game.Id.Id> _map = new();
 
-    public Task<MapResult> TryGetGameIdByDraftIdAsync(Id.Id draftId, CancellationToken ct)
+    public Task<MapResult> TryGetGameIdAsync(Id.Id draftId, CancellationToken ct)
     {
         var found = _map.TryGetValue(draftId, out var gameId);
         return Task.FromResult(new MapResult(found, found ? gameId : null));

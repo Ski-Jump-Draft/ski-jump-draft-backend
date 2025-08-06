@@ -43,7 +43,7 @@ type DraftPhaseEndedV1 =
 
 [<CLIMutable>]
 type GameCompetitionDto =
-    { CompetitionId: App.Domain.Competition.Id.Id }
+    { CompetitionId: App.Domain.SimpleCompetition.CompetitionId }
 
 [<CLIMutable>]
 type CompetitionPhaseStartedV1 =

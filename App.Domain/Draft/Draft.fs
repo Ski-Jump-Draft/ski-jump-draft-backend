@@ -103,7 +103,8 @@ type Draft =
 
             let newState =
                 { this with
-                    Phase = Running(0, initialOrder, Picks.Empty initialOrder) }
+                    Phase = Running(0, initialOrder, Picks.Empty initialOrder)
+                    Version = increment this.Version }
 
             let payload: DraftStartedV1 = { DraftId = this.Id }
 
@@ -153,7 +154,11 @@ type Draft =
                     else
                         Running(nextIdx, nextOrder, updatedPicks)
 
-                let newState = { this with Phase = newPhase }
+                let newState =
+                    { this with
+                        Phase = newPhase
+                        Version = increment this.Version }
+
                 Ok(newState, pickEvent :: endEvents)
 
         | _ -> Error(InvalidPhase([ RunningTag ], Draft.TagOfPhase this.Phase))

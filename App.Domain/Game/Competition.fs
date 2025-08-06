@@ -16,7 +16,7 @@ module Competition =
 
 type Competition =
     private
-        { CompetitionId: App.Domain.Competition.Id.Id }
+        { CompetitionId: App.Domain.SimpleCompetition.CompetitionId }
 
     member this.CompetitionId_ = this.CompetitionId
 

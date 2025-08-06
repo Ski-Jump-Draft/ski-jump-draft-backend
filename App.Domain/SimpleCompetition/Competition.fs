@@ -337,7 +337,8 @@ type Competition =
         | RoundInProgress(gateState, rnd, grp) ->
             let suspended =
                 { this with
-                    Status = Status.Suspended(gateState, rnd, grp) }
+                    Status = Status.Suspended(gateState, rnd, grp)
+                    Version = increment this.Version }
 
             let ev =
                 CompetitionEventPayload.CompetitionSuspendedV1
@@ -349,21 +350,25 @@ type Competition =
 
     member this.Continue() : Result<Competition * CompetitionEventPayload list, Competition.Error> =
         match this.Status with
-        | Competition.Suspended(gateState, rnd, grp) ->
+        | Suspended(gateState, rnd, grp) ->
             let continued =
                 { this with
-                    Status = Status.RoundInProgress(gateState, rnd, grp) }
+                    Status = Status.RoundInProgress(gateState, rnd, grp)
+                    Version = increment this.Version }
 
             let ev = CompetitionEventPayload.CompetitionContinuedV1 { CompetitionId = this.Id }
             Ok(continued, [ ev ])
-        | _ -> Error(Competition.Error.InvalidStatus(this.StatusTag, [ Competition.SuspendedTag ]))
+        | _ -> Error(Competition.Error.InvalidStatus(this.StatusTag, [ SuspendedTag ]))
 
     member this.Cancel(reason: string) : Result<Competition * CompetitionEventPayload list, Competition.Error> =
         match this.Status with
-        | Competition.Ended
-        | Competition.Cancelled -> Error(Competition.Error.InvalidStatus(this.StatusTag, []))
+        | Ended
+        | Cancelled -> Error(Competition.Error.InvalidStatus(this.StatusTag, []))
         | _ ->
-            let cancelled = { this with Status = Status.Cancelled }
+            let cancelled =
+                { this with
+                    Status = Status.Cancelled
+                    Version = increment this.Version }
 
             let ev =
                 CompetitionEventPayload.CompetitionCancelledV1
@@ -416,13 +421,14 @@ type Competition =
 
                 let allEvents = baseEvents @ grpEvents @ roundEvents
 
-                let compBeforeClear =
+                let competitionBeforeClear =
                     { this with
                         Results = resultsAfter
                         Startlist = finalStartlist
-                        Status = finalStatus }
+                        Status = finalStatus
+                        Version = increment this.Version }
 
-                let competitionFinal = compBeforeClear.clearCoachChange
+                let competitionFinal = competitionBeforeClear.clearCoachChange competitionBeforeClear
                 Ok(competitionFinal, allEvents))
 
         match this.Status with
@@ -980,7 +986,9 @@ type Competition =
             | Suspended(_, r, g) -> Suspended(newGate, r, g)
             | s -> s // Cancelled / Ended
 
-        { this with Status = newStatus }
+        { this with
+            Status = newStatus
+            Version = increment this.Version }
 
     member private this.currentGateState() =
         match this.Status with
@@ -989,15 +997,15 @@ type Competition =
         | Suspended(gs, _, _) -> gs
         | _ -> invalidOp "Gate state unavailable in this status."
 
-    member private this.clearCoachChange: Competition =
+    member private this.clearCoachChange competition : Competition =
         let newStatus =
-            match this.Status with
+            match competition.Status with
             | NotStarted gateState -> NotStarted { gateState with CoachChange = None }
             | RoundInProgress(gateState, r, g) -> RoundInProgress({ gateState with CoachChange = None }, r, g)
             | Suspended(gateState, r, g) -> Suspended({ gateState with CoachChange = None }, r, g)
             | s -> s
 
-        { this with Status = newStatus }
+        { competition with Status = newStatus }
 
 
 

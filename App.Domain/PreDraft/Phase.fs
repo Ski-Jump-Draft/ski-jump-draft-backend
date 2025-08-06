@@ -1,5 +1,6 @@
 module App.Domain.PreDraft.Phase
 
+open App
 open App.Domain.PreDraft.Competition
 
 [<Struct>]
@@ -18,7 +19,7 @@ type CompetitionIndex = CompetitionIndex of uint
 //     | EndedTag
 
 type Phase =
-    | InProgress of Index: CompetitionIndex * Competition.Id //CompetitionId: Competition.Id
+    | InProgress of Index: CompetitionIndex * Domain.SimpleCompetition.CompetitionId //CompetitionId: Competition.Id
     //| Competition of Index: CompetitionIndex * CompetitionId: Competition.Id
     //| Break of NextIndex: CompetitionIndex
     | Ended

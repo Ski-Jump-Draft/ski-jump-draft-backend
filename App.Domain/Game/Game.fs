@@ -111,7 +111,8 @@ type Game =
 
                 let updatedGame =
                     { this with
-                        Participants = updatedParticipants }
+                        Participants = updatedParticipants
+                        Version = increment this.Version }
 
                 let event: ParticipantLeftV1 =
                     { GameId = updatedGame.Id
@@ -153,7 +154,8 @@ type Game =
         | Break PhaseTag.PreDraftTag ->
             let state =
                 { this with
-                    Phase = PreDraft preDraftId } // TODO
+                    Phase = PreDraft preDraftId
+                    Version = increment this.Version } // TODO
 
             let event: PreDraftPhaseStartedV1 =
                 { GameId = this.Id
@@ -167,7 +169,8 @@ type Game =
         | PreDraft preDraftId ->
             let state =
                 { this with
-                    Phase = Break PhaseTag.PreDraftTag }
+                    Phase = Break PhaseTag.PreDraftTag
+                    Version = increment this.Version }
 
             let event: PreDraftPhaseEndedV1 =
                 { GameId = this.Id
@@ -181,7 +184,8 @@ type Game =
         | Break(Next = PhaseTag.DraftTag) ->
             let state =
                 { this with
-                    Phase = Phase.Draft draftId }
+                    Phase = Phase.Draft draftId
+                    Version = increment this.Version }
 
             let event: DraftPhaseStartedV1 = { GameId = this.Id; DraftId = draftId }
             Ok(state, [ GameEventPayload.DraftPhaseStartedV1 event ])
@@ -192,7 +196,8 @@ type Game =
         | Draft draftId ->
             let state =
                 { this with
-                    Phase = Phase.Break PhaseTag.CompetitionTag }
+                    Phase = Phase.Break PhaseTag.CompetitionTag
+                    Version = increment this.Version }
 
             let event: DraftPhaseEndedV1 = { GameId = this.Id; DraftId = draftId }
             Ok(state, [ GameEventPayload.DraftPhaseEndedV1 event ])
@@ -203,7 +208,8 @@ type Game =
         | Break(Next = PhaseTag.CompetitionTag) ->
             let state =
                 { this with
-                    Phase = Phase.Competition gameCompetition }
+                    Phase = Phase.Competition gameCompetition
+                    Version = increment this.Version }
 
             let event: CompetitionPhaseStartedV1 =
                 { GameId = this.Id
@@ -218,7 +224,8 @@ type Game =
         | Competition competitionId ->
             let state =
                 { this with
-                    Phase = Phase.Break PhaseTag.EndedTag }
+                    Phase = Phase.Break PhaseTag.EndedTag
+                    Version = increment this.Version }
 
             let event: CompetitionPhaseEndedV1 = { GameId = this.Id }
 
@@ -230,7 +237,8 @@ type Game =
         | Break(Next = PhaseTag.EndedTag) ->
             let state =
                 { this with
-                    Phase = Phase.Ended endedGameResults }
+                    Phase = Phase.Ended endedGameResults
+                    Version = increment this.Version }
 
             let event: GameEndedV1 =
                 { GameId = this.Id

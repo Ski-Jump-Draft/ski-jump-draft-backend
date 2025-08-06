@@ -28,3 +28,6 @@ type GateState =
 
         let realGate = current - coachReduction
         Jump.Gate realGate
+
+type IStartingGateSetter =
+    abstract member SetStartingGate: unit -> Jump.Gate

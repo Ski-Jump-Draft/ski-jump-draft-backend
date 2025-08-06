@@ -1,6 +1,6 @@
 using App.Domain.Shared;
 
-namespace App.Application.Abstractions;
+namespace App.Application.Commanding;
 
 public interface IEventBus
 {

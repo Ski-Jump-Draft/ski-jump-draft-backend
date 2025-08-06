@@ -13,6 +13,7 @@
     
     <ItemGroup>
       <Folder Include="Factory\Helper\" />
+      <Folder Include="UseCase\Legacy\" />
     </ItemGroup>
 
 </Project>

@@ -1,4 +1,4 @@
-namespace App.Application.Abstractions.Mappers;
+namespace App.Application.Commanding.Mappers;
 
 public interface IValueMapper<in TInput, out TOutput>
 {

@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using App.Application.Abstractions;
+using App.Application.Commanding;
 using App.Application.ReadModel.Projection;
 using App.Domain.Game;
 using App.Domain.Shared;
@@ -14,7 +14,7 @@ public class InMemory : IActiveGamesProjection, IEventHandler<Event.GameEventPay
     public Task<IEnumerable<ActiveGameDto>> GetActiveGamesAsync(CancellationToken ct) =>
         Task.FromResult(_store.Values.AsEnumerable());
 
-    public Task<ActiveGameDto?> GetActiveGameAsync(System.Guid gameId, CancellationToken ct) =>
+    public Task<ActiveGameDto?> GetByIdAsync(System.Guid gameId, CancellationToken ct) =>
         Task.FromResult(_store.GetValueOrDefault(gameId));
 
     public Task HandleAsync(DomainEvent<Event.GameEventPayload> ev, CancellationToken ct)

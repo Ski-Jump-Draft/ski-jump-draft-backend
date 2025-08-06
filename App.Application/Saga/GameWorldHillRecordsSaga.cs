@@ -1,4 +1,4 @@
-using App.Application.Abstractions;
+using App.Application.Commanding;
 using App.Application.Exception;
 using App.Application.Ext;
 using App.Application.ReadModel.Projection;
@@ -14,7 +14,7 @@ public class
     GameWorldHillRecordsSaga(
         ICommandBus commandBus,
         ICompetitionGameWorldHillProjection competitionGameWorldHillProjection,
-        ICompetitorProjection competitorProjection)
+        ICompetitorProjection competitorProjection, IGuid guid)
     : IEventHandler<Domain.SimpleCompetition.Event.CompetitionEventPayload.JumpAddedV1>
 {
     public async Task HandleAsync(DomainEvent<CompetitionEventPayload.JumpAddedV1> @event, CancellationToken ct)
@@ -44,10 +44,10 @@ public class
         var potentialRecordDistance =
             Domain.GameWorld.HillTypes.RecordModule.DistanceModule.tryCreate(jumpDistance).ResultValue;
 
-        var command = new UseCase.GameWorld.TryUpdateInGameRecords.Command(gameWorldHillId,
+        var command = new UseCase.Handlers.TryUpdateHillRecords.Command(gameWorldHillId,
             new Domain.GameWorld.HillTypes.Record(potentialRecordSetter, potentialRecordDistance));
-        var envelope = new CommandEnvelope<UseCase.GameWorld.TryUpdateInGameRecords.Command>(command,
-            MessageContext.Next(@event.Header.CorrelationId));
+        var envelope = new CommandEnvelope<UseCase.Handlers.TryUpdateHillRecords.Command>(command,
+            MessageContext.Next(@event.Header.CorrelationId, guid));
         await commandBus.SendAsync(envelope, ct);
     }
 }
