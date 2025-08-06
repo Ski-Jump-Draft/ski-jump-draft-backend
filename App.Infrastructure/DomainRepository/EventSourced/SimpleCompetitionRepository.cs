@@ -22,4 +22,4 @@ public sealed class SimpleCompetitionRepository(
             domainEvents =>
                 Task.FromResult(Domain.SimpleCompetition.Evolve.evolveFromEvents(ListModule.OfSeq(domainEvents))),
             p => Domain.SimpleCompetition.Event.Versioning.schemaVersion(p)),
-        IMatchmakingRepository;
+        ICompetitionRepository;

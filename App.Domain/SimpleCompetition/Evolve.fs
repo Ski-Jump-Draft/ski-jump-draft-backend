@@ -250,5 +250,14 @@ module Evolve =
 
     // ---------- fold ------------------------------------------------------
 
-    let evolveFromEvents events =
-        events |> List.fold (fun st ev -> Some(evolve st ev)) None
+    let evolveFromEvents (events: DomainEvent<CompetitionEventPayload> list) : Competition =
+
+        match events with
+        | [] -> invalidArg "events" "Event stream is empty – cannot rebuild Competition aggregate."
+
+        | first :: tail ->
+            // pierwszy event tworzy agregat z None
+            let initial = evolve None first
+
+            // pozostałe patche-ują istniejący stan
+            tail |> List.fold (fun state ev -> evolve (Some state) ev) initial

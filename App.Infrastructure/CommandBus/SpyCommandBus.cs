@@ -7,21 +7,25 @@ public class SpyCommandBus : ICommandBus
 {
     readonly List<object> _sent = new();
 
-    public Task SendAsync<TCommand>(CommandEnvelope<TCommand> command, CancellationToken ct) where TCommand : ICommand
+    public async Task SendAsync<TCommand>(CommandEnvelope<TCommand> command, CancellationToken ct,
+        TimeSpan? delay = null)
+        where TCommand : ICommand
     {
+        if (delay is { TotalMilliseconds: > 0 })
+            await Task.Delay(delay.Value, ct).ConfigureAwait(false);
         _sent.Add(command!);
-        return Task.CompletedTask;
     }
 
-    public Task<TResponse> SendAsync<TCommand, TResponse>(
+    public async Task<TResponse> SendAsync<TCommand, TResponse>(
         CommandEnvelope<TCommand, TResponse> command,
-        CancellationToken ct
+        CancellationToken ct,
+        TimeSpan? delay = null
     ) where TCommand : ICommand<TResponse>
     {
+        if (delay is { TotalMilliseconds: > 0 })
+            await Task.Delay(delay.Value, ct).ConfigureAwait(false);
         _sent.Add(command!);
-        // musimy zwrócić jakąś wartość, ale tutaj akurat EndDraftPhase.Command zwraca bool
-        // więc zwracamy `true`, żeby handler nie potknął się o brak wartości
-        return Task.FromResult((TResponse)(object)true)!;
+        return (TResponse)(object)true;
     }
 
     public bool WasSent<TCommand>(Func<TCommand, bool>? predicate = null)

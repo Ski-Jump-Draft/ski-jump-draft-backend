@@ -9,13 +9,18 @@ namespace App.Infrastructure.Projection.Game.ActiveGames;
 
 public class InMemory : IActiveGamesProjection, IEventHandler<Event.GameEventPayload>
 {
-    private readonly ConcurrentDictionary<System.Guid, ActiveGameDto> _store = new();
+    private readonly ConcurrentDictionary<Guid, (ActiveGameDto Game, ActiveGameTimeLimitsDto TimeLimits)>
+        _store = new();
 
     public Task<IEnumerable<ActiveGameDto>> GetActiveGamesAsync(CancellationToken ct) =>
-        Task.FromResult(_store.Values.AsEnumerable());
+        Task.FromResult(_store.Values.Select(x => x.Game).AsEnumerable());
 
-    public Task<ActiveGameDto?> GetByIdAsync(System.Guid gameId, CancellationToken ct) =>
-        Task.FromResult(_store.GetValueOrDefault(gameId));
+    public Task<ActiveGameDto?> GetByIdAsync(Domain.Game.Id.Id gameId, CancellationToken ct) =>
+        Task.FromResult(_store.TryGetValue(gameId.Item, out var entry) ? entry.Game : null);
+
+    public Task<ActiveGameTimeLimitsDto?> GetTimeLimitsByIdAsync(Id.Id gameId, CancellationToken ct) =>
+        Task.FromResult(_store.TryGetValue(gameId.Item, out var entry) ? entry.TimeLimits : null);
+
 
     public Task HandleAsync(DomainEvent<Event.GameEventPayload> ev, CancellationToken ct)
     {
@@ -24,18 +29,39 @@ public class InMemory : IActiveGamesProjection, IEventHandler<Event.GameEventPay
         switch (ev.Payload)
         {
             case Event.GameEventPayload.GameCreatedV1 payload:
-                _store[payload.Item.GameId.Item] = new ActiveGameDto(
+                var settings = payload.Item.Settings;
+
+                var preDraftDelay =
+                    (settings.StartingPreDraftPolicy as Settings.PhaseTransitionPolicy.StartingPreDraft.AutoAfter)?.Item
+                    ?.Value;
+                var draftDelay =
+                    (settings.StartingDraftPolicy as Settings.PhaseTransitionPolicy.StartingDraft.AutoAfter)?.Item
+                    ?.Value;
+                var compDelay =
+                    (settings.StartingCompetitionPolicy as Settings.PhaseTransitionPolicy.StartingCompetition.AutoAfter)
+                    ?.Item?.Value;
+                var endingDelay = (settings.EndingGamePolicy as Settings.PhaseTransitionPolicy.EndingGame.AutoAfter)
+                    ?.Item?.Value;
+
+                var dto = new ActiveGameDto(
                     payload.Item.GameId.Item,
-                    MapPhase(GameModule.Phase.NewBreak(GameModule.PhaseTag
-                        .PreDraftTag)),
+                    MapPhase(GameModule.Phase.NewBreak(GameModule.PhaseTag.PreDraftTag)),
                     occurred);
+
+                var limits = new ActiveGameTimeLimitsDto(
+                    payload.Item.GameId.Item,
+                    BreakBeforePreDraft: preDraftDelay,
+                    BreakBeforeDraft: draftDelay,
+                    BreakBeforeCompetition: compDelay,
+                    BreakBeforeEnding: endingDelay
+                );
+
+                _store[payload.Item.GameId.Item] = (dto, limits);
                 break;
 
             case Event.GameEventPayload.PreDraftPhaseStartedV1 payload:
-                var preDraftId = Domain.PreDraft.Id.Id.NewId(payload.Item.PreDraftId.Item);
-                var preDraftPhase =
-                    GameModule.Phase.NewPreDraft(preDraftId);
-                UpdatePhase(payload.Item.GameId.Item, MapPhase(preDraftPhase));
+                UpdatePhase(payload.Item.GameId.Item,
+                    MapPhase(GameModule.Phase.NewPreDraft(Domain.PreDraft.Id.Id.NewId(payload.Item.PreDraftId.Item))));
                 break;
 
             case Event.GameEventPayload.DraftPhaseStartedV1 payload:
@@ -54,10 +80,10 @@ public class InMemory : IActiveGamesProjection, IEventHandler<Event.GameEventPay
         return Task.CompletedTask;
     }
 
-    private void UpdatePhase(System.Guid gameId, GamePhase phase)
+    private void UpdatePhase(Guid gameId, GamePhase phase)
     {
-        if (_store.TryGetValue(gameId, out var dto))
-            _store[gameId] = dto with { Phase = phase };
+        if (_store.TryGetValue(gameId, out var x))
+            _store[gameId] = (x.Game with { Phase = phase }, x.TimeLimits);
     }
 
     private static GamePhase MapPhase(GameModule.Phase ph) => ph switch

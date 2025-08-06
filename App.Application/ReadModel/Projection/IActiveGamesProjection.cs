@@ -5,7 +5,7 @@ public interface IActiveGamesProjection
 {
     Task<IEnumerable<ActiveGameDto>> GetActiveGamesAsync(CancellationToken ct);
     Task<ActiveGameDto?> GetByIdAsync(Domain.Game.Id.Id gameId, CancellationToken ct);
-    Task<ActiveGameTimeLimitsDto> GetTimeLimitsByIdAsync(Domain.Game.Id.Id gameId, CancellationToken ct);
+    Task<ActiveGameTimeLimitsDto?> GetTimeLimitsByIdAsync(Domain.Game.Id.Id gameId, CancellationToken ct);
 }
 
 public enum GamePhase

@@ -4,9 +4,13 @@ namespace App.Infrastructure.CommandBus;
 
 public class InMemory(IServiceProvider sp) : ICommandBus
 {
-    public async Task SendAsync<TCommand>(CommandEnvelope<TCommand> command, CancellationToken ct)
+    public async Task SendAsync<TCommand>(CommandEnvelope<TCommand> command, CancellationToken ct,
+        TimeSpan? delay = null)
         where TCommand : ICommand
     {
+        if (delay is { TotalMilliseconds: > 0 })
+            await Task.Delay(delay.Value, ct).ConfigureAwait(false);
+
         var handlerType = typeof(ICommandHandler<>).MakeGenericType(typeof(TCommand));
         var handler = sp.GetService(handlerType);
 
@@ -20,9 +24,12 @@ public class InMemory(IServiceProvider sp) : ICommandBus
 
     public async Task<TResponse> SendAsync<TCommand, TResponse>(
         CommandEnvelope<TCommand, TResponse> command,
-        CancellationToken ct
+        CancellationToken ct, TimeSpan? delay = null
     ) where TCommand : ICommand<TResponse>
     {
+        if (delay is { TotalMilliseconds: > 0 })
+            await Task.Delay(delay.Value, ct).ConfigureAwait(false);
+
         var handlerType = typeof(ICommandHandler<,>)
             .MakeGenericType(typeof(TCommand), typeof(TResponse));
 
