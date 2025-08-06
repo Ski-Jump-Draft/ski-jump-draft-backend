@@ -58,7 +58,7 @@ public class CompetitionSaga(
         var envelope = new CommandEnvelope<UseCase.Handlers.SimulateJump.Command>(command,
             MessageContext.Next(@event.Header.CorrelationId, guid));
 
-        // Skok co 10 sekund. TODO (przenieść to gdzieś)
+        // TODO: Nie używać sztywnych 10 sekund, ale ustalić gdzieś odstep auto-skoków
         await commandBus.SendAsync(envelope, ct, delay: TimeSpan.FromSeconds(10));
     }
 }

@@ -4,7 +4,6 @@ using App.Domain.Shared;
 
 namespace App.Application.Saga;
 
-// TODO: Dokończyć Sagę 
 public class GameSaga(
     IActiveGamesProjection activeGamesProjection,
     IPreDraftToGameMapStore preDraftToGame,
@@ -28,7 +27,7 @@ public class GameSaga(
                 var matchmakingId = matchmakingEnded.Item.MatchmakingId;
                 var startGame =
                     new UseCase.Handlers.StartGame.Command(
-                        matchmakingId); // TODO: Skąd settings? prowizoryczny Provider? DI?
+                        matchmakingId);
                 var startDraftEnvelope = new CommandEnvelope<UseCase.Handlers.StartGame.Command, Domain.Game.Id.Id>(
                     startGame,
                     MessageContext.Next(@event.Header.CorrelationId, guid));

@@ -155,7 +155,7 @@ type Game =
             let state =
                 { this with
                     Phase = PreDraft preDraftId
-                    Version = increment this.Version } // TODO
+                    Version = increment this.Version }
 
             let event: PreDraftPhaseStartedV1 =
                 { GameId = this.Id
