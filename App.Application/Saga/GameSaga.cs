@@ -172,6 +172,12 @@ public class GameSaga(
 
     private async Task<ActiveGameTimeLimitsDto> GetTimeLimits(Domain.Game.Id.Id gameId, CancellationToken ct)
     {
-        return await activeGamesProjection.GetTimeLimitsByIdAsync(gameId, ct);
+        var timeLimtis = await activeGamesProjection.GetTimeLimitsByIdAsync(gameId, ct);
+        if (timeLimtis is null)
+        {
+            throw new InvalidOperationException($"Game (id {gameId.Item}) does not have time limits");
+        }
+
+        return timeLimtis;
     }
 }

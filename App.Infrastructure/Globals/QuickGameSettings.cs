@@ -32,7 +32,7 @@ public class DefaultQuickGameSettingsProvider(
                 classicEngineOptions)
         };
         // TODO: Co z subsettingsami wewnątrz Game?
-        var preDraftSettings = new Domain.PreDraft.Settings.Settings(ListModule.OfSeq(preDraftCompetitionSettings));
+        var preDraftSettings = new Domain.PreDraft.Settings.Settings(2);
         var pickTimeoutFixedTime =
             Picks.PickTimeoutModule.FixedTimeModule.tryCreate(TimeSpan.FromSeconds(15)).ResultValue;
         var draftSettings = new Domain.Draft.Settings.Settings(Order.Snake, 4, true,

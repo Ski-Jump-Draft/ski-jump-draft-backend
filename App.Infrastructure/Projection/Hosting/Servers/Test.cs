@@ -20,7 +20,7 @@ public class Test : IServersProjection
     {
         if (serverId.Item == Server.ServerId)
         {
-            return Task.FromResult(Server);
+            return Task.FromResult(Server)!;
         }
 
         return Task.FromResult<ServerDto?>(null);
