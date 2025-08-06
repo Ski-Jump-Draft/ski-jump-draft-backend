@@ -9,6 +9,7 @@ module JumpResult =
 
         let tryCreate (v: double) =
             if v >= 0 then Ok(JudgePoints v) else Error(Error.BelowZero)
+        let value (JudgePoints v) =v 
 
     type GatePoints = GatePoints of double
 

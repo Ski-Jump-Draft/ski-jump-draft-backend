@@ -82,7 +82,13 @@ type CompetitionGroupEndedV1 =
 
 type JumpAddedV1 =
     { CompetitionId: CompetitionId
-      Jump: JumpDtoV1 }
+      JumpResultId: JumpResult.Id
+      TeamId: Team.Id option
+      Jump: JumpDtoV1
+      JudgePoints: float option
+      GatePoints: float option
+      WindPoints: float option
+      TotalPoints: float }
 
 type StartingGateSetV1 =
     { CompetitionId: CompetitionId

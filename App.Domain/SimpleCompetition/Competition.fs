@@ -215,7 +215,22 @@ type Competition =
                     | Some jumpResult ->
                         CompetitionEventPayload.JumpAddedV1
                             { CompetitionId = this.Id
-                              Jump = this.toJumpDto jumpResult }
+                              JumpResultId = jumpResult.Id
+                              TeamId = jumpResult.TeamId
+                              Jump = this.toJumpDto jumpResult
+                              JudgePoints =
+                                match jumpResult.JudgePoints with
+                                | Some x -> Some(JudgePoints.value x)
+                                | None -> None
+                              GatePoints =
+                                match jumpResult.GatePoints with
+                                | Some x -> Some(GatePointsModule.value x)
+                                | None -> None
+                              WindPoints =
+                                match jumpResult.WindPoints with
+                                | Some x -> Some(WindPointsModule.value x)
+                                | None -> None
+                              TotalPoints = TotalPointsModule.value jumpResult.TotalPoints }
                         |> List.singleton
                     | None -> [])
         | _ -> Error(Competition.Error.InvalidStatus(this.StatusTag, [ RoundInProgressTag; NotStartedTag ]))
@@ -428,7 +443,9 @@ type Competition =
                         Status = finalStatus
                         Version = increment this.Version }
 
-                let competitionFinal = competitionBeforeClear.clearCoachChange competitionBeforeClear
+                let competitionFinal =
+                    competitionBeforeClear.clearCoachChange competitionBeforeClear
+
                 Ok(competitionFinal, allEvents))
 
         match this.Status with
@@ -978,7 +995,7 @@ type Competition =
           CoachChange = None }
         : GateState
 
-    member private this.withGateState(newGate: GateState) =
+    member internal this.withGateState(newGate: GateState) =
         let newStatus =
             match this.Status with
             | NotStarted _ -> NotStarted newGate
@@ -990,14 +1007,14 @@ type Competition =
             Status = newStatus
             Version = increment this.Version }
 
-    member private this.currentGateState() =
+    member internal this.currentGateState() =
         match this.Status with
         | NotStarted gs
         | RoundInProgress(gs, _, _)
         | Suspended(gs, _, _) -> gs
         | _ -> invalidOp "Gate state unavailable in this status."
 
-    member private this.clearCoachChange competition : Competition =
+    member internal this.clearCoachChange competition : Competition =
         let newStatus =
             match competition.Status with
             | NotStarted gateState -> NotStarted { gateState with CoachChange = None }

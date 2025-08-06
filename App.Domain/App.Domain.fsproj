@@ -84,6 +84,7 @@
         <Compile Include="SimpleCompetition\Services.fs" />
         <Compile Include="SimpleCompetition\Event.fs" />
         <Compile Include="SimpleCompetition\Competition.fs" />
+        <Compile Include="SimpleCompetition\Evolve.fs" />
         <Compile Include="PreDraft\Id.fs"/>
         <Compile Include="PreDraft\Competition.fs"/>
         <Compile Include="PreDraft\Settings.fs"/>
