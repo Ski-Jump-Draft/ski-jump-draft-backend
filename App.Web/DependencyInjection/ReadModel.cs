@@ -1,12 +1,11 @@
-using App.Application.Commanding;
-using App.Application.ReadModel.CrudQuery;
+using App.Application.Abstractions;
 using App.Application.ReadModel.Projection;
 
 namespace App.Web.DependencyInjection;
 
 public static class ProjectionDependencyInjection
 {
-    public static IServiceCollection AddReadModel(this IServiceCollection services)
+    public static IServiceCollection AddReadModel(this IServiceCollection services, IConfiguration config)
     {
         services.AddSingleton<IServersProjection, Infrastructure.Projection.Hosting.Servers.Test>();
 
@@ -23,6 +22,12 @@ public static class ProjectionDependencyInjection
                 Infrastructure.Projection.Matchmaking.ActiveMatchmakings.InMemory>();
 
         services
+            .AddSingleton<IGameParticipantsProjection, Infrastructure.Projection.Game.Participants.InMemory>();
+        services
+            .AddSingleton<IEventHandler<Domain.Game.Event.GameEventPayload>,
+                Infrastructure.Projection.Game.Participants.InMemory>();
+
+        services
             .AddSingleton<IMatchmakingParticipantsProjection,
                 Infrastructure.Projection.Matchmaking.MatchmakingParticipants.InMemory>();
         services
@@ -36,6 +41,9 @@ public static class ProjectionDependencyInjection
 
         // --- Queries --- //
         services.AddSingleton<IGameWorldHillQuery, Infrastructure.Query.GameWorld.Hill.Predefined>();
+
+        services.AddSingleton<IGameWorldJumperQuery, Infrastructure.Query.GameWorld.Jumper.CsvStorage>(sp =>
+            new Infrastructure.Query.GameWorld.Jumper.CsvStorage(config["GameWorldJumpersCsv"]!));
 
         services.AddSingleton<IGameWorldCountryQuery, Infrastructure.Query.GameWorld.Country.Predefined>();
 

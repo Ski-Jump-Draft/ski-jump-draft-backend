@@ -1,4 +1,4 @@
-using App.Application.ReadModel.CrudQuery;
+using App.Application.ReadModel.Projection;
 using App.Util;
 
 namespace App.Infrastructure.Query.GameWorld.Hill;

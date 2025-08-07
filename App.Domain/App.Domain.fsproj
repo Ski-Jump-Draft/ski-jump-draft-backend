@@ -91,6 +91,7 @@
         <Compile Include="PreDraft\Phase.fs"/>
         <Compile Include="PreDraft\Event.fs"/>
         <Compile Include="PreDraft\PreDraft.fs"/>
+        <Compile Include="PreDraft\Evolve.fs" />
         <Compile Include="Game\Id.fs"/>
         <Compile Include="Game\Participant.fs"/>
         <Compile Include="Game\Hill.fs"/>

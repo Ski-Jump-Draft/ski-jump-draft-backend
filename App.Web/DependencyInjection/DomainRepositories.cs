@@ -1,4 +1,4 @@
-using App.Application.Commanding;
+using App.Application.Abstractions;
 using App.Domain.Repositories;
 using App.Infrastructure.DomainRepository.Crud;
 
@@ -11,13 +11,6 @@ public static class DomainRepositoriesDependencyInjection
         IConfiguration config)
     {
         // CRUD
-        services
-            .AddSingleton<ICompetitionEngineSnapshotRepository,
-                Infrastructure.DomainRepository.Crud.CompetitionEngineSnapshot.InMemory>();
-        // services
-        //     .AddSingleton<ICompetitionEnginePluginRepository,
-        //         Infrastructure.ApplicationRepository.CompetitionEnginePlugin.InMemory>();
-
         services.AddSingleton(
             new InMemoryCrudDomainRepositoryStarter<Domain.GameWorld.HillTypes.Id, Domain.GameWorld.Hill>(
                 StarterItems:
@@ -25,23 +18,24 @@ public static class DomainRepositoriesDependencyInjection
                 MapToId: hill => hill.Id_
             ));
 
-        services.AddSingleton<IGameWorldHillRepository, Infrastructure.DomainRepository.Crud.GameWorldHill.InMemory>();
         services
-            .AddSingleton<InMemoryCrudDomainEventsRepositoryStarter<Domain.GameWorld.HillTypes.Id,
-                Domain.GameWorld.Hill>>(sp =>
-            {
-                var hills = sp.GetRequiredService<IReadOnlyCollection<Domain.GameWorld.Hill>>();
-                return new InMemoryCrudDomainEventsRepositoryStarter<Domain.GameWorld.HillTypes.Id,
-                    Domain.GameWorld.Hill>(hills, hill => hill.Id_);
-            });
-        services.AddSingleton<IPreDraftHillRepository, Infrastructure.DomainRepository.Crud.PreDraftHill.InMemory>();
+            .AddSingleton<IGameWorldHillRepository, Infrastructure.DomainRepository.Crud.GameWorldHill.Predefined>();
+        services
+            .AddSingleton<IGameWorldJumperRepository,
+                Infrastructure.DomainRepository.Crud.GameWorldJumper.CsvStorage>(sp =>
+                new Infrastructure.DomainRepository.Crud.GameWorldJumper.CsvStorage(
+                    config["GameWorldJumpersCsv"]!));
 
         // Event-Sourced
         services
             .AddSingleton<IMatchmakingRepository, Infrastructure.DomainRepository.EventSourced.MatchmakingRepository>();
         services
             .AddSingleton<IGameRepository, Infrastructure.DomainRepository.EventSourced.GameRepository>();
+        services.AddSingleton<IPreDraftRepository, Infrastructure.DomainRepository.EventSourced.PreDraftRepository>();
         services.AddSingleton<IDraftRepository, Infrastructure.DomainRepository.EventSourced.DraftRepository>();
+        services
+            .AddSingleton<ICompetitionRepository,
+                Infrastructure.DomainRepository.EventSourced.SimpleCompetitionRepository>();
 
         return services;
     }

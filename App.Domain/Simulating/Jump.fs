@@ -49,7 +49,6 @@ type Landing =
     | Telemark
 
 type Jump =
-    { Gate: Gate
-      WindAverage: WindAverage
+    { WindAverage: WindAverage
       Distance: Distance
       Landing: Landing }

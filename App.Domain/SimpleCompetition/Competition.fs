@@ -583,7 +583,18 @@ type Competition =
                           RoundIndex = roundIdx }
 
                 if this.isLastRound roundIdx then
-                    let ended = CompetitionEventPayload.CompetitionEndedV1 { CompetitionId = this.Id }
+                    let finalIndividualResults =
+                        this.Results.FinalClassification()
+                        |> List.map (fun (id, points, rank) ->
+                            { CompetitorId = id
+                              TotalPoints = TotalPointsModule.value points
+                              Rank = rank })
+
+                    let ended =
+                        CompetitionEventPayload.CompetitionEndedV1
+                            { CompetitionId = this.Id
+                              FinalIndividualResults = finalIndividualResults }
+
                     [ roundEnded; ended ], Status.Ended, startlistAfterGroup
                 else
                     let nextRound = let (RoundIndex i) = roundIdx in RoundIndex(i + 1u)

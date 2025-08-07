@@ -121,7 +121,14 @@ type CompetitionSuspendedV1 =
 
 type CompetitionContinuedV1 = { CompetitionId: CompetitionId }
 
-type CompetitionEndedV1 = { CompetitionId: CompetitionId }
+type CompetitorResultDtoV1 =
+    { CompetitorId: Competitor.Id
+      TotalPoints: double
+      Rank: int }
+
+type CompetitionEndedV1 =
+    { CompetitionId: CompetitionId
+      FinalIndividualResults: CompetitorResultDtoV1 list }
 
 type CompetitionEventPayload =
     | IndividualCompetitionCreatedV1 of IndividualCompetitionCreatedV1

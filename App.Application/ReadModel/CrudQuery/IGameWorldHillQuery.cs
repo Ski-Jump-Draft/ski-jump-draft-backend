@@ -1,6 +1,6 @@
 using App.Util;
 
-namespace App.Application.ReadModel.CrudQuery;
+namespace App.Application.ReadModel.Projection;
 
 public interface IGameWorldHillQuery
 {

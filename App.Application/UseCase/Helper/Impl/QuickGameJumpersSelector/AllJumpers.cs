@@ -3,11 +3,11 @@ using App.Domain.GameWorld;
 
 namespace App.Application.UseCase.Helper.Impl.QuickGameJumpersSelector;
 
-public class AllJumpers(IGameWorldJumperProjection gameWorldJumperProjection) : IQuickGameJumpersSelector
+public class AllJumpers(IGameWorldJumperQuery gameWorldJumperQuery) : IQuickGameJumpersSelector
 {
     public async Task<IEnumerable<JumperTypes.Id>> Select()
     {
-        var gameWorldJumpers = await gameWorldJumperProjection.GetAllAsync();
+        var gameWorldJumpers = await gameWorldJumperQuery.GetAllAsync();
         return gameWorldJumpers.Select(jumper => JumperTypes.Id.NewId(jumper.Id));
     }
 }

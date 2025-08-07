@@ -1,3 +1,4 @@
+using App.Application.Abstractions;
 using App.Application.Commanding;
 using App.Application.ReadModel.Projection;
 using App.Domain.Shared;

@@ -2,7 +2,7 @@ using App.Domain.GameWorld;
 
 namespace App.Infrastructure.Query.GameWorld.Country;
 
-using Application.ReadModel.CrudQuery;
+using Application.ReadModel.Projection;
 
 public class Predefined(
     IReadOnlyCollection<Domain.GameWorld.Country> gameWorldCountries

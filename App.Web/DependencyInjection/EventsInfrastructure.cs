@@ -1,4 +1,4 @@
-using App.Application.Commanding;
+using App.Application.Abstractions;
 
 namespace App.Web.DependencyInjection;
 
@@ -8,6 +8,11 @@ public static class EventsInfrastructureDependencyInjection
         this IServiceCollection services)
     {
         services.AddSingleton<IEventBus, Infrastructure.EventBus.InMemory>();
+
+        services
+            .AddSingleton<IEventStore<Domain.PreDraft.Id.Id, Domain.PreDraft.Event.PreDraftEventPayload>, Infrastructure
+                .EventStore.
+                InMemoryEventStore<Domain.PreDraft.Id.Id, Domain.PreDraft.Event.PreDraftEventPayload>>();
 
         services
             .AddSingleton<IEventStore<Domain.Game.Id.Id, Domain.Game.Event.GameEventPayload>, Infrastructure.EventStore.
@@ -20,6 +25,14 @@ public static class EventsInfrastructureDependencyInjection
             .AddSingleton<IEventStore<Domain.Matchmaking.Id, Domain.Matchmaking.Event.MatchmakingEventPayload>,
                 Infrastructure.EventStore.
                 InMemoryEventStore<Domain.Matchmaking.Id, Domain.Matchmaking.Event.MatchmakingEventPayload>>();
+
+        services
+            .AddSingleton<
+                IEventStore<Domain.SimpleCompetition.CompetitionId,
+                    Domain.SimpleCompetition.Event.CompetitionEventPayload>, Infrastructure
+                .EventStore.
+                InMemoryEventStore<Domain.SimpleCompetition.CompetitionId,
+                    Domain.SimpleCompetition.Event.CompetitionEventPayload>>();
 
         return services;
     }

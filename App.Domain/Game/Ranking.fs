@@ -1,5 +1,6 @@
 module App.Domain.Game.Ranking
 
+open System.Threading.Tasks
 open App.Domain
 
 module GameRanking =
@@ -12,5 +13,5 @@ module GameRanking =
 
 type GameRanking = Ranking of Map<Participant.Id, GameRanking.Points>
 
-type IGameRankingCreator =
-    abstract member Create: gameId: Game.Id.Id -> GameRanking
+type IGameRankingFactory =
+    abstract member Create: gameId: Game.Id.Id -> Task<GameRanking>

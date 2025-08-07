@@ -1,6 +1,5 @@
 namespace App.Domain.GameWorld
 
-
 type Jumper =
     { Id: JumperTypes.Id
       Name: JumperTypes.Name

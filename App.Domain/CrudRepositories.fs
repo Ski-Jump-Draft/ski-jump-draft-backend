@@ -5,11 +5,11 @@ open System.Threading.Tasks
 open App
 
 type IDomainCrudRepository<'TId, 'T> =
-    abstract member GetByIdAsync: id: 'TId -> System.Threading.Tasks.Task<'T option>
-    abstract member SaveAsync: id: 'TId * value: 'T -> System.Threading.Tasks.Task
+    abstract member GetByIdAsync: id: 'TId * ct: CancellationToken -> System.Threading.Tasks.Task<'T option>
+    abstract member SaveAsync: id: 'TId * value: 'T * ct: CancellationToken -> System.Threading.Tasks.Task
 
 type IDomainCrudEventsRepository<'T, 'TId, 'TPayload> =
-    abstract member GetByIdAsync: id: 'TId -> System.Threading.Tasks.Task<'T option>
+    abstract member GetByIdAsync: id: 'TId * ct: CancellationToken -> System.Threading.Tasks.Task<'T option>
 
     abstract SaveAsync:
         id: 'TId *

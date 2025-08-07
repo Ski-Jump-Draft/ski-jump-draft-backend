@@ -1,4 +1,4 @@
-using App.Application.Commanding;
+using App.Application.Abstractions;
 using App.Domain.GameWorld;
 using App.Domain.Repositories;
 using App.Domain.Shared;
@@ -9,8 +9,8 @@ namespace App.Infrastructure.DomainRepository.Crud.GameWorldHill;
 public sealed class InMemory(
     IEventBus eventBus,
     IGuid guid,
-    Func<Event.HillEventPayload, int> schemaVersion,
     IClock clock,
-    InMemoryCrudDomainEventsRepositoryStarter<HillTypes.Id, Hill>? starter
-) : InMemoryCrudDomainEventsRepository<Hill, HillTypes.Id, Event.HillEventPayload>(eventBus, guid, schemaVersion, clock,
-    starter), IGameWorldHillRepository;
+    IEnumerable<Hill>? starter,
+    Func<Hill, HillTypes.Id>? mapToId) : InMemoryCrudDomainEventsRepository<Hill, HillTypes.Id, Event.HillEventPayload>(eventBus, guid,
+    payload => Event.Versioning.schemaVersion(payload), clock,
+    starter, mapToId), IGameWorldHillRepository;

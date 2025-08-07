@@ -1,6 +1,6 @@
 using App.Application.ReadModel.Projection;
 using System.Text.Json;
-using App.Application.Commanding;
+using App.Application.Abstractions;
 using App.Domain.Game;
 using App.Domain.Shared;
 using StackExchange.Redis;

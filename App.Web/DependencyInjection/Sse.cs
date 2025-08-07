@@ -1,4 +1,4 @@
-using App.Application.Commanding;
+using App.Application.Abstractions;
 using App.Web.Sse;
 using App.Web.Sse.Notifier;
 

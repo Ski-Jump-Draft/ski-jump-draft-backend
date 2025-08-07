@@ -1,6 +1,6 @@
 namespace App.Infrastructure.DomainRepository.EventSourced;
 
-using Application.Commanding;
+using Application.Abstractions;
 using App.Domain.Repositories;
 using App.Domain.Shared;
 using App.Domain.Time;

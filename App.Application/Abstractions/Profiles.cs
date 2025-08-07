@@ -1,6 +1,6 @@
 using App.Domain.Profile;
 
-namespace App.Application.Commanding;
+namespace App.Application.Abstractions;
 
 public interface IUserTranslator<TOutput>
 {

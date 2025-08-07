@@ -20,27 +20,15 @@ public class QuickGameController(ICommandBus commandBus, IGuid guid) : Controlle
     [HttpPost("joinMatchmaking")]
     public async Task<IActionResult> Join([FromBody] JoinMatchmakingDto matchmakingDto, CancellationToken ct)
     {
-        var findOrCreateCommand =
-            new Application.UseCase.Game.QuickGame.FindOrCreateMatchmaking.Command(matchmakingDto.Nick);
-        var findOrCreateEnvelope =
-            new CommandEnvelope<Application.UseCase.Game.QuickGame.FindOrCreateMatchmaking.Command,
-                Domain.Matchmaking.Id>(findOrCreateCommand,
+        var joinQuickMatchmakingCommand =
+            new Application.UseCase.Handlers.JoinQuickMatchmaking.Command(matchmakingDto.Nick);
+        var joinQuickMatchmakingEnvelope =
+            new CommandEnvelope<Application.UseCase.Handlers.JoinQuickMatchmaking.Command,
+                Application.UseCase.Handlers.JoinQuickMatchmaking.Result>(joinQuickMatchmakingCommand,
                 MessageContext.New(guid.NewGuid()));
-        var matchmakingId =
-            await commandBus
-                .SendAsync(
-                    findOrCreateEnvelope, ct);
-
-        var joinCommand =
-            new Application.UseCase.Game.QuickGame.JoinMatchmaking.Command(matchmakingId,
-                matchmakingDto.Nick);
-        var joinEnvelope =
-            new CommandEnvelope<Application.UseCase.Game.QuickGame.JoinMatchmaking.Command,
-                Domain.Matchmaking.ParticipantModule.Id>(joinCommand, MessageContext.New(guid.NewGuid()));
-        var matchmakingParticipantId =
-            await commandBus
-                .SendAsync(
-                    joinEnvelope, ct);
+        var (matchmakingId, matchmakingParticipantId) = await commandBus
+            .SendAsync(
+                joinQuickMatchmakingEnvelope, ct);
 
         return Ok(new { matchmakingId = matchmakingId, participantId = matchmakingParticipantId });
     }
@@ -51,9 +39,9 @@ public class QuickGameController(ICommandBus commandBus, IGuid guid) : Controlle
         var matchmakingId = Id.NewId(dto.MatchmakingId);
         var matchmakingParticipantId = ParticipantModule.Id.NewId(dto.MatchmakingParticipantId);
         var leaveMatchmakingCommand =
-            new Application.UseCase.Game.Matchmaking.Leave.Command(matchmakingId, matchmakingParticipantId);
+            new Application.UseCase.Handlers.LeaveMatchmaking.Command(matchmakingId, matchmakingParticipantId);
         var leaveMatchmakingEnvelope = new
-            CommandEnvelope<Application.UseCase.Game.Matchmaking.Leave.Command>(leaveMatchmakingCommand,
+            CommandEnvelope<Application.UseCase.Handlers.LeaveMatchmaking.Command>(leaveMatchmakingCommand,
                 MessageContext.New(guid.NewGuid()));
         try
         {

@@ -14,7 +14,7 @@ public class Handler(IClock clock, IGameWorldHillRepository gameWorldHills) : IC
     public async Task HandleAsync(Command command, MessageContext messageContext, CancellationToken ct)
     {
         var potentialRecord = command.PotentialRecord;
-        var hill = await gameWorldHills.GetByIdAsync(command.HillId)
+        var hill = await gameWorldHills.GetByIdAsync(command.HillId, ct)
             .AwaitOrWrap(_ => new IdNotFoundException<Guid>(command.HillId.Item));
 
         var day = Domain.GameWorld.HillTypes.RecordModule.Day.NewDay(clock.UtcNow);

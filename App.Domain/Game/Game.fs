@@ -93,7 +93,7 @@ type Game =
             let event: Event.GameCreatedV1 =
                 { GameId = id
                   Settings = settings
-                  Participants = participants }
+                  Participants = Participants.value participants }
 
 
             Ok(state, [ GameEventPayload.GameCreatedV1 event ])
@@ -107,7 +107,7 @@ type Game =
             | Draft _
             | Competition _
             | PreDraft _ ->
-                let updatedParticipants = Participants.remove participant this.Participants
+                let updatedParticipants = Participants.removeById participant.Id this.Participants
 
                 let updatedGame =
                     { this with
@@ -116,7 +116,7 @@ type Game =
 
                 let event: ParticipantLeftV1 =
                     { GameId = updatedGame.Id
-                      Participant = participant }
+                      ParticipantId = participant.Id }
 
                 Ok(updatedGame, [ GameEventPayload.ParticipantLeftV1 event ])
             | _ ->

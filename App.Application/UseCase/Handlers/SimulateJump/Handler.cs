@@ -29,7 +29,7 @@ public class Handler(
             throw new InvalidOperationException($"Game (id {command.GameId.Item}) does not have active Competitions");
         }
 
-        var gameCompetitionId = Domain.SimpleCompetition.CompetitionId.NewCompetitionId(gameCompetitionDto.GameId);
+        var gameCompetitionId = gameCompetitionDto.CompetitionId;
         var gameCompetition = await competitions.LoadAsync(gameCompetitionId, ct)
             .AwaitOrWrap(_ => new IdNotFoundException<Guid>(gameCompetitionId.Item));
 

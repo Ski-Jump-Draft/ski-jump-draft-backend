@@ -15,8 +15,10 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services
     .AddPredefinedCollections()
     .AddCrudRepositories(builder.Configuration)
-    .AddReadModel()
+    .AddReadModel(builder.Configuration)
     .AddReadRepositories(builder.Configuration)
+    .AddGameRanking()
+    .AddSimulation()
     .AddEventsInfrastructure()
     .AddCommandsInfrastructure()
     .AddUtilities()

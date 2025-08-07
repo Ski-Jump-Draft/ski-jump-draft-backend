@@ -17,7 +17,7 @@ public class Default(
     {
         if (preDraftHillMapping.TryMap(gameHill.Id_, out var preDraftHillId))
         {
-            return await preDraftHills.GetByIdAsync(preDraftHillId)
+            return await preDraftHills.GetByIdAsync(preDraftHillId, ct)
                 .AwaitOrWrap(_ => new IdNotFoundException<Guid>(gameHill.Id_.Item));
         }
 

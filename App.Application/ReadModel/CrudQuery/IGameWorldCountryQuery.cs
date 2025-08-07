@@ -1,4 +1,4 @@
-namespace App.Application.ReadModel.CrudQuery;
+namespace App.Application.ReadModel.Projection;
 
 public interface IGameWorldCountryQuery
 {

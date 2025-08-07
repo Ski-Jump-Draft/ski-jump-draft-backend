@@ -18,7 +18,7 @@ public class Handler(
     IGuid guid,
     Random.IRandom random,
     IQuickGameJumpersSelector jumpersSelector,
-    IGameWorldJumperProjection gameWorldJumperProjection,
+    IGameWorldJumperQuery gameWorldJumperQuery,
     IGameRepository games,
     IDraftRepository drafts,
     IGameParticipantsProjection gameParticipantsProjection,
@@ -37,7 +37,7 @@ public class Handler(
         var draftParticipants = draftParticipantsFactory.CreateFromDtos(gameParticipants);
 
         var gameWorldJumperIds = await jumpersSelector.Select();
-        var gameWorldJumpers = await gameWorldJumperProjection.GetByIds(gameWorldJumperIds);
+        var gameWorldJumpers = await gameWorldJumperQuery.GetByIds(gameWorldJumperIds);
         var draftSubjects = draftSubjectsFactory.CreateIndividuals(gameWorldJumpers);
 
         var draftSettings = await draftSettingsProvider.Provide();

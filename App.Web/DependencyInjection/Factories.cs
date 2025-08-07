@@ -15,6 +15,8 @@ public static class FactoriesDependencyInjection
         services
             .AddSingleton<IPreDraftCompetitionHillFactory, Application.Factory.Impl.PreDraftHill.Default>();
         services.AddSingleton<ICompetitionHillFactory, Application.Factory.Impl.CompetitionHill.Default>();
+        services
+            .AddSingleton<IPreDraftHillMapping, Application.Factory.Helper.HillMapping.InMemoryPreDraftHillMapping>();
 
         services
             .AddSingleton<IMatchmakingParticipantFactory,

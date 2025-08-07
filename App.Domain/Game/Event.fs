@@ -8,7 +8,7 @@ open App.Domain.Game.Ranking
 type GameCreatedV1 =
     { GameId: Game.Id.Id
       Settings: Settings.Settings
-      Participants: Participants }
+      Participants: Participant list }
 //
 // [<CLIMutable>]
 // type ParticipantJoinedV1 =
@@ -19,7 +19,7 @@ type GameCreatedV1 =
 type ParticipantLeftV1 =
     { GameId: Game.Id.Id
       // ParticipantId: Participant.Id }
-      Participant: Participant.Participant }
+      ParticipantId: Participant.Id }
 
 [<CLIMutable>]
 type PreDraftPhaseStartedV1 =
@@ -60,7 +60,6 @@ type GameEndedV1 =
 
 type GameEventPayload =
     | GameCreatedV1 of GameCreatedV1
-    //| ParticipantJoinedV1 of ParticipantJoinedV1
     | ParticipantLeftV1 of ParticipantLeftV1
     | PreDraftPhaseStartedV1 of PreDraftPhaseStartedV1
     | PreDraftPhaseEndedV1 of PreDraftPhaseEndedV1

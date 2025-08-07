@@ -31,7 +31,7 @@ let evolve (state: Game) (event: DomainEvent<GameEventPayload>) =
     //         Version = version }
 
     | GameEventPayload.ParticipantLeftV1 e ->
-        let participants = Participants.remove e.Participant state.Participants
+        let participants = Participants.removeById e.ParticipantId state.Participants
 
         { state with
             Participants = participants

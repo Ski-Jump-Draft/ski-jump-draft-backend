@@ -100,7 +100,7 @@ let ``Individual flow – 2 rundy, Soft limit + reset`` () =
     let jump = makeJump (firstJumper.Id_)
 
     let competition, events =
-        comp.AddJump(JumpResult.Id(newId ()), firstJumper.Id_, jump)
+        comp.<AddJump(JumpResult.Id(newId ()), firstJumper.Id_, jump)
         |> Result.toOption
         |> Option.get
 

@@ -8,14 +8,14 @@ namespace App.Application.UseCase.Handlers.EndGame;
 
 public record Command(Id.Id GameId) : ICommand;
 
-public class Handler(IGameRepository games, Ranking.IGameRankingCreator gameRankingCreator) : ICommandHandler<Command>
+public class Handler(IGameRepository games, Ranking.IGameRankingFactory gameRankingFactory) : ICommandHandler<Command>
 {
     public async Task HandleAsync(Command command, MessageContext messageContext, CancellationToken ct)
     {
         var game = await games.LoadAsync(command.GameId, ct)
             .AwaitOrWrap(_ => new IdNotFoundException<Guid>(command.GameId.Item));
 
-        var gameRanking = gameRankingCreator.Create(game.Id_);
+        var gameRanking = await gameRankingFactory.Create(game.Id_);
         var newGameResult = game.EndGame(gameRanking);
 
         if (newGameResult.IsOk)

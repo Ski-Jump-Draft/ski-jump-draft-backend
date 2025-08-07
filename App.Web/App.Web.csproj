@@ -22,6 +22,7 @@
     <ProjectReference Include="..\App.Domain\App.Domain.fsproj" />
     <ProjectReference Include="..\App.Infrastructure\App.Infrastructure.csproj" />
     <ProjectReference Include="..\App.Plugin\App.Plugin.csproj" />
+    <ProjectReference Include="..\App.Simulator\App.Simulator.csproj" />
   </ItemGroup>
 
 </Project>

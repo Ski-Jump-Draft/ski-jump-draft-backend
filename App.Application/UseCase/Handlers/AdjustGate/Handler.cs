@@ -19,8 +19,7 @@ public class Handler(
     {
         var gameCompetitionDto = await gameCompetitionProjection.GetActiveCompetitionByGameIdAsync(command.GameId)
             .AwaitOrWrapNullable(_ => new IdNotFoundException<Guid>(command.GameId.Item));
-        var gameCompetitionId =
-            Domain.SimpleCompetition.CompetitionId.NewCompetitionId(gameCompetitionDto.CompetitionId);
+        var gameCompetitionId = gameCompetitionDto.CompetitionId;
         var gateChange = competitionGateAdjuster.AdjustGate(gameCompetitionId);
 
         var gameCompetition = await competitions.LoadAsync(gameCompetitionId, ct)
