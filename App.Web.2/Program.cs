@@ -4,10 +4,26 @@ using App.Application._2.Matchmaking;
 using App.Application._2.Messaging.Notifiers;
 using App.Application._2.Utility;
 using App.Domain._2.Matchmaking;
+using App.Infrastructure._2.Utility.Logger;
+using App.Web._2.MockedFlow;
 using App.Web._2.Notifiers.SseHub;
 using Microsoft.AspNetCore.Mvc;
+using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend",
+        policy =>
+        {
+            policy.WithOrigins("http://localhost:3000")
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials(); // jeśli będziesz używał cookies/sse
+        });
+});
+
 
 builder.Services.AddSingleton<IGuid, App.Infrastructure._2.Utility.Guid.System>();
 builder.Services.AddSingleton<IClock, App.Infrastructure._2.Utility.Clock.System>();
@@ -38,15 +54,19 @@ builder.Services
 
 builder.Services.AddSingleton<App.Domain._2.Matchmaking.Settings>(sp =>
     Settings.Create(SettingsModule.MinPlayersModule.create(3).Value,
-        SettingsModule.MaxPlayersModule.create(3).Value).ResultValue);
+        SettingsModule.MaxPlayersModule.create(5).Value).ResultValue);
+
+builder.Services.AddSingleton<App.Application._2.Utility.ILogger, App.Infrastructure._2.Utility.Logger.Dotnet>();
 
 builder.Services.AddSingleton<App.Web._2.Notifiers.SseHub.ISseHub, App.Web._2.Notifiers.SseHub.Default>();
 builder.Services.AddSingleton<IMatchmakingNotifier, App.Web._2.Notifiers.Matchmaking.Sse>();
 builder.Services.AddSingleton<IMatchmakings, App.Infrastructure._2.Repository.Matchmaking.InMemory>();
 builder.Services.AddSingleton<IMatchmakingSchedule, App.Infrastructure._2.Matchmaking.Schedule.InMemory>();
 
-var app = builder.Build();
+builder.Services.AddHostedService<BotJoiner>();
 
+var app = builder.Build();
+app.UseCors("AllowFrontend");
 // app.UseHttpsRedirection();
 
 app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
@@ -58,13 +78,14 @@ app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
 
 app.MapPost("/matchmaking/join",
     async (string nick, [FromServices] ICommandBus commandBus, [FromServices] IMatchmakings repo,
+        [FromServices] App.Application._2.Utility.ILogger logger,
         CancellationToken ct) =>
     {
         var command = new App.Application._2.UseCase.Matchmaking.JoinQuickMatchmaking.Command(nick);
-        var (matchmakingId, playerId) = await commandBus
+        var (matchmakingId, correctedNick, playerId) = await commandBus
             .SendAsync<App.Application._2.UseCase.Matchmaking.JoinQuickMatchmaking.Command,
                 App.Application._2.UseCase.Matchmaking.JoinQuickMatchmaking.Result>(command, ct);
-        return Results.Ok(new { MatchmakingId = matchmakingId, PlayerId = playerId });
+        return Results.Ok(new { MatchmakingId = matchmakingId, CorrectedNick = correctedNick, PlayerId = playerId });
     });
 
 app.MapDelete("/matchmaking/leave",

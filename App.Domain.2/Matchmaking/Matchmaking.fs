@@ -37,6 +37,8 @@ type Matchmaking =
     member this.Status_: Status = this.Status
     member this.Players_: IReadOnlyCollection<Player> = this.Players
     member this.PlayersCount = this.Players.Count
+    member this.MinPlayersCount = this.Settings.MinPlayers
+    member this.MaxPlayersCount = this.Settings.MaxPlayers
 
     member this.MinRequiredPlayers =
         let currentPlayers = this.PlayersCount

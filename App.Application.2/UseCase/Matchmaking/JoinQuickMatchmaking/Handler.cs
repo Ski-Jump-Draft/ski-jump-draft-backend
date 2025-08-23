@@ -17,6 +17,7 @@ public record Result(Guid MatchmakingId, string Nick, Guid PlayerId);
 public class Handler(
     IGuid guid,
     IMatchmakings matchmakings,
+    ILogger logger,
     Domain._2.Matchmaking.Settings globalMatchmakingSettings,
     IScheduler scheduler,
     IJson json,
@@ -27,6 +28,7 @@ public class Handler(
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
     {
+        logger.Info($"{command.Nick} requested the join to a matchmaking ");
         var nickOption = PlayerModule.NickModule.create(command.Nick);
         if (nickOption.IsNone())
         {
@@ -36,7 +38,8 @@ public class Handler(
         var nick = nickOption.Value;
         var (matchmaking, justCreated) = await FindOrCreateMatchmakingAsync(ct);
         var player = new Domain._2.Matchmaking.Player(PlayerId.NewPlayerId(guid.NewGuid()), nick);
-        var (matchmakingAfterJoin, correctedNick) = matchmaking.Join(player).ResultValue;
+        var joinResult = matchmaking.Join(player);
+        var (matchmakingAfterJoin, correctedNick) = joinResult.ResultValue;
         await matchmakings.Add(matchmakingAfterJoin, ct);
 
         var matchmakingDuration = TimeSpan.FromMinutes(2);
@@ -49,7 +52,9 @@ public class Handler(
             matchmakingSchedule.StartMatchmaking(matchmaking.Id_.Item, matchmakingDuration);
         }
 
-        await matchmakingNotifier.MatchmakingUpdated(MatchmakingDtoMapper.FromDomain(matchmaking));
+        await matchmakingNotifier.MatchmakingUpdated(MatchmakingDtoMapper.FromDomain(matchmakingAfterJoin));
+
+        logger.Info($"{player.Nick} joined the matchmaking ({matchmaking.Id_.Item})");
 
         return new Result(matchmaking.Id_.Item, PlayerModule.NickModule.value(correctedNick), player.Id.Item);
     }

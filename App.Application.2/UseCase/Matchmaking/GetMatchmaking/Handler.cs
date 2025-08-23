@@ -16,6 +16,8 @@ public record Result(
     string? FailReason,
     int PlayersCount,
     int? MinRequiredPlayers,
+    int MinPlayers,
+    int MaxPlayers,
     TimeSpan? RemainingTime);
 
 public class Handler(
@@ -42,6 +44,7 @@ public class Handler(
 
         var minRequiredPlayers = OptionModule.ToNullable(matchmaking.MinRequiredPlayers);
         return new Result(FSharpUnionHelper.GetCaseName(matchmaking.Status_), failReason, matchmaking.Players_.Count,
-            minRequiredPlayers, remainingTime);
+            minRequiredPlayers, SettingsModule.MinPlayersModule.value(matchmaking.MinPlayersCount),
+            SettingsModule.MaxPlayersModule.value(matchmaking.MaxPlayersCount), remainingTime);
     }
 }
