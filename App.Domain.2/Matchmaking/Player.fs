@@ -5,10 +5,12 @@ module Player =
     type Nick = private Nick of string
     module Nick =
         let create (v: string) =
-            if v.Length > 30 then
+            if v.Length < 25 then
                 Some(Nick(v))
             else
                 None
+                
+        let value (Nick v) : string = v
 
 type Player =
     {

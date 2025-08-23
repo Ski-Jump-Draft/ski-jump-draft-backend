@@ -1,0 +1,29 @@
+using App.Application._2.Commanding;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace App.Infrastructure._2.Commanding.CommandBus;
+
+public class InMemory : ICommandBus
+{
+    private readonly IServiceProvider _sp;
+
+    public InMemory(IServiceProvider sp) => _sp = sp;
+
+    public Task SendAsync<TCommand>(
+        TCommand command,
+        CancellationToken ct,
+        TimeSpan? delay = null) where TCommand : ICommand
+    {
+        var handler = _sp.GetRequiredService<ICommandHandler<TCommand>>();
+        return handler.HandleAsync(command, ct);
+    }
+
+    public Task<TResponse> SendAsync<TCommand, TResponse>(
+        TCommand command,
+        CancellationToken ct,
+        TimeSpan? delay = null) where TCommand : ICommand<TResponse>
+    {
+        var handler = _sp.GetRequiredService<ICommandHandler<TCommand, TResponse>>();
+        return handler.HandleAsync(command, ct);
+    }
+}

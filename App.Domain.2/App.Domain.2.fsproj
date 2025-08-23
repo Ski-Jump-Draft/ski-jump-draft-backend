@@ -10,7 +10,7 @@
         <Compile Include="Matchmaking\Player.fs" />
         <Compile Include="Matchmaking\Settings.fs" />
         <Compile Include="Matchmaking\Matchmaking.fs" />
-        <Compile Include="Matchmaking\IMatchmakingRepository.fs" />
+        <Compile Include="Matchmaking\IMatchmakings.fs" />
     </ItemGroup>
 
 </Project>
