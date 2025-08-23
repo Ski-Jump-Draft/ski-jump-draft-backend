@@ -47,7 +47,7 @@ type Matchmaking =
         else
             None
 
-    member this.Join(player: Player) =
+    member this.Join(player: Player) : Result<Matchmaking * Player.Nick, MatchmakingError> =
         match this.Status with
         | Running ->
             if this.Players |> Set.exists (fun p -> p.Id = player.Id) then
@@ -55,10 +55,36 @@ type Matchmaking =
             elif this.Players.Count >= Settings.MaxPlayers.value this.Settings.MaxPlayers then
                 Error TooManyPlayers
             else
-                Ok
+                let existingNicks =
+                    this.Players |> Seq.map (fun p -> Player.Nick.value p.Nick) |> Set.ofSeq
+
+                let baseNick = Player.Nick.value player.Nick
+
+                let finalNick =
+                    if existingNicks.Contains(baseNick) then
+                        let rec find i =
+                            let candidate = $"{baseNick} ({i})"
+
+                            if existingNicks.Contains(candidate) then
+                                find (i + 1)
+                            else
+                                candidate
+
+                        find 2
+                    else
+                        baseNick
+
+                let nick' =
+                    Player.Nick.createWithSuffix finalNick
+                    |> Option.defaultWith (fun () -> failwith "Nick validation error")
+
+                Ok(
                     { this with
-                        Players = this.Players.Add player }
+                        Players = this.Players.Add { player with Nick = nick' } },
+                    nick'
+                )
         | _ -> Error(InvalidStatus this.Status)
+
 
     member this.Leave playerId =
         match this.Status with

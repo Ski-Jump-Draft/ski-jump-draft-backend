@@ -12,7 +12,7 @@ public record Command(
     string Nick
 ) : ICommand<Result>;
 
-public record Result(Guid MatchmakingId, Guid PlayerId);
+public record Result(Guid MatchmakingId, string Nick, Guid PlayerId);
 
 public class Handler(
     IGuid guid,
@@ -36,7 +36,7 @@ public class Handler(
         var nick = nickOption.Value;
         var (matchmaking, justCreated) = await FindOrCreateMatchmakingAsync(ct);
         var player = new Domain._2.Matchmaking.Player(PlayerId.NewPlayerId(guid.NewGuid()), nick);
-        var matchmakingAfterJoin = matchmaking.Join(player).ResultValue;
+        var (matchmakingAfterJoin, correctedNick) = matchmaking.Join(player).ResultValue;
         await matchmakings.Add(matchmakingAfterJoin, ct);
 
         var matchmakingDuration = TimeSpan.FromMinutes(2);
@@ -51,7 +51,7 @@ public class Handler(
 
         await matchmakingNotifier.MatchmakingUpdated(MatchmakingDtoMapper.FromDomain(matchmaking));
 
-        return new Result(matchmaking.Id_.Item, player.Id.Item);
+        return new Result(matchmaking.Id_.Item, PlayerModule.NickModule.value(correctedNick), player.Id.Item);
     }
 
     private async Task<MatchmakingDto> FindOrCreateMatchmakingAsync(CancellationToken ct)
