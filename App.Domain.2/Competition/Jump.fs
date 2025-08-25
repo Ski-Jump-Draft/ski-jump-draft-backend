@@ -1,4 +1,4 @@
-namespace App.Domain.SimpleCompetition
+namespace App.Domain._2.Competition
 
 module Jump =
     type Id = Id of System.Guid
@@ -25,8 +25,6 @@ module Jump =
                 Ok(JudgeNotes notes)
 
         let value (JudgeNotes v) = v
-
-    
 
     type WindAverage =
         | Headwind of Value: double
@@ -55,10 +53,13 @@ module Jump =
             if v = 0 then Zero
             elif v <= 0.0 then WindAverage.CreateTailwind -v
             else WindAverage.CreateHeadwind v
+          
+open Jump
 
-type Jump =
-    { Id: Jump.Id
-      CompetitorId: Competitor.Id
-      Distance: Jump.Distance
-      JudgeNotes: Jump.JudgeNotes
-      WindAverage: Jump.WindAverage }
+type Jump = {
+    JumperId: JumperId
+    Distance: Distance
+    JudgeNotes: JudgeNotes
+    Wind: WindAverage
+}
+

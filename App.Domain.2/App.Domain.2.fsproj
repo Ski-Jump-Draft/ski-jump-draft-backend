@@ -11,6 +11,28 @@
         <Compile Include="Matchmaking\Settings.fs" />
         <Compile Include="Matchmaking\Matchmaking.fs" />
         <Compile Include="Matchmaking\IMatchmakings.fs" />
+        <Compile Include="Competition\Rounds.fs" />
+        <Compile Include="Competition\Gate.fs" />
+        <Compile Include="Competition\Jumper.fs" />
+        <Compile Include="Competition\Jump.fs" />
+        <Compile Include="Competition\Startlist.fs" />
+        <Compile Include="Competition\Results.fs" />
+        <Compile Include="Competition\Settings.fs" />
+        <Compile Include="Competition\Hill.fs" />
+        <Compile Include="Competition\Services.fs" />
+        <Compile Include="Competition\Competition.fs" />
+        <Compile Include="Game\Jumper.fs" />
+        <Compile Include="Game\Player.fs" />
+        <Compile Include="Game\Status.fs" />
+        <Compile Include="Game\Ranking.fs" />
+        <Compile Include="Game\Draft.fs" />
+        <Compile Include="Game\Settings.fs" />
+        <Compile Include="Game\Game.fs" />
+        <Compile Include="Game\IGames.fs" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="FsToolkit.ErrorHandling" Version="5.0.1" />
     </ItemGroup>
 
 </Project>

@@ -58,7 +58,7 @@ type Startlist =
 
     member this.RoundIsFinished = this.Remaining.IsEmpty
 
-    member this.RemainingOrder = this.Remaining |> List.map (fun e -> e.CompetitorId)
+    member this.RemainingOrder = this.Remaining |> List.map _.CompetitorId
 
     member this.FullOrder =
-        (this.Done |> List.rev) @ this.Remaining |> List.map (fun e -> e.CompetitorId)
+        (this.Done |> List.rev) @ this.Remaining |> List.map _.CompetitorId
