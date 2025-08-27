@@ -1,7 +1,8 @@
 namespace App.Domain._2.Competition
 
+type JumpResultId = JumpResultId of System.Guid
+
 module JumpResult =
-    type Id = Id of System.Guid
     type JudgePoints = private JudgePoints of double
 
     module JudgePoints =
@@ -29,7 +30,7 @@ module JumpResult =
 open JumpResult
 
 type JumpResult =
-    { Id: JumpResult.Id
+    { Id: JumpResultId
       JumperId: JumperId
       Jump: Jump
       RoundIndex: RoundIndex

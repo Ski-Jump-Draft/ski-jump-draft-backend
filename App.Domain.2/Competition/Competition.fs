@@ -41,7 +41,7 @@ type Competition =
           Hill: Hill
           Jumpers: Jumper list }
 with
-    member this.StatusTag =
+    member this.GetStatusTag =
         match this.Status with
         | Status.NotStarted _ -> StatusTag.NotStartedTag
         | Status.RoundInProgress _ -> StatusTag.RoundInProgressTag
@@ -73,7 +73,7 @@ with
         { this with Status = newStatus }
 
     static member Create
-        (id: CompetitionId, settings: Settings, hill: Hill, jumpers: Jumper list, startingGate: Gate)
+        (id: CompetitionId, settings: Settings, hill: Hill, jumpers: Jumper list,startingGate: Gate)
         : Result<Competition, Error> =
         if List.isEmpty jumpers then
             Error Error.JumpersEmpty
@@ -99,7 +99,7 @@ with
         match this.Status with
         | Status.NotStarted _ -> Ok (this.WithGateState newGateState)
         | Status.RoundInProgress _ when this.Startlist.DoneEntries.IsEmpty -> Ok (this.WithGateState newGateState)
-        | _ -> Error (Error.InvalidStatus(this.StatusTag, [ StatusTag.NotStartedTag; StatusTag.RoundInProgressTag ]))
+        | _ -> Error (Error.InvalidStatus(this.GetStatusTag, [ StatusTag.NotStartedTag; StatusTag.RoundInProgressTag ]))
 
     member this.ChangeGateByJury(change: GateChange) =
         match this.Status with
@@ -113,7 +113,7 @@ with
                 | Increase by -> Gate (current + int by)
                 | Reduction by -> Gate (current - int by)
             Ok (this.WithGateState { gs with CurrentJury = newGate })
-        | _ -> Error (Error.InvalidStatus(this.StatusTag, [ StatusTag.NotStartedTag; StatusTag.RoundInProgressTag; StatusTag.SuspendedTag ]))
+        | _ -> Error (Error.InvalidStatus(this.GetStatusTag, [ StatusTag.NotStartedTag; StatusTag.RoundInProgressTag; StatusTag.SuspendedTag ]))
 
     member this.LowerGateByCoach(change: GateChange) =
         match change with
@@ -125,17 +125,17 @@ with
     member this.Suspend() =
         match this.Status with
         | Status.RoundInProgress(gs, round) -> Ok { this with Status = Status.Suspended(gs, round) }
-        | _ -> Error (Error.InvalidStatus(this.StatusTag, [ StatusTag.RoundInProgressTag ]))
+        | _ -> Error (Error.InvalidStatus(this.GetStatusTag, [ StatusTag.RoundInProgressTag ]))
 
     member this.Continue() =
         match this.Status with
         | Status.Suspended(gs, round) -> Ok { this with Status = Status.RoundInProgress(gs, round) }
-        | _ -> Error (Error.InvalidStatus(this.StatusTag, [ StatusTag.SuspendedTag ]))
+        | _ -> Error (Error.InvalidStatus(this.GetStatusTag, [ StatusTag.SuspendedTag ]))
 
     member this.Cancel() =
         match this.Status with
         | Status.Ended
-        | Status.Cancelled -> Error (Error.InvalidStatus(this.StatusTag, []))
+        | Status.Cancelled -> Error (Error.InvalidStatus(this.GetStatusTag, []))
         | _ -> Ok { this with Status = Status.Cancelled }
 
     member this.NextJumper =
@@ -150,7 +150,8 @@ with
             | s -> s
         { this with Status = newStatus }
 
-    member this.AddJump(jumpResultId: JumpResult.Id, jumperId: JumperId, jump: Jump) =
+    member this.AddJump(jumpResultId: JumpResultId, jump: Jump) =
+        let jumperId = jump.JumperId
         let execute roundIndex =
             let gs = this.CurrentGateState()
             let jumper = this.FindJumper jumperId
@@ -198,7 +199,7 @@ with
             | _ -> execute round
         | Status.Suspended _
         | Status.Cancelled
-        | Status.Ended -> Error (Error.InvalidStatus(this.StatusTag, []))
+        | Status.Ended -> Error (Error.InvalidStatus(this.GetStatusTag, []))
 
 
     member private this.BuildNextRoundStartlist(nextRound: RoundIndex, currentResults: Results) =

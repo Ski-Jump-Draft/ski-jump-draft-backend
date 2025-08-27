@@ -21,9 +21,9 @@
         <Compile Include="Competition\Hill.fs" />
         <Compile Include="Competition\Services.fs" />
         <Compile Include="Competition\Competition.fs" />
+        <Compile Include="Game\Hill.fs" />
         <Compile Include="Game\Jumper.fs" />
         <Compile Include="Game\Player.fs" />
-        <Compile Include="Game\Status.fs" />
         <Compile Include="Game\Ranking.fs" />
         <Compile Include="Game\Draft.fs" />
         <Compile Include="Game\Settings.fs" />
