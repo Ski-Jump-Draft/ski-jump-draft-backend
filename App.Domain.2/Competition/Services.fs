@@ -11,7 +11,7 @@ module JumpResultCreator =
     type FisError = TooLessJudgeNotes of Count: int * Minimum: int
 
     let createFisJumpResult
-        (id: JumpResult.Id)
+        (id: JumpResultId)
         (jump: Jump)
         (jumper: Jumper)
         (hill: Hill)

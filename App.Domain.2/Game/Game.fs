@@ -9,7 +9,7 @@ type StatusTag =
     | DraftTag
     | MainCompetitionTag
     | EndedTag
-    | BreakTag
+    | BreakTag of Next: StatusTag
 
 type PreDraftCompetitionIndex = private PreDraftCompetitionIndex of int
 module PreDraftCompetitionIndex =
@@ -70,7 +70,6 @@ type Game = {
     Status: Status
     Players: Players
     Jumpers: Jumpers
-    Ranking: Ranking
     Hill: Competition.Hill option
 } with
     override this.Equals(obj) =
@@ -81,11 +80,38 @@ type Game = {
     override this.GetHashCode() =
         hash this.Id
         
+    member this.Id_ = this.Id
+    member this.Status_ = this.Status
+    member this.StatusTag =
+        match this.Status with
+        | PreDraft _ -> PreDraftTag
+        | Draft _ -> DraftTag
+        | MainCompetition _ -> MainCompetitionTag
+        | Ended _ -> EndedTag
+        | Break next -> BreakTag next
+        
+    static member Create id settings players jumpers (hill: Competition.Hill option) =
+        let game = {
+            Id = id
+            Settings = settings
+            Status = Break PreDraftTag
+            Players = players
+            Jumpers = jumpers
+            Hill = None
+        }
+        let newGame =
+            match hill with
+                | Some hill -> game.SetHill hill
+                | None -> Ok game
+        match newGame with
+        | Ok newGame -> Ok newGame
+        | Error e -> Error(e)
+        
     /// Hill can be set once and must be before PreDraft. Sets a one hill for every competition in Game.
-    member this.SetHill hill =
+    member this.SetHill (hill: Competition.Hill) : Result<Game, GameError> =
         match this.Hill with
         | None ->
-            Ok({ this with Hill = hill })
+            Ok({ this with Hill = Some hill })
         | Some _ ->
             Error(GameError.HillAlreadySet)
         

@@ -13,13 +13,13 @@ public class BotJoiner(IMatchmakings repo, ICommandBus bus, IClock clock, ILogge
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromSeconds(11), stoppingToken);
+            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
 
             // wybierz jakieś matchmaking in progress
             var all = await repo.GetInProgress(stoppingToken);
             var matchmaking = all.FirstOrDefault();
 
-            if (matchmaking?.PlayersCount == 3)
+            if (matchmaking?.PlayersCount == 4)
             {
                 continue;
             }
@@ -36,8 +36,12 @@ public class BotJoiner(IMatchmakings repo, ICommandBus bus, IClock clock, ILogge
 
                 log.LogInformation("Bot {correctedNick} joined {Matchmaking}", correctedNick, matchmakingId);
             }
-            catch (Exception ex)
+            catch (App.Application._2.UseCase.Matchmaking.JoinQuickMatchmaking.RoomIsFullException)
             {
+                log.LogInformation("Room is full. Bot doesn't join.");
+            }
+            catch (Exception ex)
+            { 
                 log.LogWarning(ex, "Bot failed to join");
             }
         }

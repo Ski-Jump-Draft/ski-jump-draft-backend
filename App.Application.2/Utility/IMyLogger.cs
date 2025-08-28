@@ -1,8 +1,9 @@
 namespace App.Application._2.Utility;
 
-public interface ILogger
+public interface IMyLogger
 {
     void Info(string message);
+    void Debug(string message);
     void Warn(string message, Exception? ex = null);
     void Error(string message, Exception? ex = null);
 }

@@ -19,7 +19,7 @@ public class Handler(
     IMatchmakingNotifier notifier,
     IMatchmakingSchedule matchmakingSchedule,
     IScheduler scheduler,
-    IClock clock)
+    IClock clock, IMyLogger logger)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -32,17 +32,19 @@ public class Handler(
 
         if (hasSucceeded)
         {
+            const int seconds = 2;
+            logger.Info($"Game Start is scheduled in {seconds} seconds. MatchmakingId: {command.MatchmakingId}");
             await scheduler.ScheduleAsync(
                 jobType: "StartGame",
                 payloadJson: json.Serialize(new { MatchmakingId = command.MatchmakingId }),
-                runAt: clock.Now().AddSeconds(2),
+                runAt: clock.Now().AddSeconds(seconds),
                 uniqueKey: $"StartGame:{command.MatchmakingId}",
                 ct: ct
             );
             matchmakingSchedule.EndMatchmaking(command.MatchmakingId);
         }
 
-        await notifier.MatchmakingUpdated(MatchmakingDtoMapper.FromDomain(endedMatchmaking));
+        await notifier.MatchmakingUpdated(MatchmakingUpdatedDtoMapper.FromDomain(endedMatchmaking));
 
         return new Result(hasSucceeded);
     }

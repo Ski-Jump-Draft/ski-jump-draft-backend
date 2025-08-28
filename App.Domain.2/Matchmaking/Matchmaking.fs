@@ -118,3 +118,8 @@ type Matchmaking =
         match this.Status with
         | Running -> Ok({ this with Status = Failed reason })
         | _ -> Error(InvalidStatus this.Status)
+    
+    member this.HasSucceeded =
+        match this.Status with
+        | Ended Succeeded -> true
+        | _ -> false

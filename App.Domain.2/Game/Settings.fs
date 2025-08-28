@@ -10,7 +10,7 @@ type PreDraftSettings = private {
     Competitions: Competition.Settings list
 } with
     static member Create (competitionSettingsList: Competition.Settings list) =
-        if competitionSettingsList.Length > 0 && competitionSettingsList.Length < 2 then    
+        if competitionSettingsList.Length > 0 && competitionSettingsList.Length <= 2 then    
             Some({
                 Competitions = competitionSettingsList
             })

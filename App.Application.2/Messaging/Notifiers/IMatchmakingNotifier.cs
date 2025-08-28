@@ -19,7 +19,7 @@ public sealed record MatchmakingUpdatedDto(
     int MaxPlayers
 );
 
-public static class MatchmakingDtoMapper
+public static class MatchmakingUpdatedDtoMapper
 {
     public static MatchmakingUpdatedDto FromDomain(App.Domain._2.Matchmaking.Matchmaking matchmaking)
     {
@@ -37,7 +37,7 @@ public static class MatchmakingDtoMapper
     }
 }
 
-public sealed record PlayerDto(
+public sealed record MatchmakingPlayerDto(
     Guid PlayerId,
     string Nick
 );

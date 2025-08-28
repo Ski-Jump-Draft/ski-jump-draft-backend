@@ -29,10 +29,11 @@
         <Compile Include="Game\Settings.fs" />
         <Compile Include="Game\Game.fs" />
         <Compile Include="Game\IGames.fs" />
+        <Compile Include="Simulation\IJumpSimulator.fs" />
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="FsToolkit.ErrorHandling" Version="5.0.1" />
+      <PackageReference Include="FsToolkit.ErrorHandling" Version="4.18.0" />
     </ItemGroup>
 
 </Project>

@@ -1,0 +1,41 @@
+using System.Collections.Concurrent;
+using App.Domain._2.Game;
+
+namespace App.Infrastructure._2.Repository.Game;
+
+public class InMemory : IGames
+{
+    private readonly ConcurrentDictionary<Guid, Domain._2.Game.Game> _store = new();
+
+    public Task Add(Domain._2.Game.Game game, CancellationToken ct)
+    {
+        _store[game.Id_.Item] = game;
+        return Task.CompletedTask;
+    }
+
+    public Task<Domain._2.Game.Game> GetById(GameId gameId, CancellationToken ct)
+    {
+        if (_store.TryGetValue(gameId.Item, out var game))
+            return Task.FromResult(game);
+
+        throw new KeyNotFoundException($"Game {gameId} not found");
+    }
+
+    public Task<IEnumerable<Domain._2.Game.Game>> GetNotStarted(CancellationToken ct)
+    {
+        var result = _store.Values.Where(game => !game.StatusTag.Equals(StatusTag.NewBreakTag(StatusTag.PreDraftTag)));
+        return Task.FromResult(result.AsEnumerable());
+    }
+
+    public Task<IEnumerable<Domain._2.Game.Game>> GetInProgress(CancellationToken ct)
+    {
+        var result = _store.Values.Where(game => !game.StatusTag.Equals(StatusTag.EndedTag));
+        return Task.FromResult(result.AsEnumerable());
+    }
+
+    public Task<IEnumerable<Domain._2.Game.Game>> GetEnded(CancellationToken ct)
+    {
+        var result = _store.Values.Where(game => game.StatusTag.Equals(StatusTag.EndedTag));
+        return Task.FromResult(result.AsEnumerable());
+    }
+}

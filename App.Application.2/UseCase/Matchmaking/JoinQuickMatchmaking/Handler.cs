@@ -17,7 +17,7 @@ public record Result(Guid MatchmakingId, string Nick, Guid PlayerId);
 public class Handler(
     IGuid guid,
     IMatchmakings matchmakings,
-    ILogger logger,
+    IMyLogger myLogger,
     Domain._2.Matchmaking.Settings globalMatchmakingSettings,
     IScheduler scheduler,
     IJson json,
@@ -28,7 +28,7 @@ public class Handler(
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
     {
-        logger.Info($"{command.Nick} requested the join to a matchmaking ");
+        myLogger.Info($"{command.Nick} requested the join to a matchmaking ");
         var nickOption = PlayerModule.NickModule.create(command.Nick);
         if (nickOption.IsNone())
         {
@@ -39,10 +39,25 @@ public class Handler(
         var (matchmaking, justCreated) = await FindOrCreateMatchmakingAsync(ct);
         var player = new Domain._2.Matchmaking.Player(PlayerId.NewPlayerId(guid.NewGuid()), nick);
         var joinResult = matchmaking.Join(player);
+        if (joinResult.IsError)
+        {
+            if (joinResult.ErrorValue.IsTooManyPlayers)
+            {
+                throw new RoomIsFullException();
+            }
+
+            if (joinResult.ErrorValue.IsAlreadyJoined)
+            {
+                throw new PlayerAlreadyJoinedException();
+            }
+            
+            throw new Exception($"Unknown error: {joinResult.ErrorValue}");
+        }
+        
         var (matchmakingAfterJoin, correctedNick) = joinResult.ResultValue;
         await matchmakings.Add(matchmakingAfterJoin, ct);
 
-        var matchmakingDuration = TimeSpan.FromMinutes(2);
+        var matchmakingDuration = TimeSpan.FromSeconds(50);
 
         if (justCreated)
         {
@@ -52,9 +67,9 @@ public class Handler(
             matchmakingSchedule.StartMatchmaking(matchmaking.Id_.Item, matchmakingDuration);
         }
 
-        await matchmakingNotifier.MatchmakingUpdated(MatchmakingDtoMapper.FromDomain(matchmakingAfterJoin));
+        await matchmakingNotifier.MatchmakingUpdated(MatchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterJoin));
 
-        logger.Info($"{player.Nick} joined the matchmaking ({matchmaking.Id_.Item})");
+        myLogger.Info($"{player.Nick} joined the matchmaking ({matchmaking.Id_.Item})");
 
         return new Result(matchmaking.Id_.Item, PlayerModule.NickModule.value(correctedNick), player.Id.Item);
     }
@@ -65,8 +80,7 @@ public class Handler(
         switch (matchmmakingsInProgress.Length)
         {
             case > 1:
-                throw new NotImplementedException(
-                    "We are not supporting multiple matchmaking at the moment. Please report this bug.");
+                throw new MultipleMatchmakingsNotSupportedException();
             case 1:
                 return new MatchmakingDto(matchmmakingsInProgress.Single(), JustCreated: false);
             default:
@@ -81,3 +95,7 @@ public class Handler(
 
     private record MatchmakingDto(Domain._2.Matchmaking.Matchmaking Matchmaking, bool JustCreated);
 }
+
+public class MultipleMatchmakingsNotSupportedException(string? message = null) : Exception(message);
+public class RoomIsFullException(string? message = null) : Exception(message);
+public class PlayerAlreadyJoinedException(string? message = null) : Exception(message);
