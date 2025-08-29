@@ -25,7 +25,8 @@ public class Handler(
     IClock clock,
     IMatchmakingSchedule matchmakingSchedule,
     IMatchmakingNotifier matchmakingNotifier,
-    IJumpers jumpers)
+    IJumpers jumpers,
+    IMatchmakingDurationCalculator matchmakingDurationCalculator)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -59,7 +60,7 @@ public class Handler(
         var (matchmakingAfterJoin, correctedNick) = joinResult.ResultValue;
         await matchmakings.Add(matchmakingAfterJoin, ct);
 
-        var matchmakingDuration = TimeSpan.FromSeconds(50);
+        var matchmakingDuration = matchmakingDurationCalculator.Calculate(matchmakingAfterJoin);
 
         if (justCreated)
         {

@@ -2,12 +2,12 @@ namespace App.Application._2.Policy.GameJumpersSelector;
 
 public interface IGameJumpersSelector
 {
-    Task<IEnumerable<SelectedJumperDto>> Select();
+    Task<IEnumerable<SelectedGameWorldJumperDto>> Select(CancellationToken ct);
 }
 
-public record SelectedJumperDto(
+public record SelectedGameWorldJumperDto(
     Guid Id,
-    string Alpha3,
+    string CountryFisCode,
     string Name,
     string Surname
 );

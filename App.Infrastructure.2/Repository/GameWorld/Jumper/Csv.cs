@@ -70,7 +70,7 @@ public class Csv(
     public async Task<FSharpOption<Domain._2.GameWorld.Jumper>> GetById(JumperId id, CancellationToken ct)
     {
         var all = await LoadAllAsync(ct);
-        var found = all.FirstOrDefault(j => j.Id == id);
+        var found = all.FirstOrDefault(j => j.Id.Equals(id));
         return found is null
             ? FSharpOption<Domain._2.GameWorld.Jumper>.None
             : FSharpOption<Domain._2.GameWorld.Jumper>.Some(found);
@@ -79,6 +79,6 @@ public class Csv(
     public async Task<IEnumerable<Domain._2.GameWorld.Jumper>> GetByCountryId(CountryId countryId, CancellationToken ct)
     {
         var all = await LoadAllAsync(ct);
-        return all.Where(j => j.CountryId == countryId).ToList();
+        return all.Where(j => j.CountryId.Equals(countryId)).ToList();
     }
 }

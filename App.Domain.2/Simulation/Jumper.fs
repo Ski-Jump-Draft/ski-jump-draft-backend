@@ -1,7 +1,7 @@
 namespace App.Domain._2.Simulation
 
 module JumperSkills =
-    let private inRange (minv: ^a) (maxv: ^a) (v: ^a) =
+    let private inRange (minv: 'a) (maxv: 'a) (v: 'a) : bool when 'a : comparison =
         v >= minv && v <= maxv
 
     type BigSkill = private BigSkill of double
@@ -16,7 +16,7 @@ module JumperSkills =
 
     module LandingSkill =
         let tryCreate (v: int) : LandingSkill option =
-            if inRange -3 3 v then Some (LandingSkill v) else None
+            if inRange 1 10 v then Some (LandingSkill v) else None
 
         let value (LandingSkill s) = s
 

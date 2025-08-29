@@ -12,4 +12,7 @@ public static class FSharpOptionExtensions
 
     public static T GetValueOrDefault<T>(this FSharpOption<T> opt, T defaultValue = default!) =>
         OptionModule.IsSome(opt) ? opt.Value : defaultValue;
+
+    public static T OrThrow<T>(this FSharpOption<T> opt, object exception) =>
+        opt != null ? opt.Value : throw new Exception(exception.ToString());
 }

@@ -41,8 +41,11 @@ public class InMemory(ICommandBus commandBus, IJson json, IMyLogger myLogger) : 
                     case "StartPreDraft":
                         await HandleStartPreDraft(payloadJson, ct);
                         break;
+                    case "SimulateJumpInGame":
+                        await HandleSimulateJumpInGame(payloadJson, ct);
+                        break;
                     default:
-                        throw new InvalidOperationException();
+                        throw new InvalidOperationException("Unsupported job type: " + jobType);
                 }
             }
             catch (TaskCanceledException) 
@@ -84,5 +87,11 @@ public class InMemory(ICommandBus commandBus, IJson json, IMyLogger myLogger) : 
         var payload = json.Deserialize<StartPreDraftPayload>(payloadJson);
         var command = new Application._2.UseCase.Game.StartPreDraft.Command(payload.GameId);
         await commandBus.SendAsync<Application._2.UseCase.Game.StartPreDraft.Command, Application._2.UseCase.Game.StartPreDraft.Result>(command, ct);
+    }
+    private async Task HandleSimulateJumpInGame(string payloadJson, CancellationToken ct)
+    {
+        var payload = json.Deserialize<StartPreDraftPayload>(payloadJson);
+        var command = new Application._2.UseCase.Game.SimulateJump.Command(payload.GameId);
+        await commandBus.SendAsync<Application._2.UseCase.Game.SimulateJump.Command, Application._2.UseCase.Game.SimulateJump.Result>(command, ct);
     }
 }

@@ -287,6 +287,24 @@ type Game =
         | PreDraft(PreDraftStatus.Running(_, competition))
         | MainCompetition competition -> Some competition
         | _ -> None
+        
+    override this.ToString() =
+        let idStr =
+            let (GameId g) = this.Id
+            g.ToString("N")
+
+        let playersCount = Players.toList this.Players |> List.length
+        let jumpersCount = Jumpers.toList this.Jumpers |> List.length
+        let statusStr =
+            match this.Status with
+            | PreDraft(PreDraftStatus.Running(idx, _)) -> $"PreDraft (comp {PreDraftCompetitionIndex.value idx})"
+            | PreDraft(PreDraftStatus.Break idx) -> $"PreDraftBreak (next {PreDraftCompetitionIndex.value idx})"
+            | Draft _ -> "Draft"
+            | MainCompetition _ -> "MainCompetition"
+            | Ended _ -> "Ended"
+            | Break tag -> $"Break → {tag}"
+
+        $"Game[{idStr}] Status={statusStr}, Players={playersCount}, Jumpers={jumpersCount}"
 
 and PickOutcome =
     { Game: Game

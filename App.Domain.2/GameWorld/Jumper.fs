@@ -10,7 +10,7 @@ module Jumper =
     type Name = Name of string
     type Surname = Surname of string
     
-    let private inRange (minv: ^a) (maxv: ^a) (v: ^a) =
+    let private inRange (minv: 'a) (maxv: 'a) (v: 'a) : bool when 'a : comparison =
         v >= minv && v <= maxv
 
     type BigSkill = private BigSkill of double
@@ -29,11 +29,11 @@ module Jumper =
 
         let value (LandingSkill s) = s
 
-    type LiveForm = private LiveForm of double
+    type LiveForm = private LiveForm of int
 
     module LiveForm =
         let tryCreate (v: int) : LiveForm option =
-            if inRange 0.0 10.0 v then Some (LiveForm v) else None
+            if inRange 0 10 v then Some (LiveForm v) else None
 
         let value (LiveForm s) = s
 

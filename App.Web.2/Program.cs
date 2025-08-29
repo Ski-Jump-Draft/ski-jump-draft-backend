@@ -71,6 +71,11 @@ builder.Services
         App.Application._2.UseCase.Game.StartPreDraft.Handler>();
 builder.Services
     .AddSingleton<
+        ICommandHandler<App.Application._2.UseCase.Game.SimulateJump.Command,
+            App.Application._2.UseCase.Game.SimulateJump.Result>,
+        App.Application._2.UseCase.Game.SimulateJump.Handler>();
+builder.Services
+    .AddSingleton<
         ICommandHandler<App.Application._2.UseCase.Game.LeaveGame.Command,
             App.Application._2.UseCase.Game.LeaveGame.Result>,
         App.Application._2.UseCase.Game.LeaveGame.Handler>();
@@ -126,7 +131,7 @@ builder.Services.AddSingleton<IMatchmakingNotifier, App.Web._2.Notifiers.Matchma
 builder.Services.AddSingleton<IGameNotifier, SignalRGameNotifier>();
 
 builder.Services.AddSingleton<IGameHillSelector, App.Application._2.Policy.GameHillSelector.Mocked>();
-builder.Services.AddSingleton<IGameJumpersSelector, App.Application._2.Policy.GameJumpersSelector.Mocked>();
+builder.Services.AddSingleton<IGameJumpersSelector, App.Application._2.Policy.GameJumpersSelector.All>();
 
 builder.Services.AddSingleton<IGameJumperAcl, App.Infrastructure._2.Acl.GameJumpers.InMemory>();
 builder.Services.AddSingleton<ICompetitionJumperAcl, App.Infrastructure._2.Acl.CompetitionJumper.InMemory>();
@@ -134,6 +139,11 @@ builder.Services.AddSingleton<ICompetitionHillAcl, App.Infrastructure._2.Acl.Com
 
 builder.Services.AddSingleton<App.Domain._2.Simulation.IWeatherEngine, App.Simulator.Mock.WeatherEngine>();
 builder.Services.AddSingleton<App.Domain._2.Simulation.IJumpSimulator, App.Simulator.Mock.JumpSimulator>();
+
+builder.Services
+    .AddSingleton<App.Application._2.Matchmaking.IMatchmakingDurationCalculator,
+        App.Application._2.Matchmaking.FixedMatchmakingDurationCalculator>(sp =>
+        new FixedMatchmakingDurationCalculator(TimeSpan.FromSeconds(30)));
 
 builder.Services.AddMemoryCache();
 
