@@ -1,5 +1,7 @@
 using App.Application._2.Acl;
 using App.Application._2.Commanding;
+using App.Application._2.Exceptions;
+using App.Application._2.Extensions;
 using App.Application._2.Messaging.Notifiers;
 using App.Application._2.Messaging.Notifiers.Mapper;
 using App.Application._2.Policy;
@@ -27,19 +29,21 @@ public class Handler(
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
     {
-        var game = await games.GetById(Domain._2.Game.GameId.NewGameId(command.GameId), ct);
+        var game = await games.GetById(Domain._2.Game.GameId.NewGameId(command.GameId), ct)
+            .AwaitOrWrap(_ => new IdNotFoundException(command.GameId));
         var gameGuid = game.Id_.Item;
-        
+
         var competitionId = Domain._2.Competition.CompetitionId.NewCompetitionId(guid.NewGuid());
         var gameJumperIdsEnumerable = Domain._2.Game.JumpersModule.toIdsList(game.Jumpers);
         var competitionJumpers = gameJumperIdsEnumerable.Select(gameJumperId =>
         {
-            var competitionJumperDto = competitionJumperAcl.GetCompetitionJumper(gameGuid, gameJumperId.Item);
+            var competitionJumperDto = competitionJumperAcl.GetCompetitionJumper(gameJumperId.Item);
             var competitionJumperId = Domain._2.Competition.JumperId.NewJumperId(competitionJumperDto.Id);
             return new Domain._2.Competition.Jumper(competitionJumperId);
         });
         var mockedGate = Domain._2.Competition.Gate.NewGate(10);
-        var gameAfterPreDraftStartResult = game.StartPreDraft(competitionId, ListModule.OfSeq(competitionJumpers), mockedGate );
+        var gameAfterPreDraftStartResult =
+            game.StartPreDraft(competitionId, ListModule.OfSeq(competitionJumpers), mockedGate);
         if (gameAfterPreDraftStartResult.IsOk)
         {
             var gameAfterPreDraftStart = gameAfterPreDraftStartResult.ResultValue;
@@ -51,11 +55,12 @@ public class Handler(
                 runAt: now.AddSeconds(15),
                 uniqueKey: $"SimulateJumpInGame:{gameGuid}_{now.ToUnixTimeSeconds()}",
                 ct: ct);
-            await gameNotifier.GameUpdated(GameUpdatedDtoMapper.FromDomain(gameAfterPreDraftStart));       
+            await gameNotifier.GameUpdated(GameUpdatedDtoMapper.FromDomain(gameAfterPreDraftStart));
         }
         else
         {
-            throw new Exception("Game start pre draft failed", new Exception(gameAfterPreDraftStartResult.ErrorValue.ToString()));       
+            throw new Exception("Game start pre draft failed",
+                new Exception(gameAfterPreDraftStartResult.ErrorValue.ToString()));
         }
 
         return new Result(gameGuid);

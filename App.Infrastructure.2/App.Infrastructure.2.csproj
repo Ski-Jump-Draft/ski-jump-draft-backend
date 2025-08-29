@@ -13,12 +13,22 @@
     </ItemGroup>
 
     <ItemGroup>
+      <PackageReference Include="AWSSDK.S3" Version="4.0.6.10" />
+      <PackageReference Include="CsvHelper" Version="33.1.0" />
+      <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.0-preview.7.25380.108" />
+      <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.0-preview.7.25380.108" />
       <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0-preview.7.25380.108" />
       <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0-preview.7.25380.108" />
     </ItemGroup>
 
     <ItemGroup>
       <Folder Include="Messaging\Notifier\Matchmaking\" />
+      <Folder Include="Repository\GameWorld\Hill\" />
     </ItemGroup>
+
+    <ItemGroup>
+        <Content Include="data\**\*.csv" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+
 
 </Project>

@@ -2,6 +2,11 @@ namespace App.Domain._2.Competition
 
 type JumpResultId = JumpResultId of System.Guid
 
+type TotalPoints = TotalPoints of double
+
+module TotalPoints =
+    let value (TotalPoints v) = v
+
 module JumpResult =
     type JudgePoints = private JudgePoints of double
 
@@ -10,7 +15,8 @@ module JumpResult =
 
         let tryCreate (v: double) =
             if v >= 0 then Ok(JudgePoints v) else Error(Error.BelowZero)
-        let value (JudgePoints v) =v 
+
+        let value (JudgePoints v) = v
 
     type GatePoints = GatePoints of double
 
@@ -22,10 +28,18 @@ module JumpResult =
     module WindPoints =
         let value (WindPoints v) = v
 
-    type TotalPoints = TotalPoints of double
+module Classification =
+    type Position = private Position of int
 
-    module TotalPoints =
-        let value (TotalPoints v) = v
+    module Position =
+        let tryCreate (v: int) =
+            if v < 1 then None else Some(Position v)
+        let value (Position v) = v
+        
+    type JumperClassificationResult =
+        { JumperId: JumperId
+          Points: TotalPoints
+          Position: Position }
 
 open JumpResult
 
@@ -51,21 +65,22 @@ type Results =
 
     static member Empty = { JumpResults = List.empty }
 
-    member this.AddJump (jumpResult: JumpResult, competExists: JumperId -> bool)
-        : Result<Results, Results.Error> =
+    member this.AddJump(jumpResult: JumpResult, competExists: JumperId -> bool) : Result<Results, Results.Error> =
         let jump = jumpResult.Jump
 
         if not (competExists jump.JumperId) then
-            Error (Results.Error.CompetitorNotFound(jump.JumperId, jumpResult.RoundIndex))
+            Error(Results.Error.CompetitorNotFound(jump.JumperId, jumpResult.RoundIndex))
         elif
             this.JumpResults
             |> List.exists (fun existing ->
                 existing.Jump.JumperId = jump.JumperId
                 && existing.RoundIndex = jumpResult.RoundIndex)
         then
-            Error (Results.Error.CompetitorAlreadyHasResultInRound(jump.JumperId, jumpResult.RoundIndex))
+            Error(Results.Error.CompetitorAlreadyHasResultInRound(jump.JumperId, jumpResult.RoundIndex))
         else
-            Ok { this with JumpResults = jumpResult :: this.JumpResults }
+            Ok
+                { this with
+                    JumpResults = jumpResult :: this.JumpResults }
 
 
     member this.TotalPointsOf(competitorId: JumperId) : TotalPoints option =
@@ -77,7 +92,6 @@ type Results =
             | s -> Some(TotalPoints s)
 
     member this.FinalClassification() =
-        // agreguj punkty
         let totals =
             this.JumpResults
             |> List.groupBy _.Jump.JumperId
@@ -99,26 +113,33 @@ type Results =
                 prevPts <- pts
                 displayedRank
 
-            cid, TotalPoints pts, rank)
-        
-    member this.TotalsSinceReset(resets: RoundIndex list) (upToRound: RoundIndex) =
+            { Classification.JumperClassificationResult.JumperId = cid
+              Points = TotalPoints pts
+              Position = (Classification.Position.tryCreate rank).Value }
+            : Classification.JumperClassificationResult)
+
+    member this.PositionOf(jumperId: JumperId) : Classification.Position option =
+        this.FinalClassification()
+        |> List.tryFind (fun competitorTotal -> competitorTotal.JumperId = jumperId)
+        |> Option.map _.Position
+
+    member this.TotalsSinceReset (resets: RoundIndex list) (upToRound: RoundIndex) =
         let (RoundIndex upTo) = upToRound
 
         let lastResetOpt =
             resets
             |> List.filter (fun (RoundIndex r) -> r < upTo)
             |> function
-               | [] -> None
-               | xs -> Some (List.max xs)
+                | [] -> None
+                | xs -> Some(List.max xs)
 
         this.JumpResults
         |> List.filter (fun jr ->
             match lastResetOpt with
-            | Some (RoundIndex reset) ->
+            | Some(RoundIndex reset) ->
                 let (RoundIndex r) = jr.RoundIndex
                 r > reset
             | None -> true)
         |> List.groupBy (fun jr -> jr.JumperId)
         |> Map.ofList
-        |> Map.map (fun _ jumps ->
-            jumps |> List.sumBy (fun j -> let (TotalPoints p) = j.TotalPoints in p))
+        |> Map.map (fun _ jumps -> jumps |> List.sumBy (fun j -> let (TotalPoints p) = j.TotalPoints in p))

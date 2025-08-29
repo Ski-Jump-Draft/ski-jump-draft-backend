@@ -85,4 +85,4 @@ module JumpResultCreator =
                       JudgePoints = Some judgePoints
                       GatePoints = Some(JumpResult.GatePoints totalGatePoints)
                       WindPoints = Some(JumpResult.WindPoints windPoints)
-                      TotalPoints = JumpResult.TotalPoints totalPoints }
+                      TotalPoints = TotalPoints totalPoints }

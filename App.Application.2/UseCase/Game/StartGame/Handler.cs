@@ -1,5 +1,7 @@
 using App.Application._2.Acl;
 using App.Application._2.Commanding;
+using App.Application._2.Exceptions;
+using App.Application._2.Extensions;
 using App.Application._2.Messaging.Notifiers;
 using App.Application._2.Messaging.Notifiers.Mapper;
 using App.Application._2.Policy.GameHillSelector;
@@ -37,8 +39,7 @@ public class Handler(
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
     {
-        logger.Debug($"Starting game for a matchmaking {command.MatchmakingId}");
-        var matchmaking = await matchmakings.GetById(MatchmakingId.NewMatchmakingId(command.MatchmakingId), ct);
+        var matchmaking = await matchmakings.GetById(MatchmakingId.NewMatchmakingId(command.MatchmakingId), ct).AwaitOrWrap(_ => new IdNotFoundException(command.MatchmakingId));
             
         if (!matchmaking.HasSucceeded)
         {
@@ -66,12 +67,13 @@ public class Handler(
         });
         var gamePlayers = Domain._2.Game.PlayersModule.create(ListModule.OfSeq(gamePlayersEnumerable)).ResultValue;
 
-        var gameJumpersEnumerable = selectedJumperDtos.Select(gameWorldJumperDto =>
+        var gameJumpersEnumerable = selectedJumperDtos.Select(selectedJumperDto =>
         {
             var gameJumperId = guid.NewGuid();
-            gameJumperAcl.Map(gameGuid, gameWorldJumperDto.Id, new GameJumperDto(gameJumperId));
+            var gameJumperDto = new GameJumperDto(gameJumperId);
+            gameJumperAcl.Map(new GameWorldJumperDto(selectedJumperDto.Id), gameJumperDto);
             var competitionJumperId = guid.NewGuid(); // Od razu tworzymy competition jumpera, z którego korzystać będą inne Use Case'y
-            competitionJumperAcl.Map(gameGuid, gameJumperId, new CompetitionJumperDto(competitionJumperId));
+            competitionJumperAcl.Map(gameJumperDto, new CompetitionJumperDto(competitionJumperId));
             return new Domain._2.Game.Jumper(Domain._2.Game.JumperId.NewJumperId(gameJumperId));
         });
         var gameJumpers = Domain._2.Game.JumpersModule.create(ListModule.OfSeq(gameJumpersEnumerable));

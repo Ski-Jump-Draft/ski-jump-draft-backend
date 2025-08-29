@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using App.Domain._2.Game;
+using Microsoft.FSharp.Core;
 
 namespace App.Infrastructure._2.Repository.Game;
 
@@ -13,10 +14,10 @@ public class InMemory : IGames
         return Task.CompletedTask;
     }
 
-    public Task<Domain._2.Game.Game> GetById(GameId gameId, CancellationToken ct)
+    public Task<FSharpOption<Domain._2.Game.Game>> GetById(GameId gameId, CancellationToken ct)
     {
         if (_store.TryGetValue(gameId.Item, out var game))
-            return Task.FromResult(game);
+            return Task.FromResult(FSharpOption<Domain._2.Game.Game>.Some(game));
 
         throw new KeyNotFoundException($"Game {gameId} not found");
     }

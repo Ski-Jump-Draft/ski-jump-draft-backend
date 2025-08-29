@@ -1,3 +1,4 @@
+using System.Globalization;
 using App.Application._2.Acl;
 using App.Application._2.Commanding;
 using App.Application._2.Matchmaking;
@@ -5,11 +6,14 @@ using App.Application._2.Messaging.Notifiers;
 using App.Application._2.Policy.GameHillSelector;
 using App.Application._2.Policy.GameJumpersSelector;
 using App.Application._2.Utility;
+using App.Infrastructure._2.Helper.Csv;
 using App.Web._2.MockedFlow;
 using App.Web._2.Notifiers.Game;
 using App.Web._2.Notifiers.SseHub;
 using App.Web._2.SignalR.Hub;
+using CsvHelper.Configuration;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.FSharp.Collections;
 using Results = Microsoft.AspNetCore.Http.Results;
 
@@ -29,10 +33,10 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddSignalR();
 
-builder.Services.AddSingleton<IGuid, App.Infrastructure._2.Utility.Guid.System>();
-builder.Services.AddSingleton<IClock, App.Infrastructure._2.Utility.Clock.System>();
-// builder.Services.AddSingleton<IRandom, >();
-builder.Services.AddSingleton<IJson, App.Infrastructure._2.Utility.Json.System>();
+builder.Services.AddSingleton<IGuid, App.Infrastructure._2.Utility.Guid.SystemGuid>();
+builder.Services.AddSingleton<IClock, App.Infrastructure._2.Utility.Clock.SystemClock>();
+builder.Services.AddSingleton<IRandom, App.Infrastructure._2.Utility.Random.SystemRandom>();
+builder.Services.AddSingleton<IJson, App.Infrastructure._2.Utility.Json.DefaultJson>();
 builder.Services.AddSingleton<ICommandBus, App.Infrastructure._2.Commanding.CommandBus.InMemory>();
 builder.Services.AddSingleton<IScheduler, App.Infrastructure._2.Commanding.Scheduler.InMemory>();
 
@@ -125,7 +129,55 @@ builder.Services.AddSingleton<IGameHillSelector, App.Application._2.Policy.GameH
 builder.Services.AddSingleton<IGameJumpersSelector, App.Application._2.Policy.GameJumpersSelector.Mocked>();
 
 builder.Services.AddSingleton<IGameJumperAcl, App.Infrastructure._2.Acl.GameJumpers.InMemory>();
-builder.Services.AddSingleton<ICompetitionJumperAcl, App.Infrastructure._2.Acl.CompetitionJumpers.InMemory>();
+builder.Services.AddSingleton<ICompetitionJumperAcl, App.Infrastructure._2.Acl.CompetitionJumper.InMemory>();
+builder.Services.AddSingleton<ICompetitionHillAcl, App.Infrastructure._2.Acl.CompetitionHill.InMemory>();
+
+builder.Services.AddSingleton<App.Domain._2.Simulation.IWeatherEngine, App.Simulator.Mock.WeatherEngine>();
+builder.Services.AddSingleton<App.Domain._2.Simulation.IJumpSimulator, App.Simulator.Mock.JumpSimulator>();
+
+builder.Services.AddMemoryCache();
+
+builder.Services
+    .AddSingleton<App.Domain._2.GameWorld.ICountries, App.Infrastructure._2.Repository.GameWorld.Country.Csv>();
+builder.Services
+    .AddSingleton<App.Infrastructure._2.Repository.GameWorld.Country.IGameWorldCountriesCsvStreamProvider>(sp =>
+    {
+        var relPath = sp.GetRequiredService<IConfiguration>().GetValue<string>("Csv:Countries:File");
+        var absPath = Path.Combine(AppContext.BaseDirectory, relPath!);
+
+        var inner = new App.Infrastructure._2.Helper.Csv.FileCsvStreamProvider(absPath);
+        return new CachingCsvStreamProvider(inner,
+            sp.GetRequiredService<IMemoryCache>(),
+            "countries.csv",
+            TimeSpan.FromMinutes(5));
+    });
+
+builder.Services
+    .AddSingleton<App.Domain._2.GameWorld.IJumpers, App.Infrastructure._2.Repository.GameWorld.Jumper.Csv>();
+
+builder.Services
+    .AddSingleton<App.Infrastructure._2.Repository.GameWorld.Jumper.IGameWorldJumpersCsvStreamProvider>(sp =>
+    {
+        var relPath = sp.GetRequiredService<IConfiguration>().GetValue<string>("Csv:Jumpers:File");
+        var absPath = Path.Combine(AppContext.BaseDirectory, relPath!);
+
+        var inner = new App.Infrastructure._2.Helper.Csv.FileCsvStreamProvider(absPath);
+        return new CachingCsvStreamProvider(inner,
+            sp.GetRequiredService<IMemoryCache>(),
+            "jumpers.csv",
+            TimeSpan.FromMinutes(5));
+    });
+builder.Services
+    .AddSingleton<App.Infrastructure._2.Helper.Csv.GameWorldCountryIdProvider.IGameWorldCountryIdProvider,
+        App.Infrastructure._2.Helper.Csv.GameWorldCountryIdProvider.Impl.Repository>();
+
+builder.Services.AddSingleton(new CsvConfiguration(CultureInfo.InvariantCulture)
+{
+    HasHeaderRecord = true,
+    MissingFieldFound = null,
+    Delimiter = ","
+});
+
 
 var app = builder.Build();
 app.UseCors("AllowFrontend");
@@ -202,6 +254,5 @@ app.MapGet("/game/{gameId:guid}/leave",
 app.MapHub<GameHub>("/game/hub");
 
 app.UseRouting();
-
 
 app.Run();

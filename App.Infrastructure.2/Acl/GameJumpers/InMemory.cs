@@ -5,19 +5,25 @@ namespace App.Infrastructure._2.Acl.GameJumpers;
 
 public class InMemory : IGameJumperAcl
 {
-    private readonly ConcurrentDictionary<(Guid GameId, Guid GameWorldJumperId), GameJumperDto> _map 
-        = new();
+    private readonly ConcurrentDictionary<Guid, Guid> _gwToGame = new();
+    private readonly ConcurrentDictionary<Guid, Guid> _gameToGw = new();
 
-    public void Map(Guid gameId, Guid gameWorldJumperId, GameJumperDto gameJumper)
+    public void Map(GameWorldJumperDto gameWorldJumper, GameJumperDto gameJumper)
     {
-        _map[(gameId, gameWorldJumperId)] = gameJumper;
+        if (gameWorldJumper is null || gameJumper is null)
+            throw new ArgumentNullException();
+
+        _gwToGame[gameWorldJumper.Id] = gameJumper.Id;
+        _gameToGw[gameJumper.Id] = gameWorldJumper.Id;
     }
 
-    public GameJumperDto GetGameJumper(Guid gameId, Guid gameWorldJumperId)
-    {
-        if (_map.TryGetValue((gameId, gameWorldJumperId), out var dto))
-            return dto;
+    public GameJumperDto GetGameJumper(Guid gameWorldJumperId) =>
+        _gwToGame.TryGetValue(gameWorldJumperId, out var gameId)
+            ? new GameJumperDto(gameId)
+            : throw new KeyNotFoundException($"No mapping for GameWorldJumper {gameWorldJumperId}");
 
-        throw new KeyNotFoundException($"Game jumper not found for GameId={gameId}, JumperId={gameWorldJumperId}");
-    }
+    public GameWorldJumperDto GetGameWorldJumper(Guid gameJumperId) =>
+        _gameToGw.TryGetValue(gameJumperId, out var gwId)
+            ? new GameWorldJumperDto(gwId)
+            : throw new KeyNotFoundException($"No mapping for GameJumper {gameJumperId}");
 }

@@ -1,4 +1,6 @@
 using App.Application._2.Commanding;
+using App.Application._2.Exceptions;
+using App.Application._2.Extensions;
 using App.Application._2.Matchmaking;
 using App.Application._2.Messaging;
 using App.Application._2.Messaging.Notifiers;
@@ -24,7 +26,7 @@ public class Handler(
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
     {
-        var matchmaking = await matchmakings.GetById(MatchmakingId.NewMatchmakingId(command.MatchmakingId), ct);
+        var matchmaking = await matchmakings.GetById(MatchmakingId.NewMatchmakingId(command.MatchmakingId), ct).AwaitOrWrap(_ => new IdNotFoundException(command.MatchmakingId));;
 
         var (endedMatchmaking, hasSucceeded) = matchmaking.End().ResultValue;
 

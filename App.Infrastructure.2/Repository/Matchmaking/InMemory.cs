@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using App.Domain._2.Matchmaking;
+using Microsoft.FSharp.Core;
 
 namespace App.Infrastructure._2.Repository.Matchmaking;
 
@@ -13,10 +14,10 @@ public class InMemory : IMatchmakings
         return Task.CompletedTask;
     }
 
-    public Task<Domain._2.Matchmaking.Matchmaking> GetById(MatchmakingId matchmakingId, CancellationToken ct)
+    public Task<FSharpOption<Domain._2.Matchmaking.Matchmaking>> GetById(MatchmakingId matchmakingId, CancellationToken ct)
     {
         if (_store.TryGetValue(matchmakingId.Item, out var mm))
-            return Task.FromResult(mm);
+            return Task.FromResult(FSharpOption<Domain._2.Matchmaking.Matchmaking>.Some(mm));
 
         throw new KeyNotFoundException($"Matchmaking {matchmakingId} not found");
     }
@@ -34,3 +35,4 @@ public class InMemory : IMatchmakings
         return Task.FromResult(result.AsEnumerable());
     }
 }
+

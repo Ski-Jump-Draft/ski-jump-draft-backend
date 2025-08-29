@@ -1,4 +1,5 @@
 using App.Application._2.Commanding;
+using App.Application._2.Exceptions;
 using App.Application._2.Extensions;
 using App.Application._2.Matchmaking;
 using App.Application._2.Utility;
@@ -27,7 +28,7 @@ public class Handler(
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
     {
-        var matchmaking = await matchmakings.GetById(MatchmakingId.NewMatchmakingId(command.MatchmakingId), ct);
+        var matchmaking = await matchmakings.GetById(MatchmakingId.NewMatchmakingId(command.MatchmakingId), ct).AwaitOrWrap(_ => new IdNotFoundException(command.MatchmakingId));;
 
         string? failReason = null;
         if (matchmaking.Status_.Tag == Status.Tags.Failed)

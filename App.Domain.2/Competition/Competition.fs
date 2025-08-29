@@ -94,6 +94,9 @@ with
                       Jumpers = jumpers }
             }
 
+    member this.Classification() =
+        this.Results.FinalClassification()
+        
     member this.SetStartingGate(gate: Gate) =
         let newGateState = { Starting = gate; CurrentJury = gate; CoachChange = None }
         match this.Status with
@@ -249,3 +252,7 @@ with
 
     member private this.FindJumper(jid: JumperId) =
         this.Jumpers |> List.find (fun j -> j.Id = jid)
+        
+    member this.ClassificationResultOf (jumperId: JumperId) =
+        this.Classification()
+        |> List.tryFind(fun result -> result.JumperId = jumperId)

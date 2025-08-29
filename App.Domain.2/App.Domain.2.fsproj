@@ -29,7 +29,14 @@
         <Compile Include="Game\Settings.fs" />
         <Compile Include="Game\Game.fs" />
         <Compile Include="Game\IGames.fs" />
+        <Compile Include="Simulation\Hill.fs" />
+        <Compile Include="Simulation\Jumper.fs" />
+        <Compile Include="Simulation\Jump.fs" />
+        <Compile Include="Simulation\Context.fs" />
         <Compile Include="Simulation\IJumpSimulator.fs" />
+        <Compile Include="Simulation\IWindEngine.fs" />
+        <Compile Include="GameWorld\Country.fs" />
+        <Compile Include="GameWorld\Jumper.fs" />
     </ItemGroup>
 
     <ItemGroup>

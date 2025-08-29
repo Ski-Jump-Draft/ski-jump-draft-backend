@@ -4,6 +4,7 @@ using App.Application._2.Extensions;
 using App.Application._2.Matchmaking;
 using App.Application._2.Messaging.Notifiers;
 using App.Application._2.Utility;
+using App.Domain._2.GameWorld;
 using App.Domain._2.Matchmaking;
 
 namespace App.Application._2.UseCase.Matchmaking.JoinQuickMatchmaking;
@@ -23,7 +24,8 @@ public class Handler(
     IJson json,
     IClock clock,
     IMatchmakingSchedule matchmakingSchedule,
-    IMatchmakingNotifier matchmakingNotifier)
+    IMatchmakingNotifier matchmakingNotifier,
+    IJumpers jumpers)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -50,10 +52,10 @@ public class Handler(
             {
                 throw new PlayerAlreadyJoinedException();
             }
-            
+
             throw new Exception($"Unknown error: {joinResult.ErrorValue}");
         }
-        
+
         var (matchmakingAfterJoin, correctedNick) = joinResult.ResultValue;
         await matchmakings.Add(matchmakingAfterJoin, ct);
 
@@ -97,5 +99,7 @@ public class Handler(
 }
 
 public class MultipleMatchmakingsNotSupportedException(string? message = null) : Exception(message);
+
 public class RoomIsFullException(string? message = null) : Exception(message);
+
 public class PlayerAlreadyJoinedException(string? message = null) : Exception(message);

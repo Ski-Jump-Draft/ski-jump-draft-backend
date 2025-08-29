@@ -3,7 +3,7 @@ using App.Application._2.Utility;
 
 namespace App.Infrastructure._2.Utility.Json;
 
-public class System : IJson
+public class DefaultJson : IJson
 {
     public string Serialize<T>(T value)
     {

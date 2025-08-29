@@ -1,5 +1,7 @@
 using App.Application._2.Acl;
 using App.Application._2.Commanding;
+using App.Application._2.Exceptions;
+using App.Application._2.Extensions;
 using App.Application._2.Messaging.Notifiers;
 using App.Application._2.Messaging.Notifiers.Mapper;
 using App.Application._2.Policy;
@@ -28,13 +30,13 @@ public class Handler(
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
     {
-        var game = await games.GetById(Domain._2.Game.GameId.NewGameId(command.GameId), ct);
-        var gameGuid = game.Id_.Item;
+        var game = await games.GetById(Domain._2.Game.GameId.NewGameId(command.GameId), ct)
+            .AwaitOrWrap(_ => new IdNotFoundException(command.GameId));
 
         return new Result(HasLeft: false);
 
         throw new NotImplementedException();
-        
+
         //
         // if (gameAfterPreDraftStartResult.IsOk)
         // {

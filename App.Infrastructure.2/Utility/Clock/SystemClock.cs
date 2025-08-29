@@ -2,7 +2,7 @@ using App.Application._2.Utility;
 
 namespace App.Infrastructure._2.Utility.Clock;
 
-public class System : IClock
+public class SystemClock : IClock
 {
     public DateTime UtcNow()
     {
