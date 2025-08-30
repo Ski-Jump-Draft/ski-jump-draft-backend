@@ -7,10 +7,11 @@ using App.Application._2.Messaging.Notifiers.Mapper;
 using App.Application._2.Policy.GameHillSelector;
 using App.Application._2.Policy.GameJumpersSelector;
 using App.Application._2.Utility;
-using App.Domain._2.Competition;
 using App.Domain._2.Game;
+using App.Domain._2.GameWorld;
 using App.Domain._2.Matchmaking;
 using Microsoft.FSharp.Collections;
+using HillModule = App.Domain._2.Competition.HillModule;
 using PlayerId = App.Domain._2.Game.PlayerId;
 using PlayerModule = App.Domain._2.Game.PlayerModule;
 
@@ -35,7 +36,8 @@ public class Handler(
     IGuid guid,
     IGameJumperAcl gameJumperAcl,
     ICompetitionJumperAcl competitionJumperAcl,
-    IMyLogger logger)
+    IMyLogger logger,
+    IHills hills)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -52,7 +54,9 @@ public class Handler(
 
         var selectedJumperDtos = await jumpersSelector.Select(ct);
 
-        var selectedHillDto = await hillSelector.Select();
+        var selectedHillGuid = await hillSelector.Select(ct);
+        var gameWorldHill = await hills.GetById(Domain._2.GameWorld.HillId.NewHillId(selectedHillGuid), ct)
+            .AwaitOrWrap(_ => new IdNotFoundException(selectedHillGuid));
 
         var gameGuid = guid.NewGuid();
         var gameId = Domain._2.Game.GameId.NewGameId(gameGuid);
@@ -84,13 +88,18 @@ public class Handler(
         });
         var gameJumpers = Domain._2.Game.JumpersModule.create(ListModule.OfSeq(gameJumpersEnumerable));
 
-        var competitionHillId = Domain._2.Competition.HillId.NewHillId(selectedHillDto.Id);
+        var competitionHillId = Domain._2.Competition.HillId.NewHillId(guid.NewGuid());
         var competitionHill = new Domain._2.Competition.Hill(competitionHillId,
-            HillModule.KPointModule.tryCreate(selectedHillDto.KPoint).Value,
-            HillModule.HsPointModule.tryCreate(selectedHillDto.HsPoint).Value,
-            HillModule.GatePointsModule.tryCreate(selectedHillDto.GatePoints).Value,
-            HillModule.WindPointsModule.tryCreate(selectedHillDto.HeadwindPoints).Value,
-            HillModule.WindPointsModule.tryCreate(selectedHillDto.TailwindPoints).Value);
+            HillModule.KPointModule.tryCreate(Domain._2.GameWorld.HillModule.KPointModule.value(gameWorldHill.KPoint))
+                .Value,
+            HillModule.HsPointModule
+                .tryCreate(Domain._2.GameWorld.HillModule.HsPointModule.value(gameWorldHill.HsPoint)).Value,
+            HillModule.GatePointsModule
+                .tryCreate(Domain._2.GameWorld.HillModule.GatePointsModule.value(gameWorldHill.GatePoints)).Value,
+            HillModule.WindPointsModule
+                .tryCreate(Domain._2.GameWorld.HillModule.WindPointsModule.value(gameWorldHill.HeadwindPoints)).Value,
+            HillModule.WindPointsModule
+                .tryCreate(Domain._2.GameWorld.HillModule.WindPointsModule.value(gameWorldHill.TailwindPoints)).Value);
 
         var gameResult =
             Domain._2.Game.Game.Create(gameId, globalGameSettings, gamePlayers, gameJumpers, competitionHill);

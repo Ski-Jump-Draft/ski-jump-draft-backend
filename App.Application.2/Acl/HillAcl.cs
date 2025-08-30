@@ -7,5 +7,5 @@ public interface ICompetitionHillAcl
     CompetitionHillDto GetCompetitionHill(Guid gameWorldHillId);
 }
 
-public record GameWorldHillDto(Guid Id, string Name, string Location, Guid CountryId, string CountryFisCode, int KPoint, int HsPoint);
+public record GameWorldHillDto(Guid Id);
 public record CompetitionHillDto(Guid Id);

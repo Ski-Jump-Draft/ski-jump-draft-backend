@@ -1,6 +1,7 @@
 using Amazon.S3;
 using Amazon.S3.Model;
 using App.Infrastructure._2.Repository.GameWorld.Country;
+using App.Infrastructure._2.Repository.GameWorld.Hill;
 using App.Infrastructure._2.Repository.GameWorld.Jumper;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -11,12 +12,14 @@ public interface ICsvStreamProvider
     Task<Stream> Open(CancellationToken ct);
 }
 
-public class FileCsvStreamProvider(string path) : ICsvStreamProvider, IGameWorldJumpersCsvStreamProvider, IGameWorldCountriesCsvStreamProvider
+public class FileCsvStreamProvider(string path) : IGameWorldJumpersCsvStreamProvider,
+    IGameWorldCountriesCsvStreamProvider, IGameWorldHillsCsvStreamProvider
 {
     public Task<Stream> Open(CancellationToken ct) => Task.FromResult<Stream>(File.OpenRead(path));
 }
 
-public class S3CsvStreamProvider(IAmazonS3 s3, string bucket, string key) : ICsvStreamProvider, IGameWorldJumpersCsvStreamProvider, IGameWorldCountriesCsvStreamProvider
+public class S3CsvStreamProvider(IAmazonS3 s3, string bucket, string key) : IGameWorldJumpersCsvStreamProvider,
+    IGameWorldCountriesCsvStreamProvider, IGameWorldHillsCsvStreamProvider
 {
     public async Task<Stream> Open(CancellationToken ct)
     {
@@ -30,7 +33,8 @@ public class S3CsvStreamProvider(IAmazonS3 s3, string bucket, string key) : ICsv
     }
 }
 
-public class HttpCsvStreamProvider(HttpClient client, string url) : ICsvStreamProvider, IGameWorldJumpersCsvStreamProvider, IGameWorldCountriesCsvStreamProvider
+public class HttpCsvStreamProvider(HttpClient client, string url) : IGameWorldJumpersCsvStreamProvider,
+    IGameWorldCountriesCsvStreamProvider, IGameWorldHillsCsvStreamProvider
 {
     public async Task<Stream> Open(CancellationToken ct)
     {
@@ -43,7 +47,8 @@ public class HttpCsvStreamProvider(HttpClient client, string url) : ICsvStreamPr
 }
 
 public class CachingCsvStreamProvider(ICsvStreamProvider inner, IMemoryCache cache, string cacheKey, TimeSpan ttl)
-    : ICsvStreamProvider, IGameWorldJumpersCsvStreamProvider, IGameWorldCountriesCsvStreamProvider
+    : IGameWorldJumpersCsvStreamProvider, IGameWorldCountriesCsvStreamProvider,
+        IGameWorldHillsCsvStreamProvider
 {
     public async Task<Stream> Open(CancellationToken ct)
     {

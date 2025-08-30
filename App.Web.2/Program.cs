@@ -6,6 +6,7 @@ using App.Application._2.Messaging.Notifiers;
 using App.Application._2.Policy.GameHillSelector;
 using App.Application._2.Policy.GameJumpersSelector;
 using App.Application._2.Utility;
+using App.Domain._2.GameWorld;
 using App.Infrastructure._2.Helper.Csv;
 using App.Web._2.MockedFlow;
 using App.Web._2.Notifiers.Game;
@@ -130,7 +131,8 @@ builder.Services.AddSingleton<App.Web._2.Notifiers.SseHub.ISseHub, App.Web._2.No
 builder.Services.AddSingleton<IMatchmakingNotifier, App.Web._2.Notifiers.Matchmaking.Sse>();
 builder.Services.AddSingleton<IGameNotifier, SignalRGameNotifier>();
 
-builder.Services.AddSingleton<IGameHillSelector, App.Application._2.Policy.GameHillSelector.Mocked>();
+builder.Services.AddSingleton<IGameHillSelector, App.Application._2.Policy.GameHillSelector.Fixed>(sp =>
+    new Fixed("Zakopane HS140", sp.GetRequiredService<IHills>()));
 builder.Services.AddSingleton<IGameJumpersSelector, App.Application._2.Policy.GameJumpersSelector.All>();
 
 builder.Services.AddSingleton<IGameJumperAcl, App.Infrastructure._2.Acl.GameJumpers.InMemory>();
@@ -158,7 +160,7 @@ builder.Services
         var inner = new App.Infrastructure._2.Helper.Csv.FileCsvStreamProvider(absPath);
         return new CachingCsvStreamProvider(inner,
             sp.GetRequiredService<IMemoryCache>(),
-            "countries.csv",
+            "countries",
             TimeSpan.FromMinutes(5));
     });
 
@@ -174,7 +176,21 @@ builder.Services
         var inner = new App.Infrastructure._2.Helper.Csv.FileCsvStreamProvider(absPath);
         return new CachingCsvStreamProvider(inner,
             sp.GetRequiredService<IMemoryCache>(),
-            "jumpers.csv",
+            "jumpers",
+            TimeSpan.FromMinutes(5));
+    });
+builder.Services
+    .AddSingleton<App.Domain._2.GameWorld.IHills, App.Infrastructure._2.Repository.GameWorld.Hill.Csv>();
+builder.Services
+    .AddSingleton<App.Infrastructure._2.Repository.GameWorld.Hill.IGameWorldHillsCsvStreamProvider>(sp =>
+    {
+        var relPath = sp.GetRequiredService<IConfiguration>().GetValue<string>("Csv:Hills:File");
+        var absPath = Path.Combine(AppContext.BaseDirectory, relPath!);
+
+        var inner = new App.Infrastructure._2.Helper.Csv.FileCsvStreamProvider(absPath);
+        return new CachingCsvStreamProvider(inner,
+            sp.GetRequiredService<IMemoryCache>(),
+            "hills",
             TimeSpan.FromMinutes(5));
     });
 builder.Services

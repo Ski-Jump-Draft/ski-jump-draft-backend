@@ -37,6 +37,7 @@
         <Compile Include="Simulation\IWindEngine.fs" />
         <Compile Include="GameWorld\Country.fs" />
         <Compile Include="GameWorld\Jumper.fs" />
+        <Compile Include="GameWorld\Hill.fs" />
     </ItemGroup>
 
     <ItemGroup>

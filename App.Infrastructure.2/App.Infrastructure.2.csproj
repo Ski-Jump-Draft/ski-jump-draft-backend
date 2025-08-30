@@ -23,7 +23,6 @@
 
     <ItemGroup>
       <Folder Include="Messaging\Notifier\Matchmaking\" />
-      <Folder Include="Repository\GameWorld\Hill\" />
     </ItemGroup>
 
     <ItemGroup>
