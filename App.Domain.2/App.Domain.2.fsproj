@@ -34,7 +34,7 @@
         <Compile Include="Simulation\Jump.fs" />
         <Compile Include="Simulation\Context.fs" />
         <Compile Include="Simulation\IJumpSimulator.fs" />
-        <Compile Include="Simulation\IWindEngine.fs" />
+        <Compile Include="Simulation\IWeatherEngine.fs" />
         <Compile Include="GameWorld\Country.fs" />
         <Compile Include="GameWorld\Jumper.fs" />
         <Compile Include="GameWorld\Hill.fs" />

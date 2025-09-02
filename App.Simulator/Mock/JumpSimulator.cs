@@ -3,7 +3,7 @@ using App.Domain._2.Simulation;
 
 namespace App.Simulator.Mock;
 
-public class JumpSimulator(IRandom random, IWeatherEngine weatherEngine) : IJumpSimulator
+public class JumpSimulator(IRandom random) : IJumpSimulator
 {
     public Jump Simulate(SimulationContext context)
     {
@@ -16,7 +16,6 @@ public class JumpSimulator(IRandom random, IWeatherEngine weatherEngine) : IJump
             <= 5 => Landing.Parallel,
             _ => Landing.Telemark,
         };
-        var wind = weatherEngine.GetWind();
         return new Jump(distance, landing);
     }
 }

@@ -94,8 +94,8 @@ with
                       Jumpers = jumpers }
             }
 
-    member this.Classification() =
-        this.Results.FinalClassification()
+    member this.Classification=
+        this.Results.FinalClassification
         
     member this.SetStartingGate(gate: Gate) =
         let newGateState = { Starting = gate; CurrentJury = gate; CoachChange = None }
@@ -155,6 +155,13 @@ with
 
     member this.AddJump(jumpResultId: JumpResultId, jump: Jump) =
         let jumperId = jump.JumperId
+
+        let ensureNextIs jid =
+            match this.Startlist.NextEntry with
+            | Some next when next.JumperId = jid -> Ok ()
+            | Some next -> Error (Error.JumperNotNextInStartlist(next, jid))
+            | None -> Error (Error.InvalidStatus(this.GetStatusTag, [ StatusTag.NotStartedTag; StatusTag.RoundInProgressTag ]))
+
         let execute roundIndex =
             let gs = this.CurrentGateState()
             let jumper = this.FindJumper jumperId
@@ -174,6 +181,7 @@ with
                         |> Result.mapError (fun e -> Error.Internal (string e))
                     else
                         Ok this.Startlist
+
                 let baseStatus =
                     match this.Status with
                     | Status.NotStarted _ -> Status.RoundInProgress(gs, roundIndex)
@@ -189,27 +197,27 @@ with
                     let (RoundIndex i) = roundIndex
                     let nextRound = RoundIndex (i + 1u)
                     let nextStatus = Status.RoundInProgress(gs, nextRound)
-                    let nextStartlist = this.BuildNextRoundStartlist(nextRound, resultsAfter)
+                    // IMPORTANT: use startlistAfter (po oznaczeniu bieżącego skoku jako done)
+                    let nextStartlist = this.BuildNextRoundStartlist(startlistAfter, nextRound, resultsAfter)
                     let updated = { this with Results = resultsAfter; Startlist = nextStartlist; Status = nextStatus }
                     return updated.ClearCoachChange()
             }
 
         match this.Status with
-        | Status.NotStarted _ -> execute (RoundIndex 0u)
-        | Status.RoundInProgress(_, round) ->
-            match this.Startlist.NextEntry with
-            | Some next when next.JumperId <> jumperId -> Error (Error.JumperNotNextInStartlist(next, jumperId))
-            | _ -> execute round
-        | Status.Suspended _
-        | Status.Cancelled
-        | Status.Ended -> Error (Error.InvalidStatus(this.GetStatusTag, []))
+            | Status.NotStarted _ ->
+                // Require that the jumper is actually the next in the startlist
+                ensureNextIs jumperId |> Result.bind (fun () -> execute (RoundIndex 0u))
+            | Status.RoundInProgress(_, round) ->
+                ensureNextIs jumperId |> Result.bind (fun () -> execute round)
+            | Status.Suspended _
+            | Status.Cancelled
+            | Status.Ended -> Error (Error.InvalidStatus(this.GetStatusTag, []))
 
-
-    member private this.BuildNextRoundStartlist(nextRound: RoundIndex, currentResults: Results) =
+    member private this.BuildNextRoundStartlist(prevStartlist: Startlist, nextRound: RoundIndex, currentResults: Results) =
         let totalsSinceReset = currentResults.TotalsSinceReset this.Settings.PointsResets nextRound
         let ranked = totalsSinceReset |> Map.toList |> List.sortByDescending snd
         let bibValue jid =
-            this.Startlist.BibOf jid
+            prevStartlist.BibOf jid
             |> Option.map Startlist.Bib.value
             |> Option.defaultWith (fun _ -> invalidOp "BIB not found")
         let roundSettings = this.Settings.RoundSettings[int (RoundIndexModule.value nextRound)]
@@ -241,7 +249,8 @@ with
         let ordered =
             let ids = limited |> List.map fst
             if roundSettings.SortStartlist then ids |> List.rev else ids
-        Startlist.WithOrder this.Startlist ordered |> Result.toOption |> Option.get
+        Startlist.WithOrder prevStartlist ordered |> Result.toOption |> Option.get
+
 
     member private this.IsLastRound(round: RoundIndex) =
         let (RoundIndex i) = round
@@ -254,5 +263,5 @@ with
         this.Jumpers |> List.find (fun j -> j.Id = jid)
         
     member this.ClassificationResultOf (jumperId: JumperId) =
-        this.Classification()
+        this.Classification
         |> List.tryFind(fun result -> result.JumperId = jumperId)

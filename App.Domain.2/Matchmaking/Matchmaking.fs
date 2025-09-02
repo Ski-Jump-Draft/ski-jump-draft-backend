@@ -110,7 +110,7 @@ type Matchmaking =
                 Ok(
                     { this with
                         Status = Ended NotEnoughPlayers },
-                    true
+                    false
                 )
         | _ -> Error(InvalidStatus this.Status)
 

@@ -7,8 +7,25 @@ module HillWindPointsCalculator =
 
 module JumpResultCreator =
     open Jump
-    
+
     type FisError = TooLessJudgeNotes of Count: int * Minimum: int
+
+
+    let private baseDistancePoints (k: double) = if k >= 200.0 then 120.0 else 60.0
+
+    let private pointsForMeter (k: double) =
+        if k >= 180.0 then 1.2
+        elif k >= 135.0 then 1.6
+        elif k >= 100.0 then 1.8
+        elif k >= 80.0 then 2.0
+        elif k >= 70.0 then 2.2
+        elif k >= 60.0 then 2.4
+        elif k >= 50.0 then 2.8
+        elif k >= 45.0 then 3.2
+        elif k >= 40.0 then 3.6
+        elif k >= 30.0 then 4.0
+        elif k >= 25.0 then 4.4
+        else 4.8
 
     let createFisJumpResult
         (id: JumpResultId)
@@ -43,9 +60,13 @@ module JumpResultCreator =
                 let gateDiff = float (startingGate - gate)
                 let baseGatePoints = gateDiff * pointsPerGate
 
+                let k = Hill.KPoint.value hill.KPoint
                 let hs = Hill.HsPoint.value hill.HsPoint
                 let distance95 = 0.95 * hs
                 let baseDistance = Distance.value jump.Distance
+
+                let distancePoints =
+                    baseDistancePoints (k) + ((baseDistance - k) * pointsForMeter (k))
 
                 let coachReduction =
                     match coachGateChange with
@@ -54,8 +75,7 @@ module JumpResultCreator =
                         | Reduction by -> by
                         | Increase _ ->
                             invalidOp "Coach cannot increase the gate. It should not happen, please report the bug."
-                    | None ->
-                        0u 
+                    | None -> 0u
 
                 let coachPoints =
                     if coachReduction > 0u && baseDistance >= distance95 then
@@ -67,15 +87,15 @@ module JumpResultCreator =
 
                 let windPoints =
                     match jump.Wind with
-                    | WindAverage.Headwind v ->
+                    | WindAverage.Headwind headwind ->
                         let hillHeadwindPoints = Hill.WindPoints.value hill.HeadwindPoints
-                        v * hillHeadwindPoints
-                    | WindAverage.Tailwind v ->
+                        headwind * hillHeadwindPoints
+                    | WindAverage.Tailwind tailwind ->
                         let hillTailwindPoints = Hill.WindPoints.value hill.TailwindPoints
-                        v * hillTailwindPoints
+                        tailwind * hillTailwindPoints
                     | WindAverage.Zero -> 0.0
 
-                let totalPoints = judgePointsSum + totalGatePoints + windPoints
+                let totalPoints = distancePoints + judgePointsSum + totalGatePoints + windPoints
 
                 Ok
                     { Id = id

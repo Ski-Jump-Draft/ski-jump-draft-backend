@@ -9,4 +9,5 @@ type IGames =
     abstract member GetById: gameId: GameId * ct: CancellationToken -> Task<Game option>
     abstract member GetNotStarted: ct: CancellationToken -> Task<IEnumerable<Game>>
     abstract member GetInProgress: ct: CancellationToken -> Task<IEnumerable<Game>>
+    abstract member GetInProgressCount: ct: CancellationToken -> Task<int>
     abstract member GetEnded: ct: CancellationToken -> Task<IEnumerable<Game>>

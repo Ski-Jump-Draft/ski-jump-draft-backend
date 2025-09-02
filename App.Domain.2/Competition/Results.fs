@@ -91,7 +91,7 @@ type Results =
             | 0.0 -> Option.None
             | s -> Some(TotalPoints s)
 
-    member this.FinalClassification() =
+    member this.FinalClassification=
         let totals =
             this.JumpResults
             |> List.groupBy _.Jump.JumperId
@@ -119,7 +119,7 @@ type Results =
             : Classification.JumperClassificationResult)
 
     member this.PositionOf(jumperId: JumperId) : Classification.Position option =
-        this.FinalClassification()
+        this.FinalClassification
         |> List.tryFind (fun competitorTotal -> competitorTotal.JumperId = jumperId)
         |> Option.map _.Position
 

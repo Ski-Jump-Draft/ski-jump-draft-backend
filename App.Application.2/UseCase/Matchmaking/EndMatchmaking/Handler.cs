@@ -29,6 +29,8 @@ public class Handler(
         var matchmaking = await matchmakings.GetById(MatchmakingId.NewMatchmakingId(command.MatchmakingId), ct).AwaitOrWrap(_ => new IdNotFoundException(command.MatchmakingId));;
 
         var (endedMatchmaking, hasSucceeded) = matchmaking.End().ResultValue;
+        
+        logger.Info($"Tried to end matchmaking. MatchmakingId: {command.MatchmakingId}. hasSucceeded: {hasSucceeded}. Status: {endedMatchmaking.Status_}. Players count: {endedMatchmaking.PlayersCount}.");
 
         await matchmakings.Add(endedMatchmaking, ct);
 

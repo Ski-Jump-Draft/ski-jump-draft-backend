@@ -4,8 +4,11 @@ using App.Application._2.Extensions;
 using App.Application._2.Matchmaking;
 using App.Application._2.Messaging.Notifiers;
 using App.Application._2.Utility;
+using App.Domain._2.Game;
 using App.Domain._2.GameWorld;
 using App.Domain._2.Matchmaking;
+using PlayerId = App.Domain._2.Matchmaking.PlayerId;
+using PlayerModule = App.Domain._2.Matchmaking.PlayerModule;
 
 namespace App.Application._2.UseCase.Matchmaking.JoinQuickMatchmaking;
 
@@ -26,12 +29,12 @@ public class Handler(
     IMatchmakingSchedule matchmakingSchedule,
     IMatchmakingNotifier matchmakingNotifier,
     IJumpers jumpers,
-    IMatchmakingDurationCalculator matchmakingDurationCalculator)
+    IMatchmakingDurationCalculator matchmakingDurationCalculator,
+    IGames games)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
     {
-        myLogger.Info($"{command.Nick} requested the join to a matchmaking ");
         var nickOption = PlayerModule.NickModule.create(command.Nick);
         if (nickOption.IsNone())
         {
@@ -80,12 +83,14 @@ public class Handler(
     private async Task<MatchmakingDto> FindOrCreateMatchmakingAsync(CancellationToken ct)
     {
         var matchmmakingsInProgress = (await matchmakings.GetInProgress(ct)).ToImmutableArray();
-        switch (matchmmakingsInProgress.Length)
+        var gamesInProgress = await games.GetInProgressCount(ct);
+        switch (matchmmakingsInProgress.Length, gamesInProgress)
         {
-            case > 1:
-                throw new MultipleMatchmakingsNotSupportedException();
-            case 1:
+            case (_, >= 1):
+                throw new MultipleGamesNotSupportedException();
+            case (1, 0):
                 return new MatchmakingDto(matchmmakingsInProgress.Single(), JustCreated: false);
+            // 0 matchmakings, 0 games
             default:
             {
                 var newMatchmaking =
@@ -99,7 +104,7 @@ public class Handler(
     private record MatchmakingDto(Domain._2.Matchmaking.Matchmaking Matchmaking, bool JustCreated);
 }
 
-public class MultipleMatchmakingsNotSupportedException(string? message = null) : Exception(message);
+public class MultipleGamesNotSupportedException(string? message = null) : Exception(message);
 
 public class RoomIsFullException(string? message = null) : Exception(message);
 

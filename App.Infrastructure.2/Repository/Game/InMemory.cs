@@ -34,6 +34,11 @@ public class InMemory : IGames
         return Task.FromResult(result.AsEnumerable());
     }
 
+    public async Task<int> GetInProgressCount(CancellationToken ct)
+    {
+        return (await GetInProgress(ct)).Count();
+    }
+
     public Task<IEnumerable<Domain._2.Game.Game>> GetEnded(CancellationToken ct)
     {
         var result = _store.Values.Where(game => game.StatusTag.Equals(StatusTag.EndedTag));

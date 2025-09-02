@@ -51,19 +51,13 @@ public class Handler(
             throw new CompetitionNotRunningException(command.GameId);
         }
 
-        var wind = weatherEngine.GetWind();
+        var simulationWind = weatherEngine.GetWind();
         var gate = game.CurrentCompetitionGate;
         var nextCompetitionJumper = game.NextCompetitionJumper.Value;
         var competitionHill = game.Hill.Value;
 
         var gameJumperDto = competitionJumperAcl.GetGameJumper(nextCompetitionJumper.Id.Item);
         var gameWorldJumperDto = gameJumperAcl.GetGameWorldJumper(gameJumperDto.Id);
-        logger.Debug($"gameWorldJumperDto: {gameWorldJumperDto}");
-        var allGameWorldJumpers = await gameWorldJumpers.GetAll(ct);
-        foreach (var jmpr in allGameWorldJumpers)
-        {
-            logger.Debug($"Jumper in GameWorld: {jmpr.Name} {jmpr.Surname} ({jmpr.Id})");
-        }
 
         var gameWorldJumper =
             await gameWorldJumpers.GetById(Domain._2.GameWorld.JumperId.NewJumperId(gameWorldJumperDto.Id), ct)
@@ -96,16 +90,21 @@ public class Handler(
                 .OrThrow("Wrong hs point")));
         var simulationContext =
             new SimulationContext(Gate.NewGate(App.Domain._2.Competition.GateModule.value(gate)),
-                new Jumper(jumperSkills), hill, wind);
+                new Jumper(jumperSkills), hill, simulationWind);
         var simulatedJump = jumpSimulator.Simulate(simulationContext);
+
+        logger.Debug($"{gameWorldJumper.Name.Item} {gameWorldJumper.Surname.Item} jumped: {
+            DistanceModule.value(simulatedJump.Distance)}m + {simulatedJump.Landing}");
 
         var judgeNotes = JumpModule.JudgeNotesModule.tryCreate(ListModule.OfSeq([18.0, 18.5, 18.5, 17.5, 17.5]))
             .OrThrow("Invalid judge notes"); // Komponent Judgement
+        var competitionJumpWind =
+            App.Domain._2.Competition.JumpModule.WindAverage.FromDouble(WindModule.averaged(simulationWind));
         var competitionJump = new App.Domain._2.Competition.Jump(nextCompetitionJumper.Id,
             JumpModule.DistanceModule.tryCreate(DistanceModule.value(simulatedJump.Distance))
                 .OrThrow("Invalid distance"),
             judgeNotes,
-            JumpModule.WindAverage.CreateHeadwind(15.5));
+            competitionJumpWind);
 
         var jumpResultId = JumpResultId.NewJumpResultId(guid.NewGuid());
         var gameAfterAddingJumpResult = game.AddJumpInCompetition(jumpResultId, competitionJump);
@@ -113,22 +112,40 @@ public class Handler(
         {
             var addJumpOutcome = gameAfterAddingJumpResult.ResultValue;
             var gameAfterAddingJump = addJumpOutcome.Game;
+            var competitionAfterAddingJump = addJumpOutcome.Competition;
             var changedPhase = addJumpOutcome.PhaseChangedTo;
+
+            await games.Add(gameAfterAddingJump, ct);
+
+            var classificationResult =
+                competitionAfterAddingJump.ClassificationResultOf(nextCompetitionJumper.Id).Value;
+            logger.Debug($"{gameWorldJumper.Name.Item} {gameWorldJumper.Surname.Item}: Pos. {
+                Domain._2.Competition.Classification.PositionModule.value(classificationResult.Position)}({
+                    classificationResult.Points.Item
+                }pts)");
             if (gameAfterAddingJump.IsDuringCompetition)
             {
                 var now = clock.Now();
                 await scheduler.ScheduleAsync(
                     jobType: "SimulateJumpInGame",
                     payloadJson: json.Serialize(new { GameId = command.GameId }),
-                    runAt: now.AddSeconds(10),
+                    runAt: now.AddSeconds(3),
                     uniqueKey: $"SimulateJumpInGame:{command.GameId}_{now.ToUnixTimeSeconds()}",
                     ct: ct);
             }
             else
             {
-                if (game.Status.IsPreDraft && ((Domain._2.Game.Status.PreDraft)game.Status).Item.IsBreak)
+                logger.Debug(
+                    $"Competition (Game ID: {command.GameId}) CurrentCompetitionClassification: " +
+                    string.Join(", ",
+                        competitionAfterAddingJump.Classification
+                            .Select(result => $"{result.JumperId.Item} {result.Points.Item}"))
+                );
+
+                if (gameAfterAddingJump.Status.IsPreDraft &&
+                    ((Domain._2.Game.Status.PreDraft)gameAfterAddingJump.Status).Item.IsBreak)
                 {
-                    var preDraftStatus = (Domain._2.Game.Status.PreDraft)game.Status;
+                    var preDraftStatus = (Domain._2.Game.Status.PreDraft)gameAfterAddingJump.Status;
                     var preDraftBreak = (Domain._2.Game.PreDraftStatus.Break)preDraftStatus.Item;
                     var nextPreDraftCompetitionIndex = PreDraftCompetitionIndexModule.value(preDraftBreak.NextIndex);
                     var now = clock.Now();
@@ -139,7 +156,8 @@ public class Handler(
                         uniqueKey: $"StartNextPreDraftCompetition:{command.GameId}_{nextPreDraftCompetitionIndex}",
                         ct: ct);
                 }
-                else if (game.Status.IsBreak && ((Domain._2.Game.Status.Break)game.Status).Next.IsDraftTag)
+                else if (gameAfterAddingJump.Status.IsBreak &&
+                         ((Domain._2.Game.Status.Break)gameAfterAddingJump.Status).Next.IsDraftTag)
                 {
                     var now = clock.Now();
                     await scheduler.ScheduleAsync(
@@ -149,7 +167,8 @@ public class Handler(
                         uniqueKey: $"StartDraft:{command.GameId}",
                         ct: ct);
                 }
-                else if (game.Status.IsBreak && ((Domain._2.Game.Status.Break)game.Status).Next.IsEndedTag)
+                else if (gameAfterAddingJump.Status.IsBreak &&
+                         ((Domain._2.Game.Status.Break)gameAfterAddingJump.Status).Next.IsEndedTag)
                 {
                     var now = clock.Now();
                     await scheduler.ScheduleAsync(
@@ -162,8 +181,9 @@ public class Handler(
                 else
                 {
                     throw new InternalCriticalException(
-                        $"Competition isn't in progress and no automatic action is defined. Game: {game.Id}, Phase: {
-                            game.Status}, Changed Phase: {changedPhase},");
+                        $"Competition isn't in progress and no automatic action is defined. Game: {
+                            gameAfterAddingJump.Id}, Phase: {
+                                gameAfterAddingJump.Status}, Changed Phase: {changedPhase},");
                 }
             }
 
@@ -172,14 +192,15 @@ public class Handler(
             var gameWorldCountry = await gameWorldCountries.GetById(gameWorldJumper.CountryId, ct)
                 .AwaitOrWrap(_ => new IdNotFoundException(gameWorldJumper.CountryId.Item));
 
-            var jumperResultInClassifiation = gameAfterAddingJump.ClassificationResultOf(nextCompetitionJumper.Id)
+            var jumperResultInClassifiation = addJumpOutcome.Competition
+                .ClassificationResultOf(nextCompetitionJumper.Id)
                 .OrThrow($"Missing classification result for competition jumper {nextCompetitionJumper.Id.Item}");
 
             var simulatedJumpDto = new SimulatedJumpDto(nextCompetitionJumper.Id.Item, gameWorldJumperDto.Id,
                 gameWorldJumper.Name.Item, gameWorldJumper.Surname.Item,
                 Domain._2.GameWorld.FisCodeModule.value(gameWorldCountry.FisCode),
                 DistanceModule.value(simulatedJump.Distance), JumpModule.JudgeNotesModule.value(judgeNotes).ToArray(),
-                WindModule.averaged(wind),
+                WindModule.averaged(simulationWind),
                 Domain._2.Competition.TotalPointsModule.value(jumperResultInClassifiation.Points),
                 Domain._2.Competition.Classification.PositionModule.value(jumperResultInClassifiation.Position));
 

@@ -79,7 +79,6 @@ public class Handler(
             var gameJumperId = guid.NewGuid();
             var gameJumperDto = new GameJumperDto(gameJumperId);
             var gameWorldJumperDto = new GameWorldJumperDto(selectedGameWorldJumperDto.Id);
-            logger.Debug($"Mapping {gameJumperDto} with {gameWorldJumperDto}");
             gameJumperAcl.Map(gameWorldJumperDto, gameJumperDto);
             var competitionJumperId =
                 guid.NewGuid(); // Od razu tworzymy competition jumpera, z którego korzystać będą inne Use Case'y

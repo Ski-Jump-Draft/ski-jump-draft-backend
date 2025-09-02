@@ -145,7 +145,7 @@ builder.Services.AddSingleton<App.Domain._2.Simulation.IJumpSimulator, App.Simul
 builder.Services
     .AddSingleton<App.Application._2.Matchmaking.IMatchmakingDurationCalculator,
         App.Application._2.Matchmaking.FixedMatchmakingDurationCalculator>(sp =>
-        new FixedMatchmakingDurationCalculator(TimeSpan.FromSeconds(30)));
+        new FixedMatchmakingDurationCalculator(TimeSpan.FromSeconds(25)));
 
 builder.Services.AddMemoryCache();
 

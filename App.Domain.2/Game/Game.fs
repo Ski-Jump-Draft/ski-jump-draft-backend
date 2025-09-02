@@ -272,7 +272,10 @@ type Game =
 
     member this.AdjustGateByJury = invalidOp "Not implemented" // TODO
     
-    member this.ClassificationResultOf (competitionJumperId: Competition.JumperId)   =
+    member this.CurrentCompetitionClassification=
+        this.CurrentCompetition.Value.Classification
+        
+    member this.CurrentCompetitionClassificationResultOf (competitionJumperId: Competition.JumperId)   =
         this.CurrentCompetition.Value.ClassificationResultOf competitionJumperId
             
     /// Ends the game based on a Ranking passed from Application Layer and drawn from some factory
