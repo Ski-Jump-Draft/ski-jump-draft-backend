@@ -1,248 +1,355 @@
 namespace App.Domain.Game
 
-open System
+open System.Collections.Generic
 open App.Domain
-open App.Domain.Game.Event
-open App.Domain.Game.Participant
-open App.Domain.Game.Ranking
-open App.Domain.Game.Settings
-open App.Domain.Shared.AggregateVersion
 
-// TODO: Ustawienia matchmakingu i pokoju gry. Game.Rules/Game.Settings
-// TODO: Może dynamiczny globalny limit graczy na pokój?
-// TODO: Pre-draft np. kwalifikacje
+type GameId = GameId of System.Guid
 
-module Game =
-    [<Struct>]
-    type Date = Date of DateTimeOffset
+type StatusTag =
+    | PreDraftTag
+    | DraftTag
+    | MainCompetitionTag
+    | EndedTag
+    | BreakTag of Next: StatusTag
 
-    module Date =
-        type Error = CannotBeInFuture of DateTimeOffset
+type PreDraftCompetitionIndex = private PreDraftCompetitionIndex of int
 
-        let create (v: DateTimeOffset, clock: Time.IClock) =
-            if v > clock.Now then
-                Error(CannotBeInFuture v)
+module PreDraftCompetitionIndex =
+    let create (v: int) =
+        if v < 0 then None else Some(PreDraftCompetitionIndex v)
+
+    let value (PreDraftCompetitionIndex v) = v
+
+    let next (v: PreDraftCompetitionIndex) =
+        let (PreDraftCompetitionIndex index) = v
+        (create (index + 1)).Value
+
+type PreDraftStatus =
+    | Break of NextIndex: PreDraftCompetitionIndex
+    | Running of Index: PreDraftCompetitionIndex * Competition: Competition.Competition
+
+type Status =
+    | PreDraft of PreDraftStatus
+    | Draft of Draft
+    | MainCompetition of Competition.Competition
+    | Ended of Ranking
+    | Break of Next: StatusTag
+
+type GameError =
+    | HillAlreadySet
+    | HillRequired
+    | PreDraftNotEndedYet
+    | PreDraftCompetitionAlreadyEnded
+    | DraftError of Error: DraftError
+    | CompetitionError of Error: Competition.Competition.Error
+    | InvalidPhase
+    | Internal of InnerError: string
+
+module private GameHelpers =
+    let hasNextPreDraftCompetition (settings: Settings) (index: PreDraftCompetitionIndex) =
+        let current = PreDraftCompetitionIndex.value index
+        current + 1 < settings.PreDraftSettings.Competitions.Length
+
+    let createCompetition settings hill competitionId competitionJumpers startingGate =
+        Competition.Competition.Create(competitionId, settings, hill, competitionJumpers, startingGate)
+
+    let updatePreDraftAfterCompetition settings index (competition: Competition.Competition) =
+        match competition.GetStatusTag with
+        | Competition.Competition.StatusTag.EndedTag ->
+            if hasNextPreDraftCompetition settings index then
+                let nextIndex = PreDraftCompetitionIndex.next index
+                Status.PreDraft(PreDraftStatus.Break nextIndex)
             else
-                Ok(Date v)
+                Status.Break DraftTag
+        | _ -> Status.PreDraft(PreDraftStatus.Running(index, competition))
 
-    type Phase =
-        | PreDraft of PreDraft.Id.Id
-        | Draft of Draft.Id.Id
-        | Competition of Game.Competition
-        | Ended of GameRanking
-        | Break of Next: PhaseTag
-
-    and PhaseTag =
-        | PreDraftTag
-        | DraftTag
-        | CompetitionTag
-        | EndedTag
-        | BreakTag of Next: PhaseTag
-
-    type Error =
-        | InvalidPhase of Expected: PhaseTag list * Actual: PhaseTag
-        // | GameRoomFull
-        | TooManyParticipants of Count: int * Max: int
-        | ParticipantNotInGame of Participant
-
-open Game
-
+[<CustomEquality; NoComparison>]
 type Game =
-    private
-        { Id: Id.Id
-          Version: AggregateVersion
-          Phase: Phase
-          Settings: Settings.Settings
-          Participants: Participants }
+    { Id: GameId
+      Settings: Settings
+      Status: Status
+      Players: Players
+      Jumpers: Jumpers
+      Hill: Competition.Hill option }
 
-    member this.Phase_ = this.Phase
-    member this.Participants_ = this.Participants
-    member this.Settings_ = this.Settings
-    member this.Version_: AggregateVersion = this.Version
+    override this.Equals(obj) =
+        match obj with
+        | :? Game as other -> this.Id = other.Id
+        | _ -> false
+
+    override this.GetHashCode() = hash this.Id
+
     member this.Id_ = this.Id
+    member this.Status_ = this.Status
 
-    static member TagOfPhase phase =
-        match phase with
+    member this.StatusTag =
+        match this.Status with
         | PreDraft _ -> PreDraftTag
         | Draft _ -> DraftTag
-        | Competition _ -> CompetitionTag
+        | MainCompetition _ -> MainCompetitionTag
         | Ended _ -> EndedTag
         | Break next -> BreakTag next
 
-    static member Create
-        id
-        version
-        (participantsList: Participant list)
-        (settings: Settings)
-        : Result<Game * GameEventPayload list, Error> =
-        let participants = Participants.from participantsList
+    member this.IsDuringCompetition = this.CurrentCompetition.IsSome
 
-        let participantsCount = Participants.count participants
-        let participantLimit = ParticipantLimit.value settings.ParticipantLimit
+    member this.WaitsForNextPreDraftCompetition =
+        match this.Status with
+        | PreDraft(PreDraftStatus.Break _) -> true
+        | _ -> false
 
-        if participantsCount > participantLimit then
-            Error(Error.TooManyParticipants(int (participantsCount), int (participantLimit)))
-        else
-            let state =
-                { Id = id
-                  Version = version
-                  Phase = Break PreDraftTag
-                  Settings = settings
-                  Participants = participants }
+    member this.WaitsForNextMainCompetition =
+        match this.Status with
+        | Break(StatusTag.MainCompetitionTag) -> true
+        | _ -> false
 
-            let event: Event.GameCreatedV1 =
-                { GameId = id
-                  Settings = settings
-                  Participants = Participants.value participants }
+    member this.WaitsForEnd =
+        match this.Status with
+        | Break(StatusTag.EndedTag) -> true
+        | _ -> false
 
+    member this.CurrentCompetitionGate =
+        this.CurrentCompetition.Value.GateState.Value.CurrentReal
 
-            Ok(state, [ GameEventPayload.GameCreatedV1 event ])
+    member this.NextCompetitionJumper = this.CurrentCompetition.Value.NextJumper
 
-    member this.Leave(participant: Participant) : Result<Game * GameEventPayload list, Error> =
-        if not (this.ParticipantIsPresent(participant)) then
-            Error(Game.Error.ParticipantNotInGame participant)
-        else
-            match this.Phase with
-            | Break _
-            | Draft _
-            | Competition _
-            | PreDraft _ ->
-                let updatedParticipants = Participants.removeById participant.Id this.Participants
+    member private this.Draft =
+        match this.Status with
+        | Draft draft -> Some draft
+        | _ -> None
 
-                let updatedGame =
+    member this.DraftPicks = this.Draft.Value.AllPicks;
+    
+    member this.AvailableDraftPicks : IEnumerable<JumperId> =
+        this.Draft.Value.AvailablePicks
+
+    static member Create id settings players jumpers (hill: Competition.Hill option) =
+        let game =
+            { Id = id
+              Settings = settings
+              Status = Break PreDraftTag
+              Players = players
+              Jumpers = jumpers
+              Hill = None }
+
+        let newGame =
+            match hill with
+            | Some hill -> game.SetHill hill
+            | None -> Ok game
+
+        match newGame with
+        | Ok newGame -> Ok newGame
+        | Error e -> Error(e)
+
+    /// Hill can be set once and must be before PreDraft. Sets a one hill for every competition in Game.
+    member this.SetHill(hill: Competition.Hill) : Result<Game, GameError> =
+        match this.Hill with
+        | None -> Ok({ this with Hill = Some hill })
+        | Some _ -> Error(GameError.HillAlreadySet)
+
+    /// Starts the PreDraft phase initializing it with the first competition
+    member this.StartPreDraft
+        (competitionId: Competition.CompetitionId)
+        (competitionJumpers: Competition.Jumper list)
+        (startingGate: Competition.Gate)
+        : Result<Game, GameError> =
+
+        let preDraftIdx = (PreDraftCompetitionIndex.create 0).Value
+
+        match this.Hill, this.Status with
+        | None, _ -> Error GameError.HillRequired
+        | Some hill, Break PreDraftTag ->
+            let settings = this.Settings.PreDraftSettings.Competitions[0]
+
+            match GameHelpers.createCompetition settings hill competitionId competitionJumpers startingGate with
+            | Ok competition ->
+                Ok
                     { this with
-                        Participants = updatedParticipants
-                        Version = increment this.Version }
+                        Status = Status.PreDraft(PreDraftStatus.Running(preDraftIdx, competition)) }
+            | Error e -> Error(GameError.CompetitionError e)
+        | _, _ -> Error GameError.InvalidPhase
 
-                let event: ParticipantLeftV1 =
-                    { GameId = updatedGame.Id
-                      ParticipantId = participant.Id }
+    /// Advances to the next PreDraft competition, if should. If not, throws.
+    member this.ContinuePreDraft
+        (competitionId: Competition.CompetitionId)
+        (competitionJumpers: Competition.Jumper list)
+        (startingGate: Competition.Gate)
+        : Result<Game, GameError> =
 
-                Ok(updatedGame, [ GameEventPayload.ParticipantLeftV1 event ])
-            | _ ->
-                Error(
-                    InvalidPhase(
-                        [ (PhaseTag.BreakTag PhaseTag.CompetitionTag)
-                          (PhaseTag.BreakTag PhaseTag.DraftTag)
-                          (PhaseTag.BreakTag PhaseTag.PreDraftTag)
-                          PhaseTag.DraftTag
-                          PhaseTag.CompetitionTag
-                          PhaseTag.PreDraftTag ],
-                        this.Phase |> Game.TagOfPhase
-                    )
-                )
+        match this.Hill, this.Status with
+        | None, _ -> Error GameError.HillRequired
+        | Some hill, PreDraft(PreDraftStatus.Break nextIdx) ->
+            let i = PreDraftCompetitionIndex.value nextIdx
+            let settings = this.Settings.PreDraftSettings.Competitions[i]
 
+            match GameHelpers.createCompetition settings hill competitionId competitionJumpers startingGate with
+            | Ok competition ->
+                Ok
+                    { this with
+                        Status = Status.PreDraft(PreDraftStatus.Running(nextIdx, competition)) }
+            | Error e -> Error(GameError.CompetitionError e)
+        | _, _ -> Error GameError.InvalidPhase
 
-    // TODO: Wyjątki w CanJoin!!!!!!
-    // TODO: jeśli gracz jest zbanowany, false
-    // TODO: jeśli gra prywatna, podaj hasło
-    // TODO: jeśli trzeba czekać na potwierdzenie, NIE WIEM CO
+    // --- DRAFT --- //
+    member this.StartDraft shuffleFn =
+        let draftResult =
+            Draft.Create
+                this.Settings.DraftSettings
+                (Players.toIdsList this.Players)
+                (Jumpers.toIdsList this.Jumpers)
+                shuffleFn
 
-    member this.RoomIsFull =
-        let currentParticipantsCount = Participants.count this.Participants
-
-        let participantsLimit =
-            Settings.ParticipantLimit.value this.Settings.ParticipantLimit
-
-        currentParticipantsCount >= participantsLimit
-
-    member this.ParticipantIsPresent(participant: Participant) =
-        Participants.contains participant this.Participants
-
-    member this.StartPreDraft(preDraftId) =
-        match this.Phase with
-        | Break PhaseTag.PreDraftTag ->
-            let state =
+        match draftResult with
+        | Error e -> Error(e)
+        | Ok draft ->
+            Ok(
                 { this with
-                    Phase = PreDraft preDraftId
-                    Version = increment this.Version }
+                    Status = Status.Draft draft }
+            )
 
-            let event: PreDraftPhaseStartedV1 =
-                { GameId = this.Id
-                  PreDraftId = preDraftId }
+    member this.PickInDraft (playerId: PlayerId) (jumperId: JumperId) : Result<PickOutcome, GameError> =
+        match this.Status with
+        | Draft draft ->
+            match draft.Pick playerId jumperId with
+            | Error e -> Error(GameError.DraftError e)
+            | Ok newDraft ->
+                if newDraft.Ended then
+                    let newStatus = Status.Break StatusTag.MainCompetitionTag
+                    let newGame = { this with Status = newStatus }
 
-            Ok(state, [ GameEventPayload.PreDraftPhaseStartedV1 event ])
-        | _ -> Error(InvalidPhase([ PhaseTag.BreakTag PhaseTag.PreDraftTag ], Game.TagOfPhase(this.Phase)))
+                    Ok
+                        { Game = newGame
+                          Picks = newDraft.Picks
+                          PhaseChangedTo = Some newStatus }
+                else
+                    let newGame =
+                        { this with
+                            Status = Status.Draft newDraft }
 
-    member this.EndPreDraft() =
-        match this.Phase with
-        | PreDraft preDraftId ->
-            let state =
-                { this with
-                    Phase = Break PhaseTag.PreDraftTag
-                    Version = increment this.Version }
+                    Ok
+                        { Game = newGame
+                          Picks = newDraft.Picks
+                          PhaseChangedTo = None }
+        | _ -> Error GameError.InvalidPhase
 
-            let event: PreDraftPhaseEndedV1 =
-                { GameId = this.Id
-                  PreDraftId = preDraftId }
+    member this.CurrentTurnInDraft: Result<Draft.Turn option, GameError> =
+        match this.Status with
+        | Draft draft -> Ok draft.CurrentTurn
+        | _ -> Error GameError.InvalidPhase
 
-            Ok(state, [ GameEventPayload.PreDraftPhaseEndedV1 event ])
-        | _ -> Error(InvalidPhase([ PhaseTag.PreDraftTag ], Game.TagOfPhase(this.Phase)))
 
-    member this.StartDraft draftId =
-        match this.Phase with
-        | Break(Next = PhaseTag.DraftTag) ->
-            let state =
-                { this with
-                    Phase = Phase.Draft draftId
-                    Version = increment this.Version }
+    /// Starts the Competition phase of the Game
+    member this.StartMainCompetition
+        (competitionId: Competition.CompetitionId)
+        (competitionJumpers: Competition.Jumper list)
+        (startingGate: Competition.Gate)
+        =
 
-            let event: DraftPhaseStartedV1 = { GameId = this.Id; DraftId = draftId }
-            Ok(state, [ GameEventPayload.DraftPhaseStartedV1 event ])
-        | _ -> Error(InvalidPhase([ BreakTag PhaseTag.DraftTag ], Game.TagOfPhase this.Phase))
+        match this.Hill, this.Status with
+        | None, _ -> Error GameError.HillRequired
+        | Some hill, Break MainCompetitionTag ->
+            let settings = this.Settings.MainCompetitionSettings
 
-    member this.EndDraft() =
-        match this.Phase with
-        | Draft draftId ->
-            let state =
-                { this with
-                    Phase = Phase.Break PhaseTag.CompetitionTag
-                    Version = increment this.Version }
+            match GameHelpers.createCompetition settings hill competitionId competitionJumpers startingGate with
+            | Ok competition ->
+                Ok
+                    { this with
+                        Status = Status.MainCompetition competition }
+            | Error e -> Error(GameError.CompetitionError e)
+        | _, _ -> Error GameError.InvalidPhase
 
-            let event: DraftPhaseEndedV1 = { GameId = this.Id; DraftId = draftId }
-            Ok(state, [ GameEventPayload.DraftPhaseEndedV1 event ])
-        | _ -> Error(InvalidPhase([ DraftTag ], Game.TagOfPhase this.Phase))
+    /// Adds a jump to the current competition (PreDraft or Main). Can change Game's Status to a Break.
+    member this.AddJumpInCompetition (jumpResultId: Competition.JumpResultId) (jump: Competition.Jump) =
+        match this.Hill, this.Status with
+        | None, _ -> Error GameError.HillRequired
 
-    member this.StartCompetition(gameCompetition) =
-        match this.Phase with
-        | Break(Next = PhaseTag.CompetitionTag) ->
-            let state =
-                { this with
-                    Phase = Phase.Competition gameCompetition
-                    Version = increment this.Version }
+        | Some _, PreDraft(PreDraftStatus.Running(idx, comp)) ->
+            match comp.AddJump(jumpResultId, jump) with
+            | Error e -> Error(GameError.CompetitionError e)
+            | Ok comp' ->
+                let newStatus = GameHelpers.updatePreDraftAfterCompetition this.Settings idx comp'
 
-            let event: CompetitionPhaseStartedV1 =
-                { GameId = this.Id
-                  GameCompetition = { CompetitionId = gameCompetition.CompetitionId } }
+                let phaseChanged =
+                    match comp'.GetStatusTag with
+                    | Competition.Competition.StatusTag.EndedTag -> Some newStatus
+                    | _ -> None
 
-            Ok(state, [ GameEventPayload.CompetitionPhaseStartedV1 event ])
+                Ok
+                    { Game = { this with Status = newStatus }
+                      Competition = comp'
+                      PhaseChangedTo = phaseChanged }
 
-        | _ -> Error(InvalidPhase([ BreakTag PhaseTag.CompetitionTag ], Game.TagOfPhase this.Phase))
+        | Some _, MainCompetition comp ->
+            match comp.AddJump(jumpResultId, jump) with
+            | Error e -> Error(GameError.CompetitionError e)
+            | Ok comp' ->
+                let ended = comp'.GetStatusTag = Competition.Competition.StatusTag.EndedTag
 
-    member this.EndCompetition() =
-        match this.Phase with
-        | Competition competitionId ->
-            let state =
-                { this with
-                    Phase = Phase.Break PhaseTag.EndedTag
-                    Version = increment this.Version }
+                let newStatus =
+                    if ended then
+                        Status.Break EndedTag
+                    else
+                        Status.MainCompetition comp'
 
-            let event: CompetitionPhaseEndedV1 = { GameId = this.Id }
+                Ok
+                    { Game = { this with Status = newStatus }
+                      Competition = comp'
+                      PhaseChangedTo = if ended then Some newStatus else None }
 
-            Ok(state, [ GameEventPayload.CompetitionPhaseEndedV1 event ])
-        | _ -> Error(InvalidPhase([ CompetitionTag ], Game.TagOfPhase this.Phase))
+        | _, _ -> Error GameError.InvalidPhase
 
-    member this.EndGame endedGameResults =
-        match this.Phase with
-        | Break(Next = PhaseTag.EndedTag) ->
-            let state =
-                { this with
-                    Phase = Phase.Ended endedGameResults
-                    Version = increment this.Version }
+    member this.AdjustGateByJury = invalidOp "Not implemented" // TODO
 
-            let event: GameEndedV1 =
-                { GameId = this.Id
-                  Ranking = endedGameResults }
+    member this.CurrentCompetitionClassification =
+        this.CurrentCompetition.Value.Classification
 
-            Ok(state, [ GameEventPayload.GameEndedV1 event ])
-        | _ -> Error(InvalidPhase([ BreakTag PhaseTag.EndedTag ], Game.TagOfPhase this.Phase))
+    member private this.MainCompetition =
+        match this.Status with
+        | MainCompetition competition -> Some competition
+        | _ -> None
+
+    member this.MainCompetitionClassification = this.MainCompetition.Value.Classification
+
+
+    member this.CurrentCompetitionClassificationResultOf(competitionJumperId: Competition.JumperId) =
+        this.CurrentCompetition.Value.ClassificationResultOf competitionJumperId
+
+    /// Ends the game based on a Ranking passed from Application Layer and drawn from some factory
+    member this.EndGame(ranking: Ranking) =
+        match this.Status with
+        | Break EndedTag -> Ok({ this with Status = Ended ranking })
+        | _ -> Error GameError.InvalidPhase
+
+    member private this.CurrentCompetition: Competition.Competition option =
+        match this.Status with
+        | PreDraft(PreDraftStatus.Running(_, competition))
+        | MainCompetition competition -> Some competition
+        | _ -> None
+
+    override this.ToString() =
+        let idStr =
+            let (GameId g) = this.Id
+            g.ToString("N")
+
+        let playersCount = Players.toList this.Players |> List.length
+        let jumpersCount = Jumpers.toList this.Jumpers |> List.length
+
+        let statusStr =
+            match this.Status with
+            | PreDraft(PreDraftStatus.Running(idx, _)) -> $"PreDraft (comp {PreDraftCompetitionIndex.value idx})"
+            | PreDraft(PreDraftStatus.Break idx) -> $"PreDraftBreak (next {PreDraftCompetitionIndex.value idx})"
+            | Draft _ -> "Draft"
+            | MainCompetition _ -> "MainCompetition"
+            | Ended _ -> "Ended"
+            | Break tag -> $"Break → {tag}"
+
+        $"Game[{idStr}] Status={statusStr}, Players={playersCount}, Jumpers={jumpersCount}"
+
+and PickOutcome =
+    { Game: Game
+      Picks: Draft.Picks
+      PhaseChangedTo: Status option }
+
+and AddJumpOutcome =
+    { Game: Game
+      Competition: Competition.Competition
+      PhaseChangedTo: Status option }

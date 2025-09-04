@@ -1,180 +1,125 @@
 namespace App.Domain.Matchmaking
 
-open App.Domain.Matchmaking.Event
-open App.Domain.Shared.AggregateVersion
+open System.Collections.Generic
 
-module internal Internal =
-    let tag =
-        function
-        | Active -> ActiveTag
-        | Failed _ -> FailedTag
-        | Ended -> EndedTag
+type MatchmakingId = MatchmakingId of System.Guid
 
-    let expect phases actual = Error(InvalidPhase(phases, tag actual))
-    let ok state (events: Event.MatchmakingEventPayload list) = Ok(state, events)
+type MatchmakingResult =
+    | Succeeded
+    | NotEnoughPlayers
 
-open Internal
+type Status =
+    | Running
+    | Ended of Result: MatchmakingResult
+    | Failed of Reason: string
+
+type MatchmakingError =
+    | AlreadyJoined
+    | NotInMatchmaking
+    | InvalidStatus of Status: Status
+    | TooManyPlayers
 
 type Matchmaking =
     private
-        { Id: Id
-          Version: AggregateVersion
+        { Id: MatchmakingId
           Settings: Settings
-          Phase: Phase
-          Participants: Set<Participant> }
+          Status: Status
+          Players: Set<Player> }
 
-    member this.Phase_ = this.Phase
-    member this.Settings_ = this.Settings
-    member this.Version_: AggregateVersion = this.Version
-    member this.Id_ = this.Id
+    static member Create id settings =
+        { Id = id
+          Settings = settings
+          Status = Running
+          Players = Set.empty }
 
-    static member Create id version settings : Result<Matchmaking * MatchmakingEventPayload list, Error> =
-        let state =
-            { Id = id
-              Version = version
-              Settings = settings
-              Phase = Phase.Active
-              Participants = Set.empty }
 
-        let event: MatchmakingCreatedV1 =
-            { MatchmakingId = id
-              Settings = settings }
+    member this.Id_: MatchmakingId = this.Id
+    member this.Status_: Status = this.Status
+    member this.Players_: IReadOnlyCollection<Player> = this.Players
+    member this.PlayersCount = this.Players.Count
+    member this.MinPlayersCount = this.Settings.MinPlayers
+    member this.MaxPlayersCount = this.Settings.MaxPlayers
 
-        Ok(state, [ MatchmakingEventPayload.MatchmakingCreatedV1 event ])
+    member this.MinRequiredPlayers =
+        let currentPlayers = this.PlayersCount
+        let minPlayers = Settings.MinPlayers.value this.Settings.MinPlayers
 
-    member this.Join(participant: Participant) =
-        match this.Phase with
-        | Active ->
-            if not this.CanJoin then
-                Error(Error.RoomFull(this.ParticipantsCount))
-            elif this.Participants |> Set.contains participant then
-                Error(Error.ParticipantAlreadyJoined participant.Id)
+        if currentPlayers < minPlayers then
+            Some(minPlayers - currentPlayers)
+        else
+            None
+
+    member this.Join(player: Player) : Result<Matchmaking * Player.Nick, MatchmakingError> =
+        match this.Status with
+        | Running ->
+            if this.Players |> Set.exists (fun p -> p.Id = player.Id) then
+                Error AlreadyJoined
+            elif this.Players.Count >= Settings.MaxPlayers.value this.Settings.MaxPlayers then
+                Error TooManyPlayers
             else
-                let nextVersion = increment this.Version
+                let existingNicks =
+                    this.Players |> Seq.map (fun p -> Player.Nick.value p.Nick) |> Set.ofSeq
 
-                let newParticipants = this.Participants |> Set.add participant
+                let baseNick = Player.Nick.value player.Nick
 
-                let state =
+                let finalNick =
+                    if existingNicks.Contains(baseNick) then
+                        let rec find i =
+                            let candidate = $"{baseNick} ({i})"
+
+                            if existingNicks.Contains(candidate) then
+                                find (i + 1)
+                            else
+                                candidate
+
+                        find 2
+                    else
+                        baseNick
+
+                let nick' =
+                    Player.Nick.createWithSuffix finalNick
+                    |> Option.defaultWith (fun () -> failwith "Nick validation error")
+
+                Ok(
                     { this with
-                        Participants = newParticipants
-                        Version = nextVersion }
+                        Players = this.Players.Add { player with Nick = nick' } },
+                    nick'
+                )
+        | _ -> Error(InvalidStatus this.Status)
 
-                let events =
-                    [ Event.MatchmakingParticipantJoinedV1
-                          { MatchmakingId = this.Id
-                            Participant =
-                              { Id = participant.Id
-                                Nick = participant.Nick } } ]
 
-                ok state events
-        | phase -> expect [ ActiveTag ] phase
-
-    member this.Leave(participantId: Participant.Id) =
-        let participantIsPresent = this.ParticipantIsPresent participantId
-
-        match this.Phase with
-        | Active when participantIsPresent ->
-            let nextVersion = increment this.Version
-
-            let nextParticipants =
-                this.Participants |> Set.filter (fun p -> p.Id <> participantId)
-
-            let state =
-                { this with
-                    Participants = nextParticipants
-                    Version = nextVersion }
-
-            let events =
-                [ Event.MatchmakingParticipantLeftV1
-                      { MatchmakingId = this.Id
-                        ParticipantId = participantId } ]
-
-            ok state events
-        | Active when not (participantIsPresent) -> Error(Error.ParticipantNotInMatchmaking participantId)
-        | phase -> expect [ ActiveTag ] phase
-
-    member this.TryEnd(currentDuration: Duration) =
-        let participantsCount = this.ParticipantsCount
-
-        match this.Phase with
-        | Active ->
-            let nextVersion = increment this.Version
-
-            if this.ShouldEnd currentDuration then
-                let state =
-                    { this with
-                        Phase = Ended
-                        Version = nextVersion }
-
-                let events =
-                    [ Event.MatchmakingEndedV1
-                          { MatchmakingId = this.Id
-                            ParticipantsCount = participantsCount } ]
-
-                ok state events
+    member this.Leave playerId =
+        match this.Status with
+        | Running ->
+            if this.Players |> Set.exists (fun p -> p.Id = playerId) then
+                let newPlayers = this.Players |> Set.filter (fun p -> p.Id <> playerId)
+                Ok { this with Players = newPlayers }
             else
-                let failReason =
-                    MatchmakingFailReason.NotEnoughPlayers(participantsCount, this.MinimumParticipantsCount)
+                Error NotInMatchmaking
+        | _ -> Error(InvalidStatus this.Status)
 
-                let state =
+    member this.End() : Result<(Matchmaking * bool), MatchmakingError> =
+        match this.Status with
+        | Running ->
+            let cnt = this.Players.Count
+            let min = Settings.MinPlayers.value this.Settings.MinPlayers
+
+            if cnt >= min then
+                Ok({ this with Status = Ended Succeeded }, true)
+            else
+                Ok(
                     { this with
-                        Phase = Failed(failReason)
-                        Version = nextVersion }
+                        Status = Ended NotEnoughPlayers },
+                    false
+                )
+        | _ -> Error(InvalidStatus this.Status)
 
-                let events =
-                    [ Event.MatchmakingFailedV1
-                          { MatchmakingId = this.Id
-                            ParticipantsCount = participantsCount
-                            Reason = failReason } ]
-
-                ok state events
-        | phase -> expect [ ActiveTag ] phase
-
-    member this.EndWithInternalError details =
-        match this.Phase with
-        | Active ->
-            let nextVersion = increment this.Version
-
-            let state =
-                { this with
-                    Phase = Failed(MatchmakingFailReason.InternalError details)
-                    Version = nextVersion }
-
-            let events =
-                [ Event.MatchmakingFailedV1
-                      { MatchmakingId = this.Id
-                        ParticipantsCount = this.ParticipantsCount
-                        Reason = MatchmakingFailReason.InternalError details } ]
-
-            ok state events
-        | phase -> expect [ ActiveTag ] phase
-
-    member this.RoomIsFull: bool =
-        let limit = PlayersCount.value this.Settings.MinParticipants
-        this.ParticipantsCount = limit
-
-    member this.ShouldEnd(currentDuration: Duration) : bool =
-        let maxParticipants = PlayersCount.value this.Settings.MinParticipants
-
-        this.Phase.IsActive
-        && (this.ParticipantsCount >= maxParticipants
-            || currentDuration > this.Settings.MaxDuration)
-
-    member this.CanJoin: bool =
-        match this.Phase with
-        | Active -> not this.RoomIsFull
+    member this.Fail reason =
+        match this.Status with
+        | Running -> Ok({ this with Status = Failed reason })
+        | _ -> Error(InvalidStatus this.Status)
+    
+    member this.HasSucceeded =
+        match this.Status with
+        | Ended Succeeded -> true
         | _ -> false
-
-    member this.ParticipantsCount: int = this.Participants |> Set.count
-
-    member this.MinimumParticipantsCount: int =
-        PlayersCount.value this.Settings.MaxParticipants
-
-    member this.ReachedMinimum: bool =
-        this.ParticipantsCount >= this.MinimumParticipantsCount
-
-    member this.ParticipantIsPresent(participantId: Participant.Id) : bool =
-        this.Participants |> Set.exists (fun p -> p.Id = participantId)
-
-    member this.ParticipantIsPresent(participant: Participant) : bool =
-        this.Participants |> Set.contains participant

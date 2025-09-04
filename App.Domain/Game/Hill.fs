@@ -1,5 +1,8 @@
-module App.Domain.Game.Hill
+namespace App.Domain.Game
 
-// type Id = Id of System.Guid
-//
-// type Hill = { Id: Id }
+type HillId = HillId of System.Guid
+
+type Hill = {
+    Id: HillId
+}
+

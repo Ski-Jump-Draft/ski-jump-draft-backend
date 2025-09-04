@@ -1,271 +1,343 @@
 namespace App.Domain.Competition
 
-open App.Domain.Competition.Engine
-open App.Domain.Competition.Phase
-open App.Domain
-open App.Domain.Competition.ResultsModule
-open App.Domain.Shared
-
-// TODO: Evolve dla Competition na podstawie eventów domenowych ze startlist i results (!!)
+open FsToolkit.ErrorHandling
 
 module Competition =
+    type Status =
+        | NotStarted of GateState
+        | RoundInProgress of GateState * RoundIndex
+        | Suspended of GateState * RoundIndex
+        | Cancelled
+        | Ended
+
+    type StatusTag =
+        | NotStartedTag
+        | RoundInProgressTag
+        | SuspendedTag
+        | CancelledTag
+        | EndedTag
+
     type Error =
-        | InvalidPhase of Expected: PhaseTag list * Actual: PhaseTag
-        | EngineEventsConflict of UnallowedEvents: Engine.Event list * Message: string
-        | CannotDetermineCompetitionPhase of EngineEvents: Engine.Event list
+        | JumpersEmpty
+        | TeamsEmpty
+        | GroupSettingsMissing
+        | TeamMemberCountsNotEqual of UniqueCounts: int
+        | JumperNotNextInStartlist of NextShouldBe: Startlist.Entry * JumperId: JumperId
+        | InvalidStatus of Current: StatusTag * Expected: StatusTag list
+        | Internal of string
+        | CoachGateIncrease
 
 open Competition
 
-module internal Internal =
-    let tag =
-        function
-        | NotStarted -> NotStartedTag
-        | Running _ -> RunningTag
-        | Break _ -> BreakTag
-        | Suspended _ -> SuspendedTag
-        | Cancelled -> CancelledTag
-        | Ended -> EndedTag
-
-    let expect phases actual = Error(InvalidPhase(phases, tag actual))
-
-    let ok state (events: Event.CompetitionEventPayload list) = Ok(state, events)
-
-open Internal
+type CompetitionId = CompetitionId of System.Guid
 
 type Competition =
     private
-        { Id: Id.Id
-          Version: AggregateVersion.AggregateVersion
-          Phase: Phase.Phase
-          Engine: IEngine }
+        { Id: CompetitionId
+          Status: Status
+          Settings: Settings
+          Startlist: Startlist
+          Results: Results
+          Hill: Hill
+          Jumpers: Jumper list }
 
-    member this.Id_ = this.Id
-    member this.Phase_ = this.Phase
-    member this.Version_ = this.Version
+    member this.GetStatusTag =
+        match this.Status with
+        | Status.NotStarted _ -> StatusTag.NotStartedTag
+        | Status.RoundInProgress _ -> StatusTag.RoundInProgressTag
+        | Status.Suspended _ -> StatusTag.SuspendedTag
+        | Status.Cancelled -> StatusTag.CancelledTag
+        | Status.Ended -> StatusTag.EndedTag
 
-    static member TagOfPhase phase =
-        match phase with
-        | NotStarted -> NotStartedTag
-        | Running _ -> RunningTag
-        | Break _ -> BreakTag
-        | Suspended _ -> SuspendedTag
-        | Cancelled -> CancelledTag
-        | Ended -> EndedTag
+    member this.GateState =
+        match this.Status with
+        | Status.NotStarted gs
+        | Status.RoundInProgress(gs, _)
+        | Status.Suspended(gs, _) -> Some gs
+        | _ -> None
 
-    member this.InvalidPhaseError expected =
-        InvalidPhase(expected, Competition.TagOfPhase(this.Phase))
+    member private this.CurrentGateState() =
+        match this.Status with
+        | Status.NotStarted gs
+        | Status.RoundInProgress(gs, _)
+        | Status.Suspended(gs, _) -> gs
+        | _ -> invalidOp "Gate state unavailable in this status."
 
-    static member Create id version (engine: IEngine) (engineConfigDto: Event.CompetitionEngineConfigDto) =
-        let state =
-            { Id = id
-              Version = version
-              Phase = NotStarted
-              Engine = engine }
+    member private this.WithGateState(gateState: GateState) =
+        let newStatus =
+            match this.Status with
+            | Status.NotStarted _ -> Status.NotStarted gateState
+            | Status.RoundInProgress(_, round) -> Status.RoundInProgress(gateState, round)
+            | Status.Suspended(_, round) -> Status.Suspended(gateState, round)
+            | other -> other
 
-        let event =
-            Event.CompetitionCreatedV1
-                { CompetitionId = id
-                  EngineConfig = engineConfigDto
-                //Startlist = { NextIndividualParticipants = startlist.NextIndividualParticipants }
-                }
+        { this with Status = newStatus }
 
-        Ok(state, [ event ])
+    static member Create
+        (id: CompetitionId, settings: Settings, hill: Hill, jumpers: Jumper list, startingGate: Gate)
+        : Result<Competition, Error> =
+        if List.isEmpty jumpers then
+            Error Error.JumpersEmpty
+        else
+            let jumperIds = jumpers |> List.map (fun j -> j.Id)
 
-    member this.GenerateResults() : Results = this.Engine.GenerateResults()
+            result {
+                let! startlist =
+                    Startlist.CreateLinear jumperIds
+                    |> Result.mapError (fun e -> Error.Internal(string e))
 
-    member this.GenerateStartlist() : Startlist = this.Engine.GenerateStartlist()
+                let gateState =
+                    { Starting = startingGate
+                      CurrentJury = startingGate
+                      CoachChange = None }
 
-    member this.RegisterJump
-        (jump: Competition.Jump.Jump)
-        : Result<Competition * Event.CompetitionEventPayload list, Error> =
-        match this.Phase with
-        | NotStarted
-        | Running _
-        | Break _ ->
-            let (snapshot, engineEvents) = this.Engine.RegisterJump jump
+                return
+                    { Id = id
+                      Settings = settings
+                      Hill = hill
+                      Status = Status.NotStarted gateState
+                      Startlist = startlist
+                      Results = Results.Empty
+                      Jumpers = jumpers }
+            }
 
-            let competitionEvents =
-                engineEvents
-                |> List.fold
-                    (fun acc e ->
-                        let newEvent =
-                            match e with
-                            | RoundStarted index ->
-                                Event.CompetitionEventPayload.CompetitionRoundStartedV1
-                                    { CompetitionId = this.Id
-                                      RoundIndex = index }
-                            | RoundEnded index ->
-                                Event.CompetitionEventPayload.CompetitionRoundEndedV1
-                                    { CompetitionId = this.Id
-                                      RoundIndex = index }
-                            | JumpRegistered(individualParticipantId, jumpResultId) ->
-                                let startlist = this.Engine.GenerateStartlist()
-                                let results = this.Engine.GenerateResults()
+    member this.Classification = this.Results.FinalClassification
 
-                                Event.CompetitionEventPayload.CompetitionJumpRegisteredV1
-                                    { CompetitionId = this.Id
-                                      IndividualParticipantId = individualParticipantId
-                                      // ParticipantResultId = participantResultId
-                                      JumpResultId = jumpResultId
-                                      Jump = jump
-                                    // Startlist = { NextIndividualParticipants = startlist.NextIndividualParticipants }
-                                    // Results = { ParticipantResults = results.ParticipantResults }
-                                    }
-                            | ParticipantDisqualified -> failwith "ParticipantDisqualified EngineEvent is not supported yet"
-                            | CompetitionEnded ->
-                                Event.CompetitionEventPayload.CompetitionEndedV1 { CompetitionId = this.Id }
+    member this.SetStartingGate(gate: Gate) =
+        let newGateState =
+            { Starting = gate
+              CurrentJury = gate
+              CoachChange = None }
 
-                        newEvent :: acc)
-                    []
-                |> List.rev
+        match this.Status with
+        | Status.NotStarted _ -> Ok(this.WithGateState newGateState)
+        | Status.RoundInProgress _ when this.Startlist.DoneEntries.IsEmpty -> Ok(this.WithGateState newGateState)
+        | _ -> Error(Error.InvalidStatus(this.GetStatusTag, [ StatusTag.NotStartedTag; StatusTag.RoundInProgressTag ]))
 
-            let jumpResultHasBeenRegistered =
-                competitionEvents
-                |> List.exists (function
-                    | Event.CompetitionEventPayload.CompetitionJumpRegisteredV1 _ -> true
-                    | _ -> false)
+    member this.ChangeGateByJury(change: GateChange) =
+        match this.Status with
+        | Status.NotStarted _
+        | Status.RoundInProgress _
+        | Status.Suspended _ ->
+            let gs = this.CurrentGateState()
+            let (Gate current) = gs.CurrentJury
 
-            let roundHasStarted =
-                competitionEvents
-                |> List.exists (function
-                    | Event.CompetitionEventPayload.CompetitionRoundStartedV1 _ -> true
-                    | _ -> false)
+            let newGate =
+                match change with
+                | Increase by -> Gate(current + int by)
+                | Reduction by -> Gate(current - int by)
 
-            let roundHasEnded =
-                competitionEvents
-                |> List.exists (function
-                    | Event.CompetitionEventPayload.CompetitionRoundEndedV1 _ -> true
-                    | _ -> false)
+            Ok(this.WithGateState { gs with CurrentJury = newGate })
+        | _ ->
+            Error(
+                Error.InvalidStatus(
+                    this.GetStatusTag,
+                    [ StatusTag.NotStartedTag
+                      StatusTag.RoundInProgressTag
+                      StatusTag.SuspendedTag ]
+                )
+            )
 
-            let competitionHasEnded =
-                competitionEvents
-                |> List.exists (function
-                    | Event.CompetitionEventPayload.CompetitionEndedV1 _ -> true
-                    | _ -> false)
-
-            let engineEventsHasDuplicates =
-                List.length engineEvents <> Set.count (Set.ofList engineEvents)
-
-            if engineEventsHasDuplicates then
-                Error(Error.EngineEventsConflict(engineEvents, "Engine cannot return engineEvents with duplicates."))
-            elif not (jumpResultHasBeenRegistered) then
-                Error(Error.EngineEventsConflict(engineEvents, "Engine must return JumpRegistered event."))
-            elif roundHasStarted && roundHasEnded then
-                Error(Error.EngineEventsConflict(engineEvents, "Engine cannot start and end round simultanousely."))
-            else
-                let competitionPhase =
-                    if roundHasStarted then
-                        let roundIndex =
-                            competitionEvents
-                            |> List.pick (function
-                                | Event.CompetitionEventPayload.CompetitionRoundStartedV1 ev -> Some ev.RoundIndex
-                                | _ -> None)
-
-                        Ok(Phase.Running(RoundIndex roundIndex))
-                    elif roundHasEnded && not competitionHasEnded then
-                        let nextRoundIndex =
-                            competitionEvents
-                            |> List.pick (function
-                                | Event.CompetitionEventPayload.CompetitionRoundStartedV1 ev -> Some ev.RoundIndex
-                                | _ -> None)
-
-                        Ok(Phase.Break(RoundIndex nextRoundIndex))
-                    elif roundHasEnded && competitionHasEnded then
-                        Ok Phase.Ended
-                    else
-                        Error(CannotDetermineCompetitionPhase engineEvents)
-
-                match competitionPhase with
-                | Error error -> Error error
-                | Ok competitionPhase ->
-                    let state = { this with Phase = competitionPhase }
-                    Ok(state, competitionEvents)
-
-        | phase -> expect [ NotStartedTag; BreakTag; RunningTag ] phase
-
-    // member this.StartRound() =
-    //     match this.Phase with
-    //     | NotStarted ->
-    //         let roundIndex = RoundIndex 0u
-    //         let state = { this with Phase = Running roundIndex }
-    //
-    //         let events =
-    //             [ Event.CompetitionRoundStartedV1
-    //                   { CompetitionId = this.Id
-    //                     RoundIndex = Convert.ToInt32 roundIndex } ]
-    //
-    //         ok state events
-    //
-    //     | Break nextRound ->
-    //         let state = { this with Phase = Running nextRound }
-    //
-    //         let events =
-    //             [ Event.CompetitionRoundStartedV1
-    //                   { CompetitionId = this.Id
-    //                     RoundIndex = Convert.ToInt32 nextRound } ]
-    //
-    //         ok state events
-    //
-    //     | phase -> expect [ NotStartedTag; BreakTag ] phase
-    //
-    //
-    // member this.EndRound(endCompetition: bool) =
-    //     match this.Phase with
-    //     | Running roundIdx ->
-    //         let (RoundIndex roundIdxUint) = roundIdx
-    //         let nextRoundInt = Convert.ToInt32(roundIdxUint + 1u)
-    //         let nextRoundUint = uint (nextRoundInt)
-    //
-    //         let roundEnded =
-    //             Event.CompetitionRoundEndedV1
-    //                 { CompetitionId = this.Id
-    //                   RoundIndex = Convert.ToInt32 roundIdx
-    //                   NextRoundIndex = if endCompetition then Some nextRoundInt else None }
-    //
-    //         if endCompetition then
-    //             let state = { this with Phase = Ended }
-    //             let events = [ roundEnded; Event.CompetitionEndedV1 { CompetitionId = this.Id } ]
-    //             ok state events
-    //         else
-    //             let state =
-    //                 { this with
-    //                     Phase = Break(RoundIndex nextRoundUint) }
-    //
-    //             let events = [ roundEnded ]
-    //             ok state events
-    //
-    //     | phase -> expect [ RunningTag ] phase
-
-    member this.Cancel() =
-        match this.Phase with
-        | NotStarted
-        | Break _
-        | Running _
-        | Suspended _ ->
-            let state = { this with Phase = Cancelled }
-            let events = [ Event.CompetitionCancelledV1 { CompetitionId = this.Id } ]
-            Internal.ok state events
-        | phase -> expect [ NotStartedTag; BreakTag; RunningTag; SuspendedTag ] phase
-
+    member this.LowerGateByCoach(change: GateChange) =
+        match change with
+        | Increase _ -> Error Error.CoachGateIncrease
+        | Reduction _ ->
+            let gs = this.CurrentGateState()
+            Ok(this.WithGateState { gs with CoachChange = Some change })
 
     member this.Suspend() =
-        match this.Phase with
-        | NotStarted
-        | Break _
-        | Running _ ->
-            let state =
+        match this.Status with
+        | Status.RoundInProgress(gs, round) ->
+            Ok
                 { this with
-                    Phase = Suspended this.Phase }
-
-            let events = [ Event.CompetitionSuspendedV1 { CompetitionId = this.Id } ]
-            ok state events
-        | phase -> expect [ NotStartedTag; BreakTag; RunningTag ] phase
-
+                    Status = Status.Suspended(gs, round) }
+        | _ -> Error(Error.InvalidStatus(this.GetStatusTag, [ StatusTag.RoundInProgressTag ]))
 
     member this.Continue() =
-        match this.Phase with
-        | Suspended previous ->
-            let state = { this with Phase = previous }
-            let events = [ Event.CompetitionContinuedV1 { CompetitionId = this.Id } ]
-            ok state events
-        | phase -> expect [ SuspendedTag ] phase
+        match this.Status with
+        | Status.Suspended(gs, round) ->
+            Ok
+                { this with
+                    Status = Status.RoundInProgress(gs, round) }
+        | _ -> Error(Error.InvalidStatus(this.GetStatusTag, [ StatusTag.SuspendedTag ]))
+
+    member this.Cancel() =
+        match this.Status with
+        | Status.Ended
+        | Status.Cancelled -> Error(Error.InvalidStatus(this.GetStatusTag, []))
+        | _ -> Ok { this with Status = Status.Cancelled }
+
+    member this.NextJumper =
+        this.Startlist.NextEntry |> Option.map (fun e -> this.FindJumper e.JumperId)
+
+    member private this.ClearCoachChange() =
+        let newStatus =
+            match this.Status with
+            | Status.NotStarted gs -> Status.NotStarted { gs with CoachChange = None }
+            | Status.RoundInProgress(gs, r) -> Status.RoundInProgress({ gs with CoachChange = None }, r)
+            | Status.Suspended(gs, r) -> Status.Suspended({ gs with CoachChange = None }, r)
+            | s -> s
+
+        { this with Status = newStatus }
+
+    member this.AddJump(jumpResultId: JumpResultId, jump: Jump) =
+        let jumperId = jump.JumperId
+
+        let ensureNextIs jid =
+            match this.Startlist.NextEntry with
+            | Some next when next.JumperId = jid -> Ok()
+            | Some next -> Error(Error.JumperNotNextInStartlist(next, jid))
+            | None ->
+                Error(Error.InvalidStatus(this.GetStatusTag, [ StatusTag.NotStartedTag; StatusTag.RoundInProgressTag ]))
+
+        let execute roundIndex =
+            let gs = this.CurrentGateState()
+            let jumper = this.FindJumper jumperId
+
+            let jr =
+                JumpResultCreator.createFisJumpResult
+                    jumpResultId
+                    jump
+                    jumper
+                    this.Hill
+                    roundIndex
+                    gs.CurrentReal
+                    gs.CoachChange
+                    gs.Starting
+                |> Result.mapError (fun fis -> Error.Internal(string fis))
+
+            result {
+                let! jumpResult = jr
+
+                let! resultsAfter =
+                    this.Results.AddJump(jumpResult, this.JumperExists)
+                    |> Result.mapError (fun e -> Error.Internal(string e))
+
+                let! startlistAfter =
+                    if this.Startlist.RemainingEntries |> List.exists (fun e -> e.JumperId = jumperId) then
+                        this.Startlist.MarkJumpDone jumperId
+                        |> Result.mapError (fun e -> Error.Internal(string e))
+                    else
+                        Ok this.Startlist
+
+                let baseStatus =
+                    match this.Status with
+                    | Status.NotStarted _ -> Status.RoundInProgress(gs, roundIndex)
+                    | _ -> this.Status
+
+                if not startlistAfter.RoundIsFinished then
+                    let updated =
+                        { this with
+                            Results = resultsAfter
+                            Startlist = startlistAfter
+                            Status = baseStatus }
+
+                    return updated.ClearCoachChange()
+                elif this.IsLastRound roundIndex then
+                    let updated =
+                        { this with
+                            Results = resultsAfter
+                            Startlist = startlistAfter
+                            Status = Status.Ended }
+
+                    return updated.ClearCoachChange()
+                else
+                    let (RoundIndex i) = roundIndex
+                    let nextRound = RoundIndex(i + 1u)
+                    let nextStatus = Status.RoundInProgress(gs, nextRound)
+                    // IMPORTANT: use startlistAfter (po oznaczeniu bieżącego skoku jako done)
+                    let nextStartlist =
+                        this.BuildNextRoundStartlist(startlistAfter, nextRound, resultsAfter)
+
+                    let updated =
+                        { this with
+                            Results = resultsAfter
+                            Startlist = nextStartlist
+                            Status = nextStatus }
+
+                    return updated.ClearCoachChange()
+            }
+
+        match this.Status with
+        | Status.NotStarted _ ->
+            // Require that the jumper is actually the next in the startlist
+            ensureNextIs jumperId |> Result.bind (fun () -> execute (RoundIndex 0u))
+        | Status.RoundInProgress(_, round) -> ensureNextIs jumperId |> Result.bind (fun () -> execute round)
+        | Status.Suspended _
+        | Status.Cancelled
+        | Status.Ended -> Error(Error.InvalidStatus(this.GetStatusTag, []))
+
+    member private this.BuildNextRoundStartlist
+        (prevStartlist: Startlist, nextRound: RoundIndex, currentResults: Results)
+        =
+        let totalsSinceReset =
+            currentResults.TotalsSinceReset this.Settings.PointsResets nextRound
+
+        let ranked = totalsSinceReset |> Map.toList |> List.sortByDescending snd
+
+        let bibValue jid =
+            prevStartlist.BibOf jid
+            |> Option.map Startlist.Bib.value
+            |> Option.defaultWith (fun _ -> invalidOp "BIB not found")
+
+        let roundSettings =
+            this.Settings.RoundSettings[int (RoundIndexModule.value nextRound)]
+
+        let applyLimit =
+            match roundSettings.RoundLimit with
+            | RoundLimit.NoneLimit -> id
+            | RoundLimit.Soft(RoundLimitValue n) ->
+                fun (lst: (JumperId * double) list) ->
+                    if lst.Length <= n then
+                        lst
+                    else
+                        let top, rest = lst |> List.splitAt n
+
+                        match top |> List.tryLast with
+                        | Some(_, cutPts) ->
+                            let extras = rest |> List.takeWhile (fun (_, p) -> p = cutPts)
+                            top @ extras
+                        | None -> lst
+            | RoundLimit.Exact(RoundLimitValue n) ->
+                fun lst ->
+                    if lst.Length <= n then
+                        lst
+                    else
+                        let topN, rest = lst |> List.splitAt n
+
+                        match topN |> List.tryLast with
+                        | None -> lst
+                        | Some(_, cutPts) ->
+                            let tied =
+                                (topN @ rest) |> List.filter (fun (_, pts) -> pts = cutPts) |> List.map fst
+
+                            let resolved = tied |> List.sortByDescending bibValue
+                            let occupied = topN |> List.filter (fun (_, pts) -> pts > cutPts)
+                            let need = n - occupied.Length
+                            let winners = resolved |> List.truncate need |> Set.ofList
+
+                            occupied
+                            @ ((topN @ rest)
+                               |> List.filter (fun (jid, pts) -> pts = cutPts && winners.Contains jid))
+
+        let limited = ranked |> applyLimit
+
+        let ordered =
+            let ids = limited |> List.map fst
+            if roundSettings.SortStartlist then ids |> List.rev else ids
+
+        Startlist.WithOrder prevStartlist ordered |> Result.toOption |> Option.get
+
+
+    member private this.IsLastRound(round: RoundIndex) =
+        let (RoundIndex i) = round
+        i = uint this.Settings.RoundSettings.Length - 1u
+
+    member private this.JumperExists(jid: JumperId) =
+        this.Jumpers |> List.exists (fun j -> j.Id = jid)
+
+    member private this.FindJumper(jid: JumperId) =
+        this.Jumpers |> List.find (fun j -> j.Id = jid)
+
+    member this.ClassificationResultOf(jumperId: JumperId) =
+        this.Classification |> List.tryFind (fun result -> result.JumperId = jumperId)

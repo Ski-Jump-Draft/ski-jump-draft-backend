@@ -1,0 +1,232 @@
+using App.Application.Acl;
+using App.Application.Commanding;
+using App.Application.Exceptions;
+using App.Application.Extensions;
+using App.Application.Messaging.Notifiers;
+using App.Application.Messaging.Notifiers.Mapper;
+using App.Application.Utility;
+using App.Domain.Competition;
+using App.Domain.Game;
+using App.Domain.Simulation;
+using Microsoft.FSharp.Collections;
+using Gate = App.Domain.Simulation.Gate;
+using Hill = App.Domain.Simulation.Hill;
+using HillModule = App.Domain.Simulation.HillModule;
+using Jumper = App.Domain.Simulation.Jumper;
+using JumperSkillsModule = App.Domain.Simulation.JumperSkillsModule;
+
+namespace App.Application.UseCase.Game.SimulateJump;
+
+public record Command(
+    Guid GameId
+) : ICommand<Result>;
+
+public record Result(SimulatedJumpDto SimulatedJump);
+
+public class Handler(
+    IJson json,
+    IGames games,
+    IGameNotifier gameNotifier,
+    IJumpSimulator jumpSimulator,
+    IWeatherEngine weatherEngine,
+    IScheduler scheduler,
+    IClock clock,
+    IGuid guid,
+    Acl.ICompetitionJumperAcl competitionJumperAcl,
+    IGameJumperAcl gameJumperAcl,
+    App.Domain.GameWorld.ICountries gameWorldCountries,
+    App.Domain.GameWorld.IJumpers gameWorldJumpers,
+    IMyLogger logger)
+    : ICommandHandler<Command, Result>
+{
+    public async Task<Result> HandleAsync(Command command, CancellationToken ct)
+    {
+        var game = await games.GetById(GameId.NewGameId(command.GameId), ct)
+            .AwaitOrWrap(_ => new IdNotFoundException(command.GameId));
+
+        if (!game.IsDuringCompetition)
+        {
+            throw new CompetitionNotRunningException(command.GameId);
+        }
+
+        var simulationWind = weatherEngine.GetWind();
+        var gate = game.CurrentCompetitionGate;
+        var nextCompetitionJumper = game.NextCompetitionJumper.Value;
+        var competitionHill = game.Hill.Value;
+
+        var gameJumperDto = competitionJumperAcl.GetGameJumper(nextCompetitionJumper.Id.Item);
+        var gameWorldJumperDto = gameJumperAcl.GetGameWorldJumper(gameJumperDto.Id);
+
+        var gameWorldJumper =
+            await gameWorldJumpers.GetById(Domain.GameWorld.JumperId.NewJumperId(gameWorldJumperDto.Id), ct)
+                .AwaitOrWrap(_ => new IdNotFoundException(gameWorldJumperDto.Id));
+
+        var jumperSkills = new JumperSkills(
+            JumperSkillsModule.BigSkillModule
+                .tryCreate(Domain.GameWorld.JumperModule.BigSkillModule.value(gameWorldJumper.Takeoff))
+                .OrThrow("Wrong takeoff"),
+            JumperSkillsModule.BigSkillModule
+                .tryCreate(Domain.GameWorld.JumperModule.BigSkillModule.value(gameWorldJumper.Flight))
+                .OrThrow("Wrong flight"),
+            JumperSkillsModule.LandingSkillModule
+                .tryCreate(Domain.GameWorld.JumperModule.LandingSkillModule.value(gameWorldJumper.Landing))
+                .OrThrow($"Wrong landing ({gameWorldJumper.Landing})"),
+            JumperSkillsModule.FormModule
+                .tryCreate(Domain.GameWorld.JumperModule.LiveFormModule.value(gameWorldJumper.LiveForm))
+                .OrThrow("Wrong live form"),
+            JumperSkillsModule.LikesHillPolicy.None);
+
+        var hill = new Hill(
+            HillModule.KPointModule
+                .tryCreate(Domain.Competition.HillModule.KPointModule.value(competitionHill.KPoint))
+                .OrThrow("Wrong kpoint"),
+            HillModule.HsPointModule
+                .tryCreate(Domain.Competition.HillModule.HsPointModule.value(competitionHill.HsPoint))
+                .OrThrow("Wrong hs point"),
+            new HillSimulationData(HillModule.HsPointModule
+                .tryCreate(Domain.Competition.HillModule.HsPointModule.value(competitionHill.HsPoint))
+                .OrThrow("Wrong hs point")));
+        var simulationContext =
+            new SimulationContext(Gate.NewGate(App.Domain.Competition.GateModule.value(gate)),
+                new Jumper(jumperSkills), hill,
+                Domain.Competition.HillModule.GatePointsModule.value(competitionHill.GatePoints),
+                HillPointsForMeterCalculator.calculate(
+                    Domain.Competition.HillModule.KPointModule.value(competitionHill.KPoint)), simulationWind);
+        var simulatedJump = jumpSimulator.Simulate(simulationContext);
+
+        logger.Debug($"{gameWorldJumper.Name.Item} {gameWorldJumper.Surname.Item} jumped: {
+            DistanceModule.value(simulatedJump.Distance)}m + {simulatedJump.Landing}");
+
+        var judgeNotes = JumpModule.JudgeNotesModule.tryCreate(ListModule.OfSeq([18.0, 18.5, 18.5, 17.5, 17.5])) // TODO: IJudgesFactory
+            .OrThrow("Invalid judge notes"); // Komponent Judgement
+        var competitionJumpWind =
+            App.Domain.Competition.JumpModule.WindAverage.FromDouble(WindModule.averaged(simulationWind));
+        var competitionJump = new App.Domain.Competition.Jump(nextCompetitionJumper.Id,
+            JumpModule.DistanceModule.tryCreate(DistanceModule.value(simulatedJump.Distance))
+                .OrThrow("Invalid distance"),
+            judgeNotes,
+            competitionJumpWind);
+
+        var jumpResultId = JumpResultId.NewJumpResultId(guid.NewGuid());
+        var gameAfterAddingJumpResult = game.AddJumpInCompetition(jumpResultId, competitionJump);
+        if (gameAfterAddingJumpResult.IsOk)
+        {
+            var addJumpOutcome = gameAfterAddingJumpResult.ResultValue;
+            var gameAfterAddingJump = addJumpOutcome.Game;
+            var competitionAfterAddingJump = addJumpOutcome.Competition;
+            var changedPhase = addJumpOutcome.PhaseChangedTo;
+
+            await games.Add(gameAfterAddingJump, ct);
+
+            var classificationResult =
+                competitionAfterAddingJump.ClassificationResultOf(nextCompetitionJumper.Id).Value;
+            logger.Debug($"{gameWorldJumper.Name.Item} {gameWorldJumper.Surname.Item}: Pos. {
+                Domain.Competition.Classification.PositionModule.value(classificationResult.Position)}({
+                    classificationResult.Points.Item
+                }pts)");
+            if (gameAfterAddingJump.IsDuringCompetition)
+            {
+                var now = clock.Now();
+                await scheduler.ScheduleAsync(
+                    jobType: "SimulateJumpInGame",
+                    payloadJson: json.Serialize(new { GameId = command.GameId }),
+                    runAt: now.AddSeconds(3),
+                    uniqueKey: $"SimulateJumpInGame:{command.GameId}_{now.ToUnixTimeSeconds()}",
+                    ct: ct);
+            }
+            else
+            {
+                logger.Debug(
+                    $"Competition (Game ID: {command.GameId}) CurrentCompetitionClassification: " +
+                    string.Join(", ",
+                        competitionAfterAddingJump.Classification
+                            .Select(result => $"{result.JumperId.Item} {result.Points.Item}"))
+                );
+
+                if (gameAfterAddingJump.Status.IsPreDraft &&
+                    ((Domain.Game.Status.PreDraft)gameAfterAddingJump.Status).Item.IsBreak)
+                {
+                    var preDraftStatus = (Domain.Game.Status.PreDraft)gameAfterAddingJump.Status;
+                    var preDraftBreak = (Domain.Game.PreDraftStatus.Break)preDraftStatus.Item;
+                    var nextPreDraftCompetitionIndex = PreDraftCompetitionIndexModule.value(preDraftBreak.NextIndex);
+                    var now = clock.Now();
+                    await scheduler.ScheduleAsync(
+                        jobType: "StartNextPreDraftCompetition",
+                        payloadJson: json.Serialize(new { GameId = command.GameId }),
+                        runAt: now.AddSeconds(15),
+                        uniqueKey: $"StartNextPreDraftCompetition:{command.GameId}_{nextPreDraftCompetitionIndex}",
+                        ct: ct);
+                }
+                else if (gameAfterAddingJump.Status.IsBreak &&
+                         ((Domain.Game.Status.Break)gameAfterAddingJump.Status).Next.IsDraftTag)
+                {
+                    var now = clock.Now();
+                    await scheduler.ScheduleAsync(
+                        jobType: "StartDraft",
+                        payloadJson: json.Serialize(new { GameId = command.GameId }),
+                        runAt: now.AddSeconds(25),
+                        uniqueKey: $"StartDraft:{command.GameId}",
+                        ct: ct);
+                }
+                else if (gameAfterAddingJump.Status.IsBreak &&
+                         ((Domain.Game.Status.Break)gameAfterAddingJump.Status).Next.IsEndedTag)
+                {
+                    var now = clock.Now();
+                    await scheduler.ScheduleAsync(
+                        jobType: "EndGame",
+                        payloadJson: json.Serialize(new { GameId = command.GameId }),
+                        runAt: now.AddSeconds(20),
+                        uniqueKey: $"EndGame:{command.GameId}",
+                        ct: ct);
+                }
+                else
+                {
+                    throw new InternalCriticalException(
+                        $"Competition isn't in progress and no automatic action is defined. Game: {
+                            gameAfterAddingJump.Id}, Phase: {
+                                gameAfterAddingJump.Status}, Changed Phase: {changedPhase},");
+                }
+            }
+
+            await gameNotifier.GameUpdated(GameUpdatedDtoMapper.FromDomain(gameAfterAddingJump));
+
+            var gameWorldCountry = await gameWorldCountries.GetById(gameWorldJumper.CountryId, ct)
+                .AwaitOrWrap(_ => new IdNotFoundException(gameWorldJumper.CountryId.Item));
+
+            var jumperResultInClassifiation = addJumpOutcome.Competition
+                .ClassificationResultOf(nextCompetitionJumper.Id)
+                .OrThrow($"Missing classification result for competition jumper {nextCompetitionJumper.Id.Item}");
+
+            var simulatedJumpDto = new SimulatedJumpDto(nextCompetitionJumper.Id.Item, gameWorldJumperDto.Id,
+                gameWorldJumper.Name.Item, gameWorldJumper.Surname.Item,
+                Domain.GameWorld.FisCodeModule.value(gameWorldCountry.FisCode),
+                DistanceModule.value(simulatedJump.Distance), JumpModule.JudgeNotesModule.value(judgeNotes).ToArray(),
+                WindModule.averaged(simulationWind),
+                Domain.Competition.TotalPointsModule.value(jumperResultInClassifiation.Points),
+                Domain.Competition.Classification.PositionModule.value(jumperResultInClassifiation.Position));
+
+            return new Result(simulatedJumpDto);
+        }
+
+        throw new Exception("Error adding a jump to game.");
+    }
+}
+
+public class InternalCriticalException(string? message = null) : Exception(message);
+
+public class CompetitionNotRunningException(Guid gameId, string? message = null) : Exception(message)
+{
+    public Guid GameId { get; } = gameId;
+}
+
+public record SimulatedJumpDto(
+    Guid CompetitionJumperId,
+    Guid GameWorldJumperId,
+    string Name,
+    string Surname,
+    string CountryFisCode,
+    double Distance,
+    double[] JudgeNotes,
+    double WindAverage,
+    double TotalPoints,
+    int CurrentRank);

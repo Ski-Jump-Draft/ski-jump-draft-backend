@@ -1,6 +1,6 @@
 using System.Globalization;
-using App.Application._2.Utility;
-using App.Domain._2.Simulation;
+using App.Application.Utility;
+using App.Domain.Simulation;
 
 namespace App.Simulator.Mock;
 

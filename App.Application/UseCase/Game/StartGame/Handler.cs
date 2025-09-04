@@ -1,0 +1,126 @@
+using App.Application.Acl;
+using App.Application.Commanding;
+using App.Application.Exceptions;
+using App.Application.Extensions;
+using App.Application.Messaging.Notifiers;
+using App.Application.Messaging.Notifiers.Mapper;
+using App.Application.Policy.GameHillSelector;
+using App.Application.Policy.GameJumpersSelector;
+using App.Application.Utility;
+using App.Domain.Game;
+using App.Domain.GameWorld;
+using App.Domain.Matchmaking;
+using Microsoft.FSharp.Collections;
+using HillModule = App.Domain.Competition.HillModule;
+using PlayerId = App.Domain.Game.PlayerId;
+using PlayerModule = App.Domain.Game.PlayerModule;
+
+namespace App.Application.UseCase.Game.StartGame;
+
+public record Command(
+    Guid MatchmakingId
+) : ICommand<Result>;
+
+public record Result(Guid GameId);
+
+public class Handler(
+    IJson json,
+    IMatchmakings matchmakings,
+    IGames games,
+    IGameNotifier gameNotifier,
+    IGameJumpersSelector jumpersSelector,
+    Domain.Game.Settings globalGameSettings,
+    IScheduler scheduler,
+    IClock clock,
+    IGameHillSelector hillSelector,
+    IGuid guid,
+    IGameJumperAcl gameJumperAcl,
+    ICompetitionJumperAcl competitionJumperAcl,
+    IMyLogger logger,
+    IHills hills)
+    : ICommandHandler<Command, Result>
+{
+    public async Task<Result> HandleAsync(Command command, CancellationToken ct)
+    {
+        var matchmaking = await matchmakings.GetById(MatchmakingId.NewMatchmakingId(command.MatchmakingId), ct)
+            .AwaitOrWrap(_ => new IdNotFoundException(command.MatchmakingId));
+
+        if (!matchmaking.HasSucceeded)
+        {
+            throw new Exception("Matchmaking has not succeeded");
+        }
+
+        logger.Info($"Starting game for a succeeded matchmaking {command.MatchmakingId}");
+
+        var selectedJumperDtos = await jumpersSelector.Select(ct);
+
+        var selectedHillGuid = await hillSelector.Select(ct);
+        var gameWorldHill = await hills.GetById(Domain.GameWorld.HillId.NewHillId(selectedHillGuid), ct)
+            .AwaitOrWrap(_ => new IdNotFoundException(selectedHillGuid));
+
+        var gameGuid = guid.NewGuid();
+        var gameId = Domain.Game.GameId.NewGameId(gameGuid);
+
+        var endedMatchmakingPlayers = matchmaking.Players_;
+        var gamePlayersEnumerable = endedMatchmakingPlayers.Select(matchmakingPlayer =>
+        {
+            var gamePlayerGuid = guid.NewGuid();
+            var gamePlayerId = PlayerId.NewPlayerId(gamePlayerGuid);
+            var matchmakingPlayerNickString =
+                Domain.Matchmaking.PlayerModule.NickModule.value(matchmakingPlayer.Nick)!;
+            var gamePlayerNick = PlayerModule.NickModule.createWithSuffix(matchmakingPlayerNickString).Value;
+            var gamePlayer = new Domain.Game.Player(gamePlayerId, gamePlayerNick);
+            return gamePlayer;
+        });
+        var gamePlayers = Domain.Game.PlayersModule.create(ListModule.OfSeq(gamePlayersEnumerable)).ResultValue;
+
+        var gameJumpersEnumerable = selectedJumperDtos.Select(selectedGameWorldJumperDto =>
+        {
+            var gameJumperId = guid.NewGuid();
+            var gameJumperDto = new GameJumperDto(gameJumperId);
+            var gameWorldJumperDto = new GameWorldJumperDto(selectedGameWorldJumperDto.Id);
+            gameJumperAcl.Map(gameWorldJumperDto, gameJumperDto);
+            var competitionJumperId =
+                guid.NewGuid(); // Od razu tworzymy competition jumpera, z którego korzystać będą inne Use Case'y
+            competitionJumperAcl.Map(gameJumperDto, new CompetitionJumperDto(competitionJumperId));
+            return new Domain.Game.Jumper(Domain.Game.JumperId.NewJumperId(gameJumperId));
+        });
+        var gameJumpers = Domain.Game.JumpersModule.create(ListModule.OfSeq(gameJumpersEnumerable));
+
+        var competitionHillId = Domain.Competition.HillId.NewHillId(guid.NewGuid());
+        var competitionHill = new Domain.Competition.Hill(competitionHillId,
+            HillModule.KPointModule.tryCreate(Domain.GameWorld.HillModule.KPointModule.value(gameWorldHill.KPoint))
+                .Value,
+            HillModule.HsPointModule
+                .tryCreate(Domain.GameWorld.HillModule.HsPointModule.value(gameWorldHill.HsPoint)).Value,
+            HillModule.GatePointsModule
+                .tryCreate(Domain.GameWorld.HillModule.GatePointsModule.value(gameWorldHill.GatePoints)).Value,
+            HillModule.WindPointsModule
+                .tryCreate(Domain.GameWorld.HillModule.WindPointsModule.value(gameWorldHill.HeadwindPoints)).Value,
+            HillModule.WindPointsModule
+                .tryCreate(Domain.GameWorld.HillModule.WindPointsModule.value(gameWorldHill.TailwindPoints)).Value);
+
+        var gameResult =
+            Domain.Game.Game.Create(gameId, globalGameSettings, gamePlayers, gameJumpers, competitionHill);
+        if (gameResult.IsOk)
+        {
+            var game = gameResult.ResultValue;
+            logger.Debug($"Started game: {game}");
+
+            await games.Add(game, ct);
+            await scheduler.ScheduleAsync(
+                jobType: "StartPreDraft",
+                payloadJson: json.Serialize(new { GameId = gameGuid }),
+                runAt: clock.Now().AddSeconds(15),
+                uniqueKey: $"StartPreDraft:{gameGuid}", ct: ct
+            );
+            await gameNotifier.GameStartedAfterMatchmaking(command.MatchmakingId, gameGuid);
+            await gameNotifier.GameUpdated(GameUpdatedDtoMapper.FromDomain(game));
+            return new Result(gameGuid);
+        }
+
+        throw new GameInitializationException(gameGuid, gameResult.ErrorValue.ToString());
+    }
+}
+
+public class GameInitializationException(Guid gameId, string? message = null) : Exception(message);
