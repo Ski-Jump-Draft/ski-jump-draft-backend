@@ -37,7 +37,8 @@ public class Handler(
     IGameJumperAcl gameJumperAcl,
     ICompetitionJumperAcl competitionJumperAcl,
     IMyLogger logger,
-    IHills hills)
+    IHills hills,
+    ICompetitionHillAcl competitionHillAcl)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -99,6 +100,8 @@ public class Handler(
                 .tryCreate(Domain.GameWorld.HillModule.WindPointsModule.value(gameWorldHill.HeadwindPoints)).Value,
             HillModule.WindPointsModule
                 .tryCreate(Domain.GameWorld.HillModule.WindPointsModule.value(gameWorldHill.TailwindPoints)).Value);
+        competitionHillAcl.Map(new CompetitionHillDto(competitionHillId.Item),
+            new GameWorldHillDto(gameWorldHill.Id.Item));
 
         var gameResult =
             Domain.Game.Game.Create(gameId, globalGameSettings, gamePlayers, gameJumpers, competitionHill);

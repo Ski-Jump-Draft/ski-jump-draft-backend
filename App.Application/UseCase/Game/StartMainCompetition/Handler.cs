@@ -2,6 +2,8 @@ using App.Application.Acl;
 using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
+using App.Application.Game.Gate;
+using App.Application.Mapping;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
 using App.Application.Policy.GameHillSelector;
@@ -11,6 +13,8 @@ using App.Domain.Competition;
 using App.Domain.Game;
 using App.Domain.GameWorld;
 using Microsoft.FSharp.Collections;
+using HillId = App.Domain.GameWorld.HillId;
+using JumperId = App.Domain.GameWorld.JumperId;
 
 namespace App.Application.UseCase.Game.StartMainCompetition;
 
@@ -28,6 +32,7 @@ public class Handler(
     IClock clock,
     IGuid guid,
     ICompetitionJumperAcl competitionJumperAcl,
+    ISelectGameStartingGateService selectGameStartingGateService,
     IMyLogger logger)
     : ICommandHandler<Command, Result>
 {
@@ -46,9 +51,11 @@ public class Handler(
         var competitionGuid = guid.NewGuid();
         var competitionId = CompetitionId.NewCompetitionId(competitionGuid);
         var competitionJumpers = game.Jumpers.ToCompetitionJumpers(competitionJumperAcl);
-        var mockedGate = Domain.Competition.Gate.NewGate(10); // TODO
+
+        var startingGate = Domain.Competition.Gate.NewGate(await selectGameStartingGateService.Select(game, ct));
+
         var gameAfterMainCompetitionStartResult =
-            game.StartMainCompetition(competitionId, ListModule.OfSeq(competitionJumpers), mockedGate);
+            game.StartMainCompetition(competitionId, ListModule.OfSeq(competitionJumpers), startingGate);
         if (!gameAfterMainCompetitionStartResult.IsOk)
             throw new Exception("Game start next pre draft competition failed",
                 new Exception(gameAfterMainCompetitionStartResult.ErrorValue.ToString()));

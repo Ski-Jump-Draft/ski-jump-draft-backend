@@ -1,11 +1,16 @@
+using App.Application.Acl;
+using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Domain.Competition;
+using App.Domain.GameWorld;
 using App.Domain.Simulation;
+using HillId = App.Domain.GameWorld.HillId;
 using HillModule = App.Domain.Simulation.HillModule;
+using JumperId = App.Domain.Competition.JumperId;
 
 namespace App.Application.Mapping;
 
-public static class SimulationJumperMapper
+public static class JumperMapper
 {
     public static Domain.Simulation.Jumper ToSimulationJumper(this Domain.GameWorld.Jumper jumper, bool? likesHill)
     {
@@ -31,9 +36,41 @@ public static class SimulationJumperMapper
             likesHillPolicy);
         return new Domain.Simulation.Jumper(jumperSkills);
     }
+
+    public static IEnumerable<GameWorldJumperDto> ToGameWorldJumpers(
+        this Domain.Game.Jumpers gameJumpers, IGameJumperAcl acl)
+    {
+        var idsEnumerable = Domain.Game.JumpersModule.toIdsList(gameJumpers);
+        return idsEnumerable.Select(gameJumperId =>
+        {
+            var gameWorldJumperDto = acl.GetGameWorldJumper(gameJumperId.Item);
+            return new GameWorldJumperDto(gameWorldJumperDto.Id);
+        });
+    }
+
+    public static async Task<IEnumerable<Domain.GameWorld.Jumper>> ToGameWorldJumpers(
+        this Domain.Game.Jumpers gameJumpers, IGameJumperAcl acl, IJumpers jumpers, CancellationToken ct = default)
+    {
+        var gameWorldJumperDtos = gameJumpers.ToGameWorldJumpers(acl);
+        var gameWorldJumpers = await
+            jumpers.GetFromIds(gameWorldJumperDtos.Select(dto => Domain.GameWorld.JumperId.NewJumperId(dto.Id)), ct);
+        return gameWorldJumpers;
+    }
+
+    public static IEnumerable<Domain.Competition.Jumper> ToCompetitionJumpers(
+        this Domain.Game.Jumpers gameJumpers, ICompetitionJumperAcl acl)
+    {
+        var idsEnumerable = Domain.Game.JumpersModule.toIdsList(gameJumpers);
+        return idsEnumerable.Select(gameJumperId =>
+        {
+            var competitionJumperDto = acl.GetCompetitionJumper(gameJumperId.Item);
+            var competitionJumperId = Domain.Competition.JumperId.NewJumperId(competitionJumperDto.Id);
+            return new Domain.Competition.Jumper(competitionJumperId);
+        });
+    }
 }
 
-public static class SimulationHillMapper
+public static class HillMapper
 {
     public static Domain.Simulation.Hill ToSimulationHill(this Domain.GameWorld.Hill hill,
         double? overridenMetersByGate = null)
@@ -87,5 +124,14 @@ public static class SimulationHillMapper
                 HillModule.HsPointModule.tryCreate(Domain.Competition.HillModule.HsPointModule.value(hill.HsPoint))
                     .OrThrow("Wrong real hs point"),
                 HillModule.MetersByGateModule.tryCreate(metersByGate).OrThrow("Wrong meters by gate")));
+    }
+
+    public static async Task<Domain.GameWorld.Hill> ToGameWorldHill(this Domain.Competition.Hill hill, IHills hills,
+        ICompetitionHillAcl competitionHillAcl, double? overridenMetersByGate = null, CancellationToken ct = default)
+    {
+        var gameWorldHillDto = competitionHillAcl.GetGameWorldHill(hill.Id.Item);
+        var gameWorldHill = await hills.GetById(HillId.NewHillId(gameWorldHillDto.Id), ct)
+            .AwaitOrWrap(_ => new IdNotFoundException("GameWorldHill", gameWorldHillDto.Id));
+        return gameWorldHill;
     }
 }

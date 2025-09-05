@@ -1,5 +1,6 @@
 using App.Application.Acl;
 using App.Application.Game.DraftPicks;
+using App.Application.Game.GameCompetitions;
 using App.Domain.Competition;
 using App.Domain.Game;
 using Microsoft.FSharp.Collections;
@@ -9,7 +10,10 @@ using RankingModule = App.Domain.Game.RankingModule;
 namespace App.Application.Game.Ranking;
 
 // TODO: Zrobić refactor i reuse. + PodiumAtAllCosts
-public class ClassicGameRankingFactory(IDraftPicksArchive draftPicksArchive, ICompetitionJumperAcl competitionJumperAcl)
+public class ClassicGameRankingFactory(
+    IDraftPicksArchive draftPicksArchive,
+    IGameCompetitionResultsArchive gameCompetitionResultsArchive,
+    ICompetitionJumperAcl competitionJumperAcl)
     : IGameRankingFactory
 {
     public Task<Domain.Game.Ranking> Create(Domain.Game.Game game, CancellationToken ct)
@@ -21,16 +25,21 @@ public class ClassicGameRankingFactory(IDraftPicksArchive draftPicksArchive, ICo
 
         var playerIds = PlayersModule.toIdsList(game.Players).ToList();
         var picks = draftPicksArchive.GetPicks(game.Id_.Item);
-        var mainCompetitionClassification = game.CurrentCompetitionClassification.ToList();
+
+        var mainCompetitionClassification = gameCompetitionResultsArchive.GetMainResults(game.Id.Item)?.Results;
+        if (mainCompetitionClassification is null)
+        {
+            throw new Exception($"Game {game.Id
+            } does not have a main competition in archive even though it waits for end.");
+        }
 
         var mainCompetitionPositionByJumper = new Dictionary<JumperId, int>();
-        foreach (var classificationResult in mainCompetitionClassification)
+        foreach (var (competitionJumperId, position, _) in mainCompetitionClassification)
         {
-            var competitionJumperId = classificationResult.JumperId;
-            var gameJumperDto = competitionJumperAcl.GetGameJumper(competitionJumperId.Item);
+            var gameJumperDto = competitionJumperAcl.GetGameJumper(competitionJumperId);
             var gameJumperId = JumperId.NewJumperId(gameJumperDto.Id);
             mainCompetitionPositionByJumper.Add(gameJumperId,
-                Classification.PositionModule.value(classificationResult.Position));
+                position);
         }
 
         var mainCompetitionPositionsByPlayer = new Dictionary<PlayerId, List<int>>();

@@ -39,7 +39,7 @@ module JumpResultCreator =
         (startingGate: Gate)
         : Result<JumpResult, FisError> =
 
-        let judgeNotes = JudgeNotes.value jump.JudgeNotes
+        let judgeNotes = Judges.value jump.JudgeNotes
         let judgeNotesCount = judgeNotes.Length
 
         if judgeNotesCount < 3 then

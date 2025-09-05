@@ -117,9 +117,9 @@ type Game =
         | Draft draft -> Some draft
         | _ -> None
 
-    member this.DraftPicks = this.Draft.Value.AllPicks;
-    
-    member this.AvailableDraftPicks : IEnumerable<JumperId> =
+    member this.DraftPicks = this.Draft.Value.AllPicks
+
+    member this.AvailableDraftPicks: IEnumerable<JumperId> =
         this.Draft.Value.AvailablePicks
 
     static member Create id settings players jumpers (hill: Competition.Hill option) =
@@ -275,6 +275,7 @@ type Game =
 
                 Ok
                     { Game = { this with Status = newStatus }
+                      Classification = this.CurrentCompetitionClassification
                       Competition = comp'
                       PhaseChangedTo = phaseChanged }
 
@@ -292,6 +293,7 @@ type Game =
 
                 Ok
                     { Game = { this with Status = newStatus }
+                      Classification = this.CurrentCompetitionClassification
                       Competition = comp'
                       PhaseChangedTo = if ended then Some newStatus else None }
 
@@ -351,5 +353,6 @@ and PickOutcome =
 
 and AddJumpOutcome =
     { Game: Game
+      Classification: IEnumerable<Competition.Classification.JumperClassificationResult>
       Competition: Competition.Competition
       PhaseChangedTo: Status option }

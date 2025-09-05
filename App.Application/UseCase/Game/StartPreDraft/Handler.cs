@@ -2,6 +2,8 @@ using App.Application.Acl;
 using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
+using App.Application.Game.Gate;
+using App.Application.Mapping;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
 using App.Application.Policy;
@@ -24,7 +26,8 @@ public class Handler(
     IGameNotifier gameNotifier,
     IScheduler scheduler,
     IClock clock,
-    IGuid guid)
+    IGuid guid,
+    ISelectGameStartingGateService selectGameStartingGateService)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -35,9 +38,11 @@ public class Handler(
 
         var competitionId = Domain.Competition.CompetitionId.NewCompetitionId(guid.NewGuid());
         var competitionJumpers = game.Jumpers.ToCompetitionJumpers(competitionJumperAcl);
-        var mockedGate = Domain.Competition.Gate.NewGate(10); // TODO
+
+        var startingGate = Domain.Competition.Gate.NewGate(await selectGameStartingGateService.Select(game, ct));
+
         var gameAfterPreDraftStartResult =
-            game.StartPreDraft(competitionId, ListModule.OfSeq(competitionJumpers), mockedGate);
+            game.StartPreDraft(competitionId, ListModule.OfSeq(competitionJumpers), startingGate);
         if (gameAfterPreDraftStartResult.IsOk)
         {
             var gameAfterPreDraftStart = gameAfterPreDraftStartResult.ResultValue;

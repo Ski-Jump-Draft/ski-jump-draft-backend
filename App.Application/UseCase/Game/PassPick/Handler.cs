@@ -61,7 +61,7 @@ public class Handler(
                 await scheduler.ScheduleAsync(
                     jobType: "StartMainCompetition",
                     payloadJson: json.Serialize(new { GameId = game.Id_.Item }),
-                    runAt: now.AddSeconds(15),
+                    runAt: now.AddSeconds(4),
                     uniqueKey: $"StartMainCompetition:{game.Id_.Item}",
                     ct: ct);
             }

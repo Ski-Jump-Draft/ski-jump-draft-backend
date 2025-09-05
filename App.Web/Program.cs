@@ -179,6 +179,11 @@ builder.Services
 
 builder.Services.AddSingleton<App.Domain.Simulation.IWeatherEngine, App.Simulator.Mock.WeatherEngine>();
 builder.Services.AddSingleton<App.Domain.Simulation.IJumpSimulator, App.Simulator.Simple.JumpSimulator>();
+builder.Services.AddSingleton<App.Domain.Simulation.IJudgesSimulator, App.Simulator.Simple.JudgesSimulator>();
+
+builder.Services
+    .AddSingleton<App.Application.Game.Gate.ISelectGameStartingGateService,
+        App.Application.Game.Gate.SelectGameStartingGateService>();
 
 builder.Services
     .AddSingleton<App.Application.Matchmaking.IMatchmakingDurationCalculator,
@@ -186,6 +191,9 @@ builder.Services
         new FixedMatchmakingDurationCalculator(TimeSpan.FromSeconds(25)));
 builder.Services
     .AddSingleton<App.Application.Game.DraftPicks.IDraftPicksArchive, App.Infrastructure.Archive.DraftPicks.InMemory>();
+builder.Services
+    .AddSingleton<App.Application.Game.GameCompetitions.IGameCompetitionResultsArchive, App.Infrastructure.Archive.GameCompetitionResults.
+        InMemory>();
 
 builder.Services
     .AddSingleton<App.Application.Game.Gate.IGameStartingGateSelector,

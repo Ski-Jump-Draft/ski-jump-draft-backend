@@ -2,6 +2,7 @@ using App.Application.Acl;
 using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
+using App.Application.Game.GameCompetitions;
 using App.Application.Mapping;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
@@ -37,7 +38,9 @@ public class Handler(
     IGameJumperAcl gameJumperAcl,
     App.Domain.GameWorld.ICountries gameWorldCountries,
     App.Domain.GameWorld.IJumpers gameWorldJumpers,
-    IMyLogger logger)
+    IMyLogger logger,
+    IJudgesSimulator judgesSimulator,
+    IGameCompetitionResultsArchive gameCompetitionResultsArchive)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -73,15 +76,21 @@ public class Handler(
         logger.Debug($"{gameWorldJumper.Name.Item} {gameWorldJumper.Surname.Item} jumped: {
             DistanceModule.value(simulatedJump.Distance)}m + {simulatedJump.Landing}");
 
-        var judgeNotes = JumpModule.JudgeNotesModule
-            .tryCreate(ListModule.OfSeq([18.0, 18.5, 18.5, 17.5, 17.5])) // TODO: IJudgesFactory
-            .OrThrow("Invalid judge notes"); // Komponent Judgement
+        var judgesSimulationContext =
+            new JudgesSimulationContext(simulatedJump, Gate.NewGate(App.Domain.Competition.GateModule.value(gate)),
+                simulationJumper, simulationHill, simulationWind);
+        var simulatedJudges = judgesSimulator.Evaluate(judgesSimulationContext);
+
+        var competitionJudges = JumpModule.JudgesModule
+            .tryCreate(JudgesModule.value(simulatedJudges))
+            .OrThrow("Invalid judge notes");
+
         var competitionJumpWind =
             App.Domain.Competition.JumpModule.WindAverage.FromDouble(WindModule.averaged(simulationWind));
         var competitionJump = new App.Domain.Competition.Jump(nextCompetitionJumper.Id,
             JumpModule.DistanceModule.tryCreate(DistanceModule.value(simulatedJump.Distance))
                 .OrThrow("Invalid distance"),
-            judgeNotes,
+            competitionJudges,
             competitionJumpWind);
 
         var jumpResultId = JumpResultId.NewJumpResultId(guid.NewGuid());
@@ -148,6 +157,8 @@ public class Handler(
                 else if (gameAfterAddingJump.Status.IsBreak &&
                          ((Domain.Game.Status.Break)gameAfterAddingJump.Status).Next.IsEndedTag)
                 {
+                    gameCompetitionResultsArchive.ArchiveMain(command.GameId,
+                        addJumpOutcome.Classification.ToGameCompetitionResultsArchiveDto());
                     var now = clock.Now();
                     await scheduler.ScheduleAsync(
                         jobType: "EndGame",
@@ -177,7 +188,8 @@ public class Handler(
             var simulatedJumpDto = new SimulatedJumpDto(nextCompetitionJumper.Id.Item, gameWorldJumperDto.Id,
                 gameWorldJumper.Name.Item, gameWorldJumper.Surname.Item,
                 Domain.GameWorld.FisCodeModule.value(gameWorldCountry.FisCode),
-                DistanceModule.value(simulatedJump.Distance), JumpModule.JudgeNotesModule.value(judgeNotes).ToArray(),
+                DistanceModule.value(simulatedJump.Distance),
+                JumpModule.JudgesModule.value(competitionJudges).ToArray(),
                 WindModule.averaged(simulationWind),
                 Domain.Competition.TotalPointsModule.value(jumperResultInClassifiation.Points),
                 Domain.Competition.Classification.PositionModule.value(jumperResultInClassifiation.Position));

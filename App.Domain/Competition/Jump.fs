@@ -1,5 +1,7 @@
 namespace App.Domain.Competition
 
+open System
+
 module Jump =
     type Id = Id of System.Guid
 
@@ -13,18 +15,20 @@ module Jump =
 
         let value (Distance v) = v
 
-    type JudgeNotes = private JudgeNotes of double list
+    type Judges = private Judges of double list
+    module Judges =
+        let private roundToHalf (x: double) =
+            Math.Round(x * 2.0, MidpointRounding.AwayFromZero) / 2.0
 
-    module JudgeNotes =
-        type Error = Empty
-
-        let tryCreate (notes: double list) =
-            if notes.IsEmpty then
-                Error(Error.Empty)
+        let tryCreate (scores: double list) =
+            if scores.Length = 5 then
+                let rounded = scores |> List.map roundToHalf
+                Some(Judges rounded)
             else
-                Ok(JudgeNotes notes)
+                None
 
-        let value (JudgeNotes v) = v
+        let value (Judges scores) = scores
+
 
     type WindAverage =
         | Headwind of Value: double
@@ -59,7 +63,7 @@ open Jump
 type Jump = {
     JumperId: JumperId
     Distance: Distance
-    JudgeNotes: JudgeNotes
+    JudgeNotes: Judges
     Wind: WindAverage
 }
 

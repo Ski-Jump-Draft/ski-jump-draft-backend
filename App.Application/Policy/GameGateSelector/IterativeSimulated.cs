@@ -23,7 +23,7 @@ public class IterativeSimulated(
         var currentGate = startingGate;
         var tries = 0;
         
-        var isGoingHigher = SomeoneJumpedOverHs(currentGate);
+        var isGoingHigher = !SomeoneJumpedOverHs(currentGate);
         
         while (tries < maxTries)
         {
