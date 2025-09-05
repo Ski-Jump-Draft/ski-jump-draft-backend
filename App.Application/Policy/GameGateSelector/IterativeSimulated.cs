@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using App.Application.Game.Gate;
 using App.Application.Mapping;
 using App.Domain.Simulation;
@@ -12,19 +13,17 @@ public class IterativeSimulated(
 {
     public int Select(GameStartingGateSelectorContext context)
     {
-        var gameWorldHill = context.Hill;
-        var gameWorldJumpers = context.Jumpers;
-        var simulationJumpers = gameWorldJumpers.Select(j => j.ToSimulationJumper(null)).ToList();
-        var simulationHill = gameWorldHill.ToSimulationHill();
-        var hsPoint = Domain.GameWorld.HillModule.HsPointModule.value(gameWorldHill.HsPoint);
+        var simulationHill = context.Hill;
+        var simulationJumpers = context.Jumpers.ToImmutableArray();
+        var hsPoint = Domain.Simulation.HillModule.HsPointModule.value(simulationHill.HsPoint);
 
         const int maxTries = 50;
         const int startingGate = 0;
         var currentGate = startingGate;
         var tries = 0;
-        
+
         var isGoingHigher = !SomeoneJumpedOverHs(currentGate);
-        
+
         while (tries < maxTries)
         {
             tries++;
@@ -32,9 +31,10 @@ public class IterativeSimulated(
             {
                 if (SomeoneJumpedOverHs(currentGate))
                 {
-                    currentGate--; 
+                    currentGate--;
                     break;
                 }
+
                 currentGate++;
             }
             else
@@ -47,7 +47,7 @@ public class IterativeSimulated(
 
         if (tries >= maxTries)
             throw new MaxTriesExceededException(maxTries, $"Could not find suitable gate after {maxTries} tries");
-        
+
         currentGate += juryBravery switch
         {
             JuryBravery.High => +1,
@@ -68,6 +68,7 @@ public class IterativeSimulated(
                 var distance = DistanceModule.value(result.Distance);
                 if (distance > hsPoint) return true;
             }
+
             return false;
         }
     }

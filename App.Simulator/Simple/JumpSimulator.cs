@@ -33,7 +33,7 @@ public class JumpSimulator(IRandom random, IMyLogger logger) : IJumpSimulator
         };
         logger.Info($"TakeoffRandom: {randomAdditive}");
         // Od 1 do 100
-        var takeoffRating = (takeoffSkill * 5) + (form * 7) + randomAdditive;
+        var takeoffRating = (takeoffSkill * 6) + (form * 4.5) + randomAdditive;
 
         return takeoffRating;
     }
@@ -70,7 +70,7 @@ public class JumpSimulator(IRandom random, IMyLogger logger) : IJumpSimulator
         };
         logger.Info($"FlightRandom: {randomAdditive}");
         // Od 1 do 100
-        var rating = (flightSkill * 5 * 0.96) + (form * 7 * 1.04) + randomAdditive;
+        var rating = (flightSkill * 6 * 0.96) + (form * 4.5 * 1.04) + randomAdditive;
 
         return rating;
     }

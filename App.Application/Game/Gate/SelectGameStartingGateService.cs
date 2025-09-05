@@ -20,7 +20,9 @@ public class SelectGameStartingGateService(
     {
         var gameWorldJumpers = await game.Jumpers.ToGameWorldJumpers(gameJumperAcl, gameWorldJumpersRepository, ct);
         var gameWorldHill = await game.Hill.Value.ToGameWorldHill(gameWorldHillsRepository, competitionHillAcl, ct: ct);
-        var gateSelectorContext = new GameStartingGateSelectorContext(gameWorldJumpers, gameWorldHill);
+        var gateSelectorContext =
+            new GameStartingGateSelectorContext(gameWorldJumpers.ToSimulationJumpers(),
+                gameWorldHill.ToSimulationHill());
         return startingGateSelector.Select(gateSelectorContext);
     }
 }

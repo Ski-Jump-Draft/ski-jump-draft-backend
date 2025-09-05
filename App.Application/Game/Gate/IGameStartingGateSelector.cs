@@ -5,4 +5,4 @@ public interface IGameStartingGateSelector
     int Select(GameStartingGateSelectorContext context);
 }
 
-public record GameStartingGateSelectorContext(IEnumerable<Domain.GameWorld.Jumper> Jumpers, Domain.GameWorld.Hill Hill);
+public record GameStartingGateSelectorContext(IEnumerable<Domain.Simulation.Jumper> Jumpers, Domain.Simulation.Hill Hill);
