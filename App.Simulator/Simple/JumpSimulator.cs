@@ -138,13 +138,11 @@ public class JumpSimulator(IRandom random, IMyLogger logger) : IJumpSimulator
     private double CalculateDistance(SimulationContext context, double takeoffRating, double flightRating,
         double averageWind)
     {
-        var pointsByGate = context.HillPointsByGate;
-        var pointsByMeter = context.HillPointsByMeter;
+        var metersByGate = HillModule.MetersByGateModule.value(context.Hill.SimulationData.MetersByGate);
         var gate = context.Gate.Item;
-        var metersByGate = pointsByGate / pointsByMeter;
 
         var gateAddition = metersByGate * gate;
-        logger.Info($"Gate: {gate}, PointsByGate: {pointsByGate}, PointsByMeter: {pointsByMeter}, GateAddition: {
+        logger.Info($"Gate: {gate}, MetersByGate: {metersByGate}, GateAddition: {
             gateAddition}");
 
         var kPoint = HillModule.KPointModule.value(context.Hill.KPoint);

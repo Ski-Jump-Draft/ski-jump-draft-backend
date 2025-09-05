@@ -22,18 +22,17 @@ public record CompetitionJumperDto(Guid Id);
 
 public static class JumperAclExtensions
 {
-    public static IEnumerable<Domain.Competition.Jumper> ToGameWorldJumpers(
+    public static IEnumerable<GameWorldJumperDto> ToGameWorldJumpers(
         this Domain.Game.Jumpers gameJumpers, IGameJumperAcl acl)
     {
         var idsEnumerable = Domain.Game.JumpersModule.toIdsList(gameJumpers);
         return idsEnumerable.Select(gameJumperId =>
         {
             var gameWorldJumperDto = acl.GetGameWorldJumper(gameJumperId.Item);
-            var competitionJumperId = Domain.Competition.JumperId.NewJumperId(gameWorldJumperDto.Id);
-            return new Domain.GameWorld.Jumper(competitionJumperId);
+            return new GameWorldJumperDto(gameWorldJumperDto.Id);
         });
     }
-    
+
     public static IEnumerable<Domain.Competition.Jumper> ToCompetitionJumpers(
         this Domain.Game.Jumpers gameJumpers, ICompetitionJumperAcl acl)
     {

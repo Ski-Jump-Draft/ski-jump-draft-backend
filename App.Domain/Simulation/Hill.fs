@@ -17,14 +17,21 @@ module Hill =
 
         let value (HsPoint v) = v
 
-    type GatePoints = private GatePoints of double
+    type MetersByGate = private MetersByGate of double
+
+    module MetersByGate =
+        let tryCreate (v: double) =
+            if v > 0 then Some(MetersByGate v) else Option.None
+
+        let value (MetersByGate v) = v
 
 open Hill
-type Hill = {
-    KPoint: KPoint
-    HsPoint: HsPoint
-    SimulationData: HillSimulationData
-}
-and HillSimulationData = {
-    RealHs: HsPoint
-}
+
+type Hill =
+    { KPoint: KPoint
+      HsPoint: HsPoint
+      SimulationData: HillSimulationData }
+
+and HillSimulationData =
+    { RealHs: HsPoint
+      MetersByGate: MetersByGate }

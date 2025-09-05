@@ -67,6 +67,13 @@ public class Csv(
     public async Task<IEnumerable<Domain.GameWorld.Jumper>> GetAll(CancellationToken ct) =>
         await LoadAllAsync(ct);
 
+    public async Task<IEnumerable<Domain.GameWorld.Jumper>> GetFromIds(IEnumerable<JumperId> ids, CancellationToken ct)
+    {
+        var idSet = new HashSet<JumperId>(ids);
+        var all = await LoadAllAsync(ct);
+        return all.Where(j => idSet.Contains(j.Id)).ToList();
+    }
+
     public async Task<FSharpOption<Domain.GameWorld.Jumper>> GetById(JumperId id, CancellationToken ct)
     {
         var all = await LoadAllAsync(ct);

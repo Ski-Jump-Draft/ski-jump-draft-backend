@@ -39,11 +39,9 @@ public class BotJoiner(IMatchmakings repo, ICommandBus bus, IClock clock, ILogge
             catch (App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.RoomIsFullException)
             {
                 continue;
-                log.LogInformation("Room is full. Bot doesn't join.");
             }
             catch (App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.MultipleGamesNotSupportedException)
             {
-                continue;
             }
             catch (Exception ex)
             {

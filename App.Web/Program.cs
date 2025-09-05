@@ -3,6 +3,7 @@ using App.Application.Acl;
 using App.Application.Commanding;
 using App.Application.Matchmaking;
 using App.Application.Messaging.Notifiers;
+using App.Application.Policy.GameGateSelector;
 using App.Application.Policy.GameHillSelector;
 using App.Application.Policy.GameJumpersSelector;
 using App.Application.Utility;
@@ -185,6 +186,12 @@ builder.Services
         new FixedMatchmakingDurationCalculator(TimeSpan.FromSeconds(25)));
 builder.Services
     .AddSingleton<App.Application.Game.DraftPicks.IDraftPicksArchive, App.Infrastructure.Archive.DraftPicks.InMemory>();
+
+builder.Services
+    .AddSingleton<App.Application.Game.Gate.IGameStartingGateSelector,
+        App.Application.Policy.GameGateSelector.IterativeSimulated>(sp => new IterativeSimulated(
+        sp.GetRequiredService<App.Domain.Simulation.IJumpSimulator>(),
+        sp.GetRequiredService<App.Domain.Simulation.IWeatherEngine>(), JuryBravery.Medium));
 
 builder.Services.AddMemoryCache();
 

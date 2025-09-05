@@ -29,7 +29,7 @@ module JumperSkills =
         let value (LiveForm s) = s
         
     type LikesHillPolicy =
-        | DoNotLike
+        | DoesNotLike
         | None
         | Likes
 

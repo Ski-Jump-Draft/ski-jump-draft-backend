@@ -2,6 +2,7 @@ using App.Application.Acl;
 using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
+using App.Application.Mapping;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
 using App.Application.Utility;
@@ -61,43 +62,19 @@ public class Handler(
             await gameWorldJumpers.GetById(Domain.GameWorld.JumperId.NewJumperId(gameWorldJumperDto.Id), ct)
                 .AwaitOrWrap(_ => new IdNotFoundException(gameWorldJumperDto.Id));
 
-        var jumperSkills = new JumperSkills(
-            JumperSkillsModule.BigSkillModule
-                .tryCreate(Domain.GameWorld.JumperModule.BigSkillModule.value(gameWorldJumper.Takeoff))
-                .OrThrow("Wrong takeoff"),
-            JumperSkillsModule.BigSkillModule
-                .tryCreate(Domain.GameWorld.JumperModule.BigSkillModule.value(gameWorldJumper.Flight))
-                .OrThrow("Wrong flight"),
-            JumperSkillsModule.LandingSkillModule
-                .tryCreate(Domain.GameWorld.JumperModule.LandingSkillModule.value(gameWorldJumper.Landing))
-                .OrThrow($"Wrong landing ({gameWorldJumper.Landing})"),
-            JumperSkillsModule.FormModule
-                .tryCreate(Domain.GameWorld.JumperModule.LiveFormModule.value(gameWorldJumper.LiveForm))
-                .OrThrow("Wrong live form"),
-            JumperSkillsModule.LikesHillPolicy.None);
+        var simulationJumper = gameWorldJumper.ToSimulationJumper(likesHill: null);
+        var simulationHill = competitionHill.ToSimulationHill(overridenMetersByGate: null);
 
-        var hill = new Hill(
-            HillModule.KPointModule
-                .tryCreate(Domain.Competition.HillModule.KPointModule.value(competitionHill.KPoint))
-                .OrThrow("Wrong kpoint"),
-            HillModule.HsPointModule
-                .tryCreate(Domain.Competition.HillModule.HsPointModule.value(competitionHill.HsPoint))
-                .OrThrow("Wrong hs point"),
-            new HillSimulationData(HillModule.HsPointModule
-                .tryCreate(Domain.Competition.HillModule.HsPointModule.value(competitionHill.HsPoint))
-                .OrThrow("Wrong hs point")));
         var simulationContext =
             new SimulationContext(Gate.NewGate(App.Domain.Competition.GateModule.value(gate)),
-                new Jumper(jumperSkills), hill,
-                Domain.Competition.HillModule.GatePointsModule.value(competitionHill.GatePoints),
-                HillPointsForMeterCalculator.calculate(
-                    Domain.Competition.HillModule.KPointModule.value(competitionHill.KPoint)), simulationWind);
+                simulationJumper, simulationHill, simulationWind);
         var simulatedJump = jumpSimulator.Simulate(simulationContext);
 
         logger.Debug($"{gameWorldJumper.Name.Item} {gameWorldJumper.Surname.Item} jumped: {
             DistanceModule.value(simulatedJump.Distance)}m + {simulatedJump.Landing}");
 
-        var judgeNotes = JumpModule.JudgeNotesModule.tryCreate(ListModule.OfSeq([18.0, 18.5, 18.5, 17.5, 17.5])) // TODO: IJudgesFactory
+        var judgeNotes = JumpModule.JudgeNotesModule
+            .tryCreate(ListModule.OfSeq([18.0, 18.5, 18.5, 17.5, 17.5])) // TODO: IJudgesFactory
             .OrThrow("Invalid judge notes"); // Komponent Judgement
         var competitionJumpWind =
             App.Domain.Competition.JumpModule.WindAverage.FromDouble(WindModule.averaged(simulationWind));
