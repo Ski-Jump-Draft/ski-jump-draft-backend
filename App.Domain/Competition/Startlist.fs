@@ -108,6 +108,10 @@ with
 
     member this.RemainingEntries : Startlist.Entry list =
         this.Remaining
+        
+    member this.RemainingJumperIds : JumperId list =
+        this.Done
+        |> List.map(_.JumperId)
 
     member this.DoneEntries : Startlist.Entry list =
         this.Done

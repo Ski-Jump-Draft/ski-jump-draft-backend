@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using App.Application.Acl;
 using App.Application.Commanding;
 using App.Application.Exceptions;
@@ -37,9 +38,10 @@ public class Handler(
         var gameGuid = game.Id_.Item;
 
         var competitionId = Domain.Competition.CompetitionId.NewCompetitionId(guid.NewGuid());
-        var competitionJumpers = game.Jumpers.ToCompetitionJumpers(competitionJumperAcl);
 
-        var startingGate = Domain.Competition.Gate.NewGate(await selectGameStartingGateService.Select(game, ct));
+        var competitionJumpers = game.Jumpers.ToCompetitionJumpers(competitionJumperAcl).ToImmutableList();
+        var startingGateInt = await selectGameStartingGateService.Select(competitionJumpers, game.Hill.Value, ct);
+        var startingGate = Domain.Competition.Gate.NewGate(startingGateInt);
 
         var gameAfterPreDraftStartResult =
             game.StartPreDraft(competitionId, ListModule.OfSeq(competitionJumpers), startingGate);

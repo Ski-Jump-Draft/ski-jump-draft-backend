@@ -1,6 +1,7 @@
 using System.Globalization;
 using App.Application.Acl;
 using App.Application.Commanding;
+using App.Application.Game.Gate;
 using App.Application.Matchmaking;
 using App.Application.Messaging.Notifiers;
 using App.Application.Policy.GameGateSelector;
@@ -8,6 +9,7 @@ using App.Application.Policy.GameHillSelector;
 using App.Application.Policy.GameJumpersSelector;
 using App.Application.Utility;
 using App.Domain.GameWorld;
+using App.Domain.Simulation;
 using App.Infrastructure.Helper.Csv;
 using App.Web.MockedFlow;
 using App.Web.Notifiers.Game;
@@ -183,7 +185,7 @@ builder.Services.AddSingleton<App.Domain.Simulation.IJudgesSimulator, App.Simula
 
 builder.Services
     .AddSingleton<App.Application.Game.Gate.ISelectGameStartingGateService,
-        App.Application.Game.Gate.SelectGameStartingGateService>();
+        App.Application.Game.Gate.SelectCompetitionStartingGateService>();
 
 builder.Services
     .AddSingleton<App.Application.Matchmaking.IMatchmakingDurationCalculator,
@@ -192,14 +194,19 @@ builder.Services
 builder.Services
     .AddSingleton<App.Application.Game.DraftPicks.IDraftPicksArchive, App.Infrastructure.Archive.DraftPicks.InMemory>();
 builder.Services
-    .AddSingleton<App.Application.Game.GameCompetitions.IGameCompetitionResultsArchive, App.Infrastructure.Archive.GameCompetitionResults.
+    .AddSingleton<App.Application.Game.GameCompetitions.IGameCompetitionResultsArchive, App.Infrastructure.Archive.
+        GameCompetitionResults.
         InMemory>();
-
 builder.Services
-    .AddSingleton<App.Application.Game.Gate.IGameStartingGateSelector,
-        App.Application.Policy.GameGateSelector.IterativeSimulated>(sp => new IterativeSimulated(
-        sp.GetRequiredService<App.Domain.Simulation.IJumpSimulator>(),
-        sp.GetRequiredService<App.Domain.Simulation.IWeatherEngine>(), JuryBravery.Medium));
+    .AddSingleton<App.Application.Game.Gate.IGameStartingGateSelectorFactory,
+        App.Application.Game.Gate.IterativeSimulatedFactory>(sp =>
+    {
+        const JuryBravery juryBravery = JuryBravery.Medium;
+        return new IterativeSimulatedFactory(sp.GetRequiredService<IJumpSimulator>(),
+            sp.GetRequiredService<IWeatherEngine>(),
+            juryBravery, sp.GetRequiredService<ICompetitionJumperAcl>(), sp.GetRequiredService<IGameJumperAcl>(),
+            sp.GetRequiredService<ICompetitionHillAcl>(), sp.GetRequiredService<IJumpers>());
+    });
 
 builder.Services.AddMemoryCache();
 

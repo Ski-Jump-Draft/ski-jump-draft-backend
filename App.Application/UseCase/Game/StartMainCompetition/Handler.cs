@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using App.Application.Acl;
 using App.Application.Commanding;
 using App.Application.Exceptions;
@@ -50,9 +51,9 @@ public class Handler(
 
         var competitionGuid = guid.NewGuid();
         var competitionId = CompetitionId.NewCompetitionId(competitionGuid);
-        var competitionJumpers = game.Jumpers.ToCompetitionJumpers(competitionJumperAcl);
-
-        var startingGate = Domain.Competition.Gate.NewGate(await selectGameStartingGateService.Select(game, ct));
+        var competitionJumpers = game.Jumpers.ToCompetitionJumpers(competitionJumperAcl).ToImmutableList();
+        var startingGateInt = await selectGameStartingGateService.Select(competitionJumpers, game.Hill.Value, ct);
+        var startingGate = Domain.Competition.Gate.NewGate(startingGateInt);
 
         var gameAfterMainCompetitionStartResult =
             game.StartMainCompetition(competitionId, ListModule.OfSeq(competitionJumpers), startingGate);

@@ -8,13 +8,15 @@ namespace App.Application.Policy.GameGateSelector;
 public class IterativeSimulated(
     IJumpSimulator simulator,
     IWeatherEngine weatherEngine,
-    JuryBravery juryBravery
+    JuryBravery juryBravery,
+    IEnumerable<Domain.Simulation.Jumper> jumpers,
+    Domain.Simulation.Hill hill
 ) : IGameStartingGateSelector
 {
     public int Select(GameStartingGateSelectorContext context)
     {
-        var simulationHill = context.Hill;
-        var simulationJumpers = context.Jumpers.ToImmutableArray();
+        var simulationHill = hill;
+        var simulationJumpers = jumpers.ToImmutableArray();
         var hsPoint = Domain.Simulation.HillModule.HsPointModule.value(simulationHill.HsPoint);
 
         const int maxTries = 50;

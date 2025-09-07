@@ -1,9 +1,61 @@
-Id,Name,Surname,CountryFisCode,Takeoff,Flight,Landing,LiveForm
-bf7f8094-d36a-4ec3-ad42-bfcf70aedcc9,Kamil,Stoch,POL,8.1,8.2,10,8
-2bfe6e94-5178-4170-87f7-be6370d17449,Piotr,Żyła,POL,8.3,8.2,7,4
-825837c6-2942-4b07-b55e-3abee9fbd760,Dawid,Kubacki,POL,9.2,7.6,8,4
-8db5eaf1-12a4-4471-b273-aabc069d828b,Jakub,Wolny,POL,6,7.6,8,2
-5ed56fa9-68a2-4087-b981-a40bd2c00c4e,Andrzej,Stękała,POL,6,7.2,7,4
-68aff2af-27b6-47f3-ac1b-c9e0f1a02356,Paweł,Wąsek,POL,8.3,8,9,3
-57248eda-d288-4f77-8f28-553846df9d0c,Aleksander,Zniszczoł,POL,7,8.3,7,6
-921cc5ed-06cd-4f73-9234-2ca56cb2c43f,Daniel,Huber,AUT,7.8,8.8,7,4
+Id,Name,Surname,FisCountryCode,Takeoff,Flight,Landing,LiveForm
+0,Jan,Hoerl,AUT,9.1,9.1,91,5
+0,Daniel,Tschofenig,AUT,9.2,9.2,92,5
+0,Stefan,Kraft,AUT,9.0,9.0,90,5
+0,Maximilian,Ortner,AUT,8.6,8.6,86,5
+0,Manuel,Fettner,AUT,8.5,8.5,85,5
+0,Domen,Prevc,SLO,8.5,8.5,85,5
+0,Timi,Zajc,SLO,8.7,8.7,87,5
+0,Anze,Lanisek,SLO,8.9,8.9,89,5
+0,Lovro,Kos,SLO,8.3,8.3,83,5
+0,Marius,Lindvik,NOR,8.8,8.8,88,5
+0,Halvor,Egner Granerud,NOR,7.5,7.5,75,5
+0,Kristoffer,Eriksen Sundal,NOR,7.5,7.5,75,5
+0,Johann,Andre Forfang,NOR,7.5,7.5,75,5
+0,Philipp,Raimund,GER,8.4,8.4,84,5
+0,Karl,Geiger,GER,8.6,8.6,86,5
+0,Pius,Paschke,GER,8.7,8.7,87,5
+0,Andreas,Wellinger,GER,8.9,8.9,89,5
+0,Kamil,Stoch,POL,8.0,8.0,80,5
+0,Pawel,Wasek,POL,8.5,8.5,85,5
+0,Dawid,Kubacki,POL,8.3,8.3,83,5
+0,Piotr,Zyla,POL,8.2,8.2,82,5
+0,Ryoyu,Kobayashi,JAP,8.7,8.7,87,5
+0,Ren,Nikaido,JAP,8.4,8.4,84,5
+0,Sakutaro,Kobayashi,JAP,8.7,8.7,87,5
+0,Naoki,Nakamura,JAP,8.0,8.0,80,5
+0,Gregor,Deschwanden,SUI,8.7,8.7,87,5
+0,Killian,Peier,SUI,8.2,8.2,82,5
+0,Simon,Ammann,SUI,7.6,7.6,76,5
+0,Yanick,Wasser,SUI,7.8,7.8,78,5
+0,Antti,Aalto,FIN,8.1,8.1,81,5
+0,Eetu,Nousiainen,FIN,7.9,7.9,79,5
+0,Kasperi,Valto,FIN,7.6,7.6,76,5
+0,Niko,Kytosaho,FIN,7.9,7.9,79,5
+0,Kevin,Bickner,USA,8.2,8.2,82,5
+0,Andrew,Urlaub,USA,7.5,7.5,75,5
+0,Tate,Frantz,USA,8.3,8.3,83,5
+0,Casey,Larson,USA,7.4,7.4,74,5
+0,Alex,Insam,ITA,7.8,7.8,78,5
+0,Francesco,Cecon,ITA,7.4,7.4,74,5
+0,Giovanni,Bresadola,ITA,8.0,8.0,80,5
+0,Artti,Aigro,EST,8.1,8.1,81,5
+0,Kaimar,Vagul,EST,7.2,7.2,72,5
+0,Mihnea,Alexandru Spulber,EST,7.5,7.5,75,5
+0,Vladimir,Zografski,BUL,8.1,8.1,81,5
+0,Danil,Vassilyev,KAZ,7.6,7.6,76,5
+0,Ilya,Mizernykh,KAZ,7.4,7.4,74,5
+0,MacKenzie,Boyd-Clowes,CAN,7.5,7.5,75,5
+0,Roman,Koudelka,CZE,7.8,7.8,78,5
+0,Qiwu,Song,CHN,7.0,7.0,70,5
+0,Fatih,Arda Ipcioglu,TUR,7.5,7.5,75,5
+0,Muhammed,Ali Bedir,TUR,7.5,7.5,75,5
+0,Valentin,Foubert,FRA,8.0,8.0,80,5
+0,Jules,Chervet,FRA,6.9,6.9,69,5
+0,Ari,Repellin,FRA,7.0,7.0,70,5
+0,Enzo,Milesi,FRA,7.3,7.3,73,5
+0,Yevhen,Marusiak,UKR,7.9,7.9,79,5
+0,Vitaliy,Kalinichenko,UKR,7.4,7.4,74,5
+0,Heung-Chul,Choi,KOR,6.2,6.2,62,5
+0,Hektor,Kapustik,SVK,7.1,7.1,71,5
+0,Daniel,Andrei Cacina,ROU,7.5,7.5,75,5
