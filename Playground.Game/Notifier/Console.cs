@@ -22,7 +22,7 @@ public class ConsoleGameNotifier : IGameNotifier
         
         var client = new TcpClient();
         
-        const int maxAttempts = 10;
+        const int maxAttempts = 20;
         var attempt = 0;
         while (attempt < maxAttempts)
         {

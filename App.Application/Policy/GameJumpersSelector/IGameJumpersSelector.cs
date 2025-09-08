@@ -9,5 +9,6 @@ public record SelectedGameWorldJumperDto(
     Guid Id,
     string CountryFisCode,
     string Name,
-    string Surname
+    string Surname,
+    double LiveForm
 );

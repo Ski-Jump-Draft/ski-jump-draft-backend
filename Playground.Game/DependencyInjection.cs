@@ -4,6 +4,7 @@ using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Game.Gate;
+using App.Application.JumpersForm;
 using App.Application.Matchmaking;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
@@ -13,7 +14,7 @@ using App.Application.Policy.GameJumpersSelector;
 using App.Application.Utility;
 using App.Domain.GameWorld;
 using App.Domain.Simulation;
-using App.Simulator.Mock;
+using App.Simulator.Simple;
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -257,8 +258,13 @@ public static class DependencyInjection
         services
             .AddSingleton<GameUpdatedDtoMapper, GameUpdatedDtoMapper>();
 
-        services.AddSingleton<App.Domain.Simulation.IWeatherEngine, App.Simulator.Mock.WeatherEngine>(sp =>
-            new WeatherEngine(sp.GetRequiredService<IRandom>(), null, sp.GetRequiredService<IMyLogger>()));
+        services.AddSingleton<App.Simulator.Simple.SimulatorConfiguration>(sp =>
+            new SimulatorConfiguration(SkillImpactFactor: 1.95, AverageBigSkill: 7,
+                FlightToTakeoffRatio: 1, RandomAdditionsRatio: 1.25, TakeoffRatingPointsByForm: 5.15 * 0.9,
+                FlightRatingPointsByForm: 5.15 * 1.1));
+        services.AddSingleton<App.Domain.Simulation.IWeatherEngine, App.Simulator.Simple.WeatherEngine>(sp =>
+            new WeatherEngine(sp.GetRequiredService<IRandom>(), sp.GetRequiredService<IMyLogger>(),
+                ConfigurationPresetFactory.StableTailwind));
         services.AddSingleton<App.Domain.Simulation.IJumpSimulator, App.Simulator.Simple.JumpSimulator>();
         services.AddSingleton<App.Domain.Simulation.IJudgesSimulator, App.Simulator.Simple.JudgesSimulator>();
 
@@ -269,7 +275,7 @@ public static class DependencyInjection
         services
             .AddSingleton<App.Application.Matchmaking.IMatchmakingDurationCalculator,
                 App.Application.Matchmaking.FixedMatchmakingDurationCalculator>(sp =>
-                new FixedMatchmakingDurationCalculator(TimeSpan.FromSeconds(40)));
+                new FixedMatchmakingDurationCalculator(TimeSpan.FromSeconds(20)));
         services
             .AddSingleton<App.Application.Game.DraftPicks.IDraftPicksArchive,
                 App.Infrastructure.Archive.DraftPicks.InMemory>();
@@ -287,9 +293,19 @@ public static class DependencyInjection
                     sp.GetRequiredService<IWeatherEngine>(),
                     juryBravery, sp.GetRequiredService<ICompetitionJumperAcl>(),
                     sp.GetRequiredService<IGameJumperAcl>(),
-                    sp.GetRequiredService<ICompetitionHillAcl>(), sp.GetRequiredService<IJumpers>());
+                    sp.GetRequiredService<ICompetitionHillAcl>(), sp.GetRequiredService<IJumpers>(),
+                    sp.GetRequiredService<IJumperGameFormStorage>());
             });
-        
+        services
+            .AddSingleton<App.Application.JumpersForm.IJumperGameFormAlgorithm,
+                App.Application.Policy.GameFormAlgorithm.FullyRandom>();
+        services
+            .AddSingleton<App.Application.JumpersForm.IJumperGameFormStorage,
+                App.Infrastructure.Storage.JumperGameForm.InMemory>();
+        // services
+        //     .AddSingleton<App.Application.JumpersForm.IJumperLiveFormProvider,
+        //     >();
+
         services
             .AddSingleton<App.Domain.GameWorld.ICountries, App.Infrastructure.Repository.GameWorld.Country.Csv>();
         services

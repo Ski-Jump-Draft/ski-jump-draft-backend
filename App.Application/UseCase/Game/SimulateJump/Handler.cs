@@ -3,6 +3,7 @@ using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Game.GameCompetitions;
+using App.Application.JumpersForm;
 using App.Application.Mapping;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
@@ -41,7 +42,8 @@ public class Handler(
     IMyLogger logger,
     IJudgesSimulator judgesSimulator,
     IGameCompetitionResultsArchive gameCompetitionResultsArchive,
-    GameUpdatedDtoMapper gameUpdatedDtoMapper)
+    GameUpdatedDtoMapper gameUpdatedDtoMapper,
+    IJumperGameFormStorage jumperGameFormStorage)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -66,7 +68,8 @@ public class Handler(
             await gameWorldJumpers.GetById(Domain.GameWorld.JumperId.NewJumperId(gameWorldJumperDto.Id), ct)
                 .AwaitOrWrap(_ => new IdNotFoundException(gameWorldJumperDto.Id));
 
-        var simulationJumper = gameWorldJumper.ToSimulationJumper(likesHill: null);
+        var gameForm = jumperGameFormStorage.GetGameForm(gameJumperDto.Id);
+        var simulationJumper = gameWorldJumper.ToSimulationJumper(likesHill: null, form: gameForm);
         var simulationHill = competitionHill.ToSimulationHill(overridenMetersByGate: null);
 
         var simulationContext =
@@ -74,8 +77,9 @@ public class Handler(
                 simulationJumper, simulationHill, simulationWind);
         var simulatedJump = jumpSimulator.Simulate(simulationContext);
 
-        logger.Debug($"{gameWorldJumper.Name.Item} {gameWorldJumper.Surname.Item} jumped: {
-            DistanceModule.value(simulatedJump.Distance)}m + {simulatedJump.Landing}");
+        logger.Info($"{gameWorldJumper.Name.Item} {gameWorldJumper.Surname.Item} jumped: {
+            DistanceModule.value(simulatedJump.Distance)}m + {simulatedJump.Landing} ({
+                WindModule.averaged(simulationWind):F2}m/s)");
 
         var judgesSimulationContext =
             new JudgesSimulationContext(simulatedJump, Gate.NewGate(App.Domain.Competition.GateModule.value(gate)),
@@ -111,9 +115,9 @@ public class Handler(
                 Domain.Competition.Classification.PositionModule.value(classificationResult.Position)}({
                     classificationResult.Points.Item
                 }pts)");
-            
+
             Competition? previousCompetition = null;
-            
+
             if (gameAfterAddingJump.IsDuringCompetition)
             {
                 var now = clock.Now();
@@ -155,7 +159,7 @@ public class Handler(
                     await scheduler.ScheduleAsync(
                         jobType: "StartDraft",
                         payloadJson: json.Serialize(new { GameId = command.GameId }),
-                        runAt: now.AddSeconds(25),
+                        runAt: now.AddSeconds(7),
                         uniqueKey: $"StartDraft:{command.GameId}",
                         ct: ct);
                 }
@@ -169,7 +173,7 @@ public class Handler(
                     await scheduler.ScheduleAsync(
                         jobType: "EndGame",
                         payloadJson: json.Serialize(new { GameId = command.GameId }),
-                        runAt: now.AddSeconds(20),
+                        runAt: now.AddSeconds(15),
                         uniqueKey: $"EndGame:{command.GameId}",
                         ct: ct);
                 }
@@ -182,7 +186,8 @@ public class Handler(
                 }
             }
 
-            await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterAddingJump, previousCompetition));
+            await gameNotifier.GameUpdated(
+                await gameUpdatedDtoMapper.FromDomain(gameAfterAddingJump, previousCompetition));
 
             var jumperResultInClassifiation = addJumpOutcome.Competition
                 .ClassificationResultOf(nextCompetitionJumper.Id)

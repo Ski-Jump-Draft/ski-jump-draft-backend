@@ -4,7 +4,7 @@ using App.Simulator.Simple;
 using App.Domain.Simulation;
 using App.Infrastructure.Utility.Logger;
 using App.Infrastructure.Utility.Random;
-using App.Simulator.Mock;
+using App.Simulator.Simple;
 using Microsoft.Extensions.Logging;
 using HillModule = App.Domain.Simulation.HillModule;
 
@@ -33,44 +33,57 @@ public static class Program
 
         var logger = new Dotnet(loggerFactory);
 
-        var weatherEngine = new WeatherEngine(random, WindModule.create(0.2), logger);
+        var weatherEngineConfiguration = ConfigurationPresetFactory.LotteryHeadwind;
+        var weatherEngine = new WeatherEngine(random, logger, weatherEngineConfiguration);
         var simulatorConfiguration = new SimulatorConfiguration(SkillImpactFactor: 1.95, AverageBigSkill: 7,
-            FlightToTakeoffRatio: 1, RandomAdditionsRatio: 1.25, TakeoffRatingPointsByForm: 5.15 * 0.9, FlightRatingPointsByForm: 5.15 * 1.1);
+            FlightToTakeoffRatio: 1, RandomAdditionsRatio: 1.25, TakeoffRatingPointsByForm: 5.15 * 0.9,
+            FlightRatingPointsByForm: 5.15 * 1.1);
         var jumpSimulator = new JumpSimulator(simulatorConfiguration, random, logger);
         var judgesSimulator = new JudgesSimulator(random, logger);
 
         var jumpers = new List<Jumper>()
         {
             new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.BigSkillModule.tryCreate(6).Value,
+                JumperSkillsModule.LandingSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.FormModule.tryCreate(6).Value,
+                JumperSkillsModule.LikesHillPolicy.None)),
+            new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(6).Value,
                 JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
                 JumperSkillsModule.LandingSkillModule.tryCreate(8).Value,
-                JumperSkillsModule.FormModule.tryCreate(1).Value,
+                JumperSkillsModule.FormModule.tryCreate(6).Value,
                 JumperSkillsModule.LikesHillPolicy.None)),
-            new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
-                JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
-                JumperSkillsModule.LandingSkillModule.tryCreate(8).Value,
-                JumperSkillsModule.FormModule.tryCreate(3).Value,
-                JumperSkillsModule.LikesHillPolicy.None)),
-            new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
-                JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
-                JumperSkillsModule.LandingSkillModule.tryCreate(8).Value,
-                JumperSkillsModule.FormModule.tryCreate(5).Value,
-                JumperSkillsModule.LikesHillPolicy.None)),
-            new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
-                JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
-                JumperSkillsModule.LandingSkillModule.tryCreate(8).Value,
-                JumperSkillsModule.FormModule.tryCreate(7).Value,
-                JumperSkillsModule.LikesHillPolicy.None)),
-            new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
-                JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
-                JumperSkillsModule.LandingSkillModule.tryCreate(8).Value,
-                JumperSkillsModule.FormModule.tryCreate(9).Value,
-                JumperSkillsModule.LikesHillPolicy.None)),
-            new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
-                JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
-                JumperSkillsModule.LandingSkillModule.tryCreate(8).Value,
-                JumperSkillsModule.FormModule.tryCreate(10).Value,
-                JumperSkillsModule.LikesHillPolicy.None)),
+            //
+            // new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+            //     JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+            //     JumperSkillsModule.LandingSkillModule.tryCreate(8).Value,
+            //     JumperSkillsModule.FormModule.tryCreate(1).Value,
+            //     JumperSkillsModule.LikesHillPolicy.None)),
+            // new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+            //     JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+            //     JumperSkillsModule.LandingSkillModule.tryCreate(8).Value,
+            //     JumperSkillsModule.FormModule.tryCreate(3).Value,
+            //     JumperSkillsModule.LikesHillPolicy.None)),
+            // new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+            //     JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+            //     JumperSkillsModule.LandingSkillModule.tryCreate(8).Value,
+            //     JumperSkillsModule.FormModule.tryCreate(5).Value,
+            //     JumperSkillsModule.LikesHillPolicy.None)),
+            // new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+            //     JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+            //     JumperSkillsModule.LandingSkillModule.tryCreate(8).Value,
+            //     JumperSkillsModule.FormModule.tryCreate(7).Value,
+            //     JumperSkillsModule.LikesHillPolicy.None)),
+            // new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+            //     JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+            //     JumperSkillsModule.LandingSkillModule.tryCreate(8).Value,
+            //     JumperSkillsModule.FormModule.tryCreate(9).Value,
+            //     JumperSkillsModule.LikesHillPolicy.None)),
+            // new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+            //     JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+            //     JumperSkillsModule.LandingSkillModule.tryCreate(8).Value,
+            //     JumperSkillsModule.FormModule.tryCreate(10).Value,
+            //     JumperSkillsModule.LikesHillPolicy.None)),
         };
 
         const double pointsPerGate = 7.56;
@@ -90,7 +103,7 @@ public static class Program
         Console.WriteLine($"Chosen gate no. {gate}");
 
 
-        const int jumpsPerJumper = 30;
+        const int jumpsPerJumper = 300;
 
         foreach (var (jumper, index) in jumpers.Select((jumper, index) => (jumper, index)))
         {
@@ -100,6 +113,7 @@ public static class Program
             for (var i = 0; i < jumpsPerJumper; i++)
             {
                 var wind = weatherEngine.GetWind();
+                weatherEngine.SimulateTime(TimeSpan.FromMinutes(1));
                 var windDouble = WindModule.averaged(wind);
                 var ctx = new SimulationContext(Gate.NewGate(gate), jumper, hill, wind);
                 var jump = jumpSimulator.Simulate(ctx);
@@ -120,10 +134,10 @@ public static class Program
             var averageDistance = distances.Average();
             var stdDevDistance = CalculateStdDev(distances, averageDistance);
 
-            // var minWind = winds.Min();
-            // var maxWind = winds.Max();
-            // var averageWind = winds.Average();
-            // var stdDevWind = CalculateStdDev(winds, averageWind);
+            var minWind = winds.Min();
+            var maxWind = winds.Max();
+            var averageWind = winds.Average();
+            var stdDevWind = CalculateStdDev(winds, averageWind);
 
             Console.WriteLine($"\nJump Distance Statistics (JUMPER NO. {index + 1}):");
             Console.WriteLine($"  Min: {minDistance:F2}m");
@@ -131,11 +145,11 @@ public static class Program
             Console.WriteLine($"  Avg: {averageDistance:F2}m");
             Console.WriteLine($"  StdDev: {stdDevDistance:F2}m\n\n");
 
-            // Console.WriteLine("\nWind Statistics:");
-            // Console.WriteLine($"  Min: {minWind:F2}m/s");
-            // Console.WriteLine($"  Max: {maxWind:F2}m/s");
-            // Console.WriteLine($"  Avg: {averageWind:F2}m/s");
-            // Console.WriteLine($"  StdDev: {stdDevWind:F2}m/s");
+            Console.WriteLine("\nWind Statistics:");
+            Console.WriteLine($"  Min: {minWind:F2}m/s");
+            Console.WriteLine($"  Max: {maxWind:F2}m/s");
+            Console.WriteLine($"  Avg: {averageWind:F2}m/s");
+            Console.WriteLine($"  StdDev: {stdDevWind:F2}m/s");
         }
 
         Console.WriteLine("\nFinished simulation run.");

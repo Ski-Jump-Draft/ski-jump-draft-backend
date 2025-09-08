@@ -2,6 +2,7 @@ using System.Globalization;
 using App.Application.Acl;
 using App.Application.Commanding;
 using App.Application.Game.Gate;
+using App.Application.JumpersForm;
 using App.Application.Matchmaking;
 using App.Application.Messaging.Notifiers;
 using App.Application.Policy.GameGateSelector;
@@ -179,7 +180,7 @@ builder.Services
     .AddSingleton<App.Application.Game.Ranking.IGameRankingFactorySelector,
         App.Application.Game.Ranking.DefaultSelector>();
 
-builder.Services.AddSingleton<App.Domain.Simulation.IWeatherEngine, App.Simulator.Mock.WeatherEngine>();
+builder.Services.AddSingleton<App.Domain.Simulation.IWeatherEngine, App.Simulator.Simple.WeatherEngine>();
 builder.Services.AddSingleton<App.Domain.Simulation.IJumpSimulator, App.Simulator.Simple.JumpSimulator>();
 builder.Services.AddSingleton<App.Domain.Simulation.IJudgesSimulator, App.Simulator.Simple.JudgesSimulator>();
 
@@ -205,7 +206,8 @@ builder.Services
         return new IterativeSimulatedFactory(sp.GetRequiredService<IJumpSimulator>(),
             sp.GetRequiredService<IWeatherEngine>(),
             juryBravery, sp.GetRequiredService<ICompetitionJumperAcl>(), sp.GetRequiredService<IGameJumperAcl>(),
-            sp.GetRequiredService<ICompetitionHillAcl>(), sp.GetRequiredService<IJumpers>());
+            sp.GetRequiredService<ICompetitionHillAcl>(), sp.GetRequiredService<IJumpers>(),
+            sp.GetRequiredService<IJumperGameFormStorage>());
     });
 
 builder.Services.AddMemoryCache();

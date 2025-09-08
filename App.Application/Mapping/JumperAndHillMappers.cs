@@ -1,6 +1,7 @@
 using App.Application.Acl;
 using App.Application.Exceptions;
 using App.Application.Extensions;
+using App.Application.JumpersForm;
 using App.Domain.Competition;
 using App.Domain.Game;
 using App.Domain.GameWorld;
@@ -13,7 +14,8 @@ namespace App.Application.Mapping;
 
 public static class JumperMapper
 {
-    public static Domain.Simulation.Jumper ToSimulationJumper(this Domain.GameWorld.Jumper jumper, bool? likesHill)
+    public static Domain.Simulation.Jumper ToSimulationJumper(this Domain.GameWorld.Jumper jumper, bool? likesHill,
+        double form)
     {
         var likesHillPolicy = likesHill switch
         {
@@ -32,16 +34,10 @@ public static class JumperMapper
                 .tryCreate(Domain.GameWorld.JumperModule.LandingSkillModule.value(jumper.Landing))
                 .OrThrow($"Wrong landing ({jumper.Landing})"),
             JumperSkillsModule.FormModule
-                .tryCreate(Domain.GameWorld.JumperModule.LiveFormModule.value(jumper.LiveForm))
+                .tryCreate(form)
                 .OrThrow("Wrong live form"),
             likesHillPolicy);
         return new Domain.Simulation.Jumper(jumperSkills);
-    }
-
-    public static IEnumerable<Domain.Simulation.Jumper> ToSimulationJumpers(
-        this IEnumerable<Domain.GameWorld.Jumper> gameWorldJumpers)
-    {
-        return gameWorldJumpers.Select(gameWorldJumper => gameWorldJumper.ToSimulationJumper(likesHill: null));
     }
 
     public static IEnumerable<GameWorldJumperDto> ToGameWorldJumperDtos(
@@ -121,7 +117,7 @@ public static class JumperMapper
             return new Domain.Competition.Jumper(competitionJumperId);
         });
     }
-    
+
     public static IEnumerable<Domain.Competition.Jumper> ToCompetitionJumpers(
         this Domain.Game.Jumpers gameJumpers, ICompetitionJumperAcl acl)
     {

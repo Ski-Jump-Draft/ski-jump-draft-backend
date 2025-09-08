@@ -1,4 +1,5 @@
 using App.Application.Acl;
+using App.Application.JumpersForm;
 using App.Application.Mapping;
 using App.Application.Policy.GameGateSelector;
 using App.Domain.GameWorld;
@@ -17,7 +18,8 @@ public class IterativeSimulatedFactory(
     ICompetitionJumperAcl competitionJumperAcl,
     IGameJumperAcl gameJumperAcl,
     ICompetitionHillAcl competitionHillAcl,
-    IJumpers gameWorldJumpersRepository) : IGameStartingGateSelectorFactory
+    IJumpers gameWorldJumpersRepository,
+    IJumperGameFormStorage jumperGameFormStorage) : IGameStartingGateSelectorFactory
 {
     public ICompetitionHillAcl CompetitionHillAcl { get; } = competitionHillAcl;
 
@@ -26,8 +28,13 @@ public class IterativeSimulatedFactory(
     {
         var gameJumpers = jumpers.ToGameJumpers(competitionJumperAcl);
         var gameWorldJumpers = await gameJumpers.ToGameWorldJumpers(gameJumperAcl, gameWorldJumpersRepository, ct);
-        var simulationJumpers = gameWorldJumpers.ToSimulationJumpers();
-        
+        var simulationJumpers = gameWorldJumpers.Select(gameWorldJumper =>
+        {
+            var gameJumperId = gameJumperAcl.GetGameJumper(gameWorldJumper.Id.Item).Id;
+            return gameWorldJumper.ToSimulationJumper(likesHill: null,
+                form: jumperGameFormStorage.GetGameForm(gameJumperId));
+        });
+
         var simulationHill = hill.ToSimulationHill();
         return new IterativeSimulated(jumpSimulator, weatherEngine, juryBravery, simulationJumpers, simulationHill);
     }

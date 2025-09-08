@@ -19,7 +19,7 @@ class Program(IMyLogger logger)
         var loggerFactory = LoggerFactory.Create(builder =>
         {
             builder
-                .SetMinimumLevel(LogLevel.Debug)
+                .SetMinimumLevel(LogLevel.Information)
                 .AddConsole();
         });
 

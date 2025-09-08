@@ -7,7 +7,14 @@ namespace Playground.Game.Bot.Service;
 
 public record MyPlayerData(string Nick);
 
-public class Joiner(IRandom random, MyPlayerData myPlayer, IMatchmakings repo, ICommandBus bus, IClock clock, IMyLogger log, IMyLogger myLogger)
+public class Joiner(
+    IRandom random,
+    MyPlayerData myPlayer,
+    IMatchmakings repo,
+    ICommandBus bus,
+    IClock clock,
+    IMyLogger log,
+    IMyLogger myLogger)
     : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -16,7 +23,7 @@ public class Joiner(IRandom random, MyPlayerData myPlayer, IMatchmakings repo, I
 
         while (!ct.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromSeconds(3), ct);
+            await Task.Delay(TimeSpan.FromSeconds(2), ct);
 
             // wybierz jakieś matchmaking in progress
             var all = await repo.GetInProgress(ct);

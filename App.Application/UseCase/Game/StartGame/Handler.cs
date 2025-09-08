@@ -1,7 +1,9 @@
+using System.Collections.Immutable;
 using App.Application.Acl;
 using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
+using App.Application.JumpersForm;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
 using App.Application.Policy.GameHillSelector;
@@ -38,9 +40,11 @@ public class Handler(
     IGameJumperAcl gameJumperAcl,
     ICompetitionJumperAcl competitionJumperAcl,
     IMyLogger logger,
-    IHills hills,
+    IHills gameWorldHills,
     ICompetitionHillAcl competitionHillAcl,
-    GameUpdatedDtoMapper gameUpdatedDtoMapper)
+    GameUpdatedDtoMapper gameUpdatedDtoMapper,
+    IJumperGameFormAlgorithm jumperGameFormAlgorithm,
+    IJumperGameFormStorage jumperGameFormStorage)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -55,10 +59,10 @@ public class Handler(
 
         logger.Info($"Starting game for a succeeded matchmaking {command.MatchmakingId}");
 
-        var selectedJumperDtos = await jumpersSelector.Select(ct);
+        var selectedJumperDtos = (await jumpersSelector.Select(ct)).ToImmutableList();
 
         var selectedHillGuid = await hillSelector.Select(ct);
-        var gameWorldHill = await hills.GetById(Domain.GameWorld.HillId.NewHillId(selectedHillGuid), ct)
+        var gameWorldHill = await gameWorldHills.GetById(Domain.GameWorld.HillId.NewHillId(selectedHillGuid), ct)
             .AwaitOrWrap(_ => new IdNotFoundException(selectedHillGuid));
 
         var gameGuid = guid.NewGuid();
@@ -77,6 +81,7 @@ public class Handler(
         });
         var gamePlayers = Domain.Game.PlayersModule.create(ListModule.OfSeq(gamePlayersEnumerable)).ResultValue;
 
+        var jumperGameFormsPrintString = "Forma zawodników:\n";
         var gameJumpersEnumerable = selectedJumperDtos.Select(selectedGameWorldJumperDto =>
         {
             var gameJumperId = guid.NewGuid();
@@ -86,8 +91,16 @@ public class Handler(
             var competitionJumperId =
                 guid.NewGuid(); // Od razu tworzymy competition jumpera, z którego korzystać będą inne Use Case'y
             competitionJumperAcl.Map(gameJumperDto, new CompetitionJumperDto(competitionJumperId));
+
+            var liveForm = selectedGameWorldJumperDto.LiveForm;
+            var gameForm = jumperGameFormAlgorithm.CalculateFromLiveForm(liveForm);
+            jumperGameFormStorage.Add(gameJumperId, gameForm);
+            jumperGameFormsPrintString += $"{selectedGameWorldJumperDto.Name} {selectedGameWorldJumperDto.Surname
+            } --> GameForm {gameForm}\n";
+
             return new Domain.Game.Jumper(Domain.Game.JumperId.NewJumperId(gameJumperId));
         });
+        logger.Info(jumperGameFormsPrintString + "\n\n");
         var gameJumpers = Domain.Game.JumpersModule.create(ListModule.OfSeq(gameJumpersEnumerable));
 
         var competitionHillId = Domain.Competition.HillId.NewHillId(guid.NewGuid());
@@ -116,7 +129,7 @@ public class Handler(
             await scheduler.ScheduleAsync(
                 jobType: "StartPreDraft",
                 payloadJson: json.Serialize(new { GameId = gameGuid }),
-                runAt: clock.Now().AddSeconds(15),
+                runAt: clock.Now().AddSeconds(7),
                 uniqueKey: $"StartPreDraft:{gameGuid}", ct: ct
             );
             await gameNotifier.GameStartedAfterMatchmaking(command.MatchmakingId, gameGuid);
