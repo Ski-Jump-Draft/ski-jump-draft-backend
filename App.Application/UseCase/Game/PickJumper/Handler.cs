@@ -74,6 +74,11 @@ public class Handler(
             throw new JumperTakenException(command.JumperId);
         }
 
+        if (error.IsDraftError && ((GameError.DraftError)error).Error.IsInvalidPlayer)
+        {
+            throw new NotYourTurnException();
+        }
+
         throw new Exception($@"
 Error during picking a Jumper ({command.JumperId})
 by a Player (ID: {command.PlayerId})
@@ -83,3 +88,4 @@ Draft: {error}");
 }
 
 public class JumperTakenException(Guid jumperId, string? message = null) : Exception(message);
+public class NotYourTurnException(string? message = null) : Exception(message);

@@ -1,4 +1,5 @@
 using App.Application.Commanding;
+using App.Domain.Game;
 using App.Web;
 using App.Web.DependencyInjection;
 using App.Web.Notifiers.SseHub;
@@ -98,13 +99,42 @@ app.MapGet("/game/{gameId:guid}/leave",
         }
     });
 
+
+app.MapPost("/game/{gameId:guid}/pick",
+    async (Guid gameId, Guid playerId, Guid jumperId, [FromServices] ICommandBus commandBus,
+        [FromServices] App.Domain.Game.IGames repo, [FromServices] App.Application.Utility.IMyLogger myLogger,
+        CancellationToken ct) =>
+    {
+        var command = new App.Application.UseCase.Game.PickJumper.Command(gameId, playerId, jumperId);
+        try
+        {
+            var pickResult = await commandBus
+                .SendAsync<App.Application.UseCase.Game.PickJumper.Command,
+                    App.Application.UseCase.Game.PickJumper.Result>(command, ct);
+            return Results.Ok();
+        }
+        catch (App.Application.UseCase.Game.PickJumper.JumperTakenException)
+        {
+            return Results.Conflict();
+        }
+        catch (App.Application.UseCase.Game.PickJumper.NotYourTurnException)
+        {
+            return Results.Forbid();
+        }
+        catch (Exception e)
+        {
+            myLogger.Error($"Error during picking a jumper: {e.Message} (gameId: {gameId}, playerId: {playerId
+            }, jumperId: {jumperId})");
+            return Results.InternalServerError();
+        }
+    });
+
 app.MapHub<GameHub>("/game/hub");
 
 app.UseRouting();
 
 if (mode == Mode.Offline)
 {
-    
     await OfflineTests.InitializeOfflineTest(app.Services,
         app.Services.GetRequiredService<App.Application.Utility.IMyLogger>());
 }
