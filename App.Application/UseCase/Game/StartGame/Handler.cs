@@ -82,24 +82,29 @@ public class Handler(
         var gamePlayers = Domain.Game.PlayersModule.create(ListModule.OfSeq(gamePlayersEnumerable)).ResultValue;
 
         var jumperGameFormsPrintString = "Forma zawodników:\n";
-        var gameJumpersEnumerable = selectedJumperDtos.Select(selectedGameWorldJumperDto =>
+        var gameJumpersEnumerable = new List<Domain.Game.Jumper>();
+
+        // Musimy użyć foreach, żeby zbudować debugowy jumperGameFormsPrintString
+        foreach (var selectedGameWorldJumperDto in selectedJumperDtos)
         {
             var gameJumperId = guid.NewGuid();
             var gameJumperDto = new GameJumperDto(gameJumperId);
             var gameWorldJumperDto = new GameWorldJumperDto(selectedGameWorldJumperDto.Id);
             gameJumperAcl.Map(gameWorldJumperDto, gameJumperDto);
-            var competitionJumperId =
-                guid.NewGuid(); // Od razu tworzymy competition jumpera, z którego korzystać będą inne Use Case'y
+
+            var competitionJumperId = guid.NewGuid();
             competitionJumperAcl.Map(gameJumperDto, new CompetitionJumperDto(competitionJumperId));
 
             var liveForm = selectedGameWorldJumperDto.LiveForm;
             var gameForm = jumperGameFormAlgorithm.CalculateFromLiveForm(liveForm);
             jumperGameFormStorage.Add(gameJumperId, gameForm);
+
             jumperGameFormsPrintString += $"{selectedGameWorldJumperDto.Name} {selectedGameWorldJumperDto.Surname
             } --> GameForm {gameForm}\n";
 
-            return new Domain.Game.Jumper(Domain.Game.JumperId.NewJumperId(gameJumperId));
-        });
+            gameJumpersEnumerable.Add(new Domain.Game.Jumper(Domain.Game.JumperId.NewJumperId(gameJumperId)));
+        }
+
         logger.Info(jumperGameFormsPrintString + "\n\n");
         var gameJumpers = Domain.Game.JumpersModule.create(ListModule.OfSeq(gameJumpersEnumerable));
 

@@ -37,7 +37,5 @@ public static class Program
         Console.WriteLine($"JoinResult: {joinResult}");
         
         await host.RunAsync();
-
-//        await Task.Delay(-1);
     }
 }

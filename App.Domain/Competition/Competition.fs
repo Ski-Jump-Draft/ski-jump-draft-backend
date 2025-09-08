@@ -256,7 +256,7 @@ type Competition =
                         this.BuildNextRoundStartlist(startlistAfter, nextRound, resultsAfter)
 
                     if nextStartlist.IsError then
-                        raise (Exception($"Next round startlist internal error: {nextStartlist}"))
+                        raise (Exception($"Next round startlist internal error: {nextStartlist |> Result.mapError string}"))
 
                     let updated =
                         { this with

@@ -4,7 +4,6 @@ using App.Simulator.Simple;
 using App.Domain.Simulation;
 using App.Infrastructure.Utility.Logger;
 using App.Infrastructure.Utility.Random;
-using App.Simulator.Simple;
 using Microsoft.Extensions.Logging;
 using HillModule = App.Domain.Simulation.HillModule;
 
@@ -33,11 +32,12 @@ public static class Program
 
         var logger = new Dotnet(loggerFactory);
 
+        const double baseFormFactor = 4.0;
         var weatherEngineConfiguration = ConfigurationPresetFactory.LotteryHeadwind;
         var weatherEngine = new WeatherEngine(random, logger, weatherEngineConfiguration);
         var simulatorConfiguration = new SimulatorConfiguration(SkillImpactFactor: 1.95, AverageBigSkill: 7,
-            FlightToTakeoffRatio: 1, RandomAdditionsRatio: 1.25, TakeoffRatingPointsByForm: 5.15 * 0.9,
-            FlightRatingPointsByForm: 5.15 * 1.1);
+            FlightToTakeoffRatio: 1, RandomAdditionsRatio: 1.25, TakeoffRatingPointsByForm: baseFormFactor * 0.9,
+            FlightRatingPointsByForm: baseFormFactor * 1.1);
         var jumpSimulator = new JumpSimulator(simulatorConfiguration, random, logger);
         var judgesSimulator = new JudgesSimulator(random, logger);
 

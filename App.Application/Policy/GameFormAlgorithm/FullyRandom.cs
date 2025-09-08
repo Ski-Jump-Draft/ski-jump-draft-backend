@@ -11,15 +11,27 @@ public class FullyRandom(IRandom random) : IJumperGameFormAlgorithm
         {
             { 1, 1 },
             { 2, 2 },
-            { 3, 4 },
-            { 4, 8 },
-            { 5, 10 },
-            { 6, 10 },
-            { 7, 8 },
-            { 8, 4 },
+            { 3, 5 },
+            { 4, 15 },
+            { 5, 20 },
+            { 6, 20 },
+            { 7, 15 },
+            { 8, 5 },
             { 9, 2 },
             { 10, 1 },
         };
-        return probabilities[random.RandomInt(1, 11)];
+
+        var total = probabilities.Values.Sum();
+        var r = random.RandomInt(0, total);
+        var cum = 0;
+
+        foreach (var kv in probabilities)
+        {
+            cum += kv.Value;
+            if (r < cum)
+                return kv.Key;
+        }
+
+        return probabilities.Keys.Last();
     }
 }

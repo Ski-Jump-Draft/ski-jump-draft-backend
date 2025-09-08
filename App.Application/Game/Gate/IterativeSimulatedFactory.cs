@@ -31,8 +31,9 @@ public class IterativeSimulatedFactory(
         var simulationJumpers = gameWorldJumpers.Select(gameWorldJumper =>
         {
             var gameJumperId = gameJumperAcl.GetGameJumper(gameWorldJumper.Id.Item).Id;
+            var liveForm = jumperGameFormStorage.GetGameForm(gameJumperId);
             return gameWorldJumper.ToSimulationJumper(likesHill: null,
-                form: jumperGameFormStorage.GetGameForm(gameJumperId));
+                form: liveForm);
         });
 
         var simulationHill = hill.ToSimulationHill();

@@ -79,7 +79,7 @@ public class Handler(
             MatchmakingNotifierMappers.MatchmakingUpdatedFromDomain(matchmakingAfterJoin));
 
 
-        myLogger.Info($"{player.Nick} joined the matchmaking ({matchmaking.Id_.Item})");
+        myLogger.Info($"{correctedNick} joined the matchmaking ({matchmaking.Id_.Item})");
 
         return new Result(matchmaking.Id_.Item, PlayerModule.NickModule.value(correctedNick), player.Id.Item);
     }

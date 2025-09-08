@@ -124,7 +124,7 @@ type Startlist =
 
     member this.RemainingEntries: Startlist.Entry list = this.Remaining
 
-    member this.RemainingJumperIds: JumperId list = this.Done |> List.map (_.JumperId)
+    member this.RemainingJumperIds: JumperId list = this.Remaining |> List.map (_.JumperId)
 
     member this.DoneEntries: Startlist.Entry list = this.Done
 
@@ -136,31 +136,39 @@ type Startlist =
     static member WithOrder (previous: Startlist) (order: JumperId list) : Result<Startlist, Startlist.Error> =
 
         let knownJumperIds = previous.BibOfMap |> Map.toList |> List.map fst |> Set.ofList
-        let providedJumperIds = order |> Set.ofList
 
-        if order.Length <> knownJumperIds.Count then
-            Error(Startlist.Error.OrderLengthMismatch(order.Length, knownJumperIds.Count))
-        elif not (Set.isSubset providedJumperIds knownJumperIds) then
-            let firstUnknown =
-                order
-                |> List.tryFind (fun jid -> not (Set.contains jid knownJumperIds))
-                |> Option.get
+        let duplicates =
+            order
+            |> List.groupBy id
+            |> List.choose (fun (jid, xs) -> if xs.Length > 1 then Some jid else None)
 
-            Error(Startlist.Error.UnknownCompetitor firstUnknown)
+        if not duplicates.IsEmpty then
+            Error(Startlist.Error.DuplicatedJumper duplicates)
         else
-            let entries =
-                order
-                |> List.map (fun jid ->
-                    let bib =
-                        previous.BibOfMap
-                        |> Map.tryFind jid
-                        |> Option.defaultWith (fun _ -> invalidOp "Missing BIB")
+            let provided = order |> Set.ofList
 
-                    { Startlist.Entry.JumperId = jid
-                      Bib = bib }
-                    : Startlist.Entry)
+            if not (Set.isSubset provided knownJumperIds) then
+                let firstUnknown =
+                    order |> List.find (fun jid -> not (Set.contains jid knownJumperIds))
 
-            Ok
-                { Remaining = entries
-                  Done = []
-                  BibOfMap = previous.BibOfMap }
+                Error(Startlist.Error.UnknownCompetitor firstUnknown)
+            else
+                let entries =
+                    order
+                    |> List.map (fun jid ->
+                        let bib =
+                            previous.BibOfMap
+                            |> Map.tryFind jid
+                            |> Option.defaultWith (fun _ -> invalidOp "Missing BIB")
+
+                        { Startlist.Entry.JumperId = jid
+                          Bib = bib }
+                        : Startlist.Entry)
+
+                let newBibMap =
+                    previous.BibOfMap |> Map.filter (fun jid _ -> Set.contains jid provided)
+
+                Ok
+                    { Remaining = entries
+                      Done = []
+                      BibOfMap = newBibMap }

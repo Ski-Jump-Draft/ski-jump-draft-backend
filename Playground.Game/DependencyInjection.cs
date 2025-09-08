@@ -132,8 +132,8 @@ public static class DependencyInjection
                         .ResultValue), true, true)
             })).ResultValue;
             var draftSettings = new App.Domain.Game.DraftModule.Settings(
-                App.Domain.Game.DraftModule.SettingsModule.TargetPicksModule.create(4).Value,
-                App.Domain.Game.DraftModule.SettingsModule.MaxPicksModule.create(4).Value,
+                App.Domain.Game.DraftModule.SettingsModule.TargetPicksModule.create(2).Value,
+                App.Domain.Game.DraftModule.SettingsModule.MaxPicksModule.create(2).Value,
                 App.Domain.Game.DraftModule.SettingsModule.UniqueJumpersPolicy.Unique,
                 App.Domain.Game.DraftModule.SettingsModule.Order.Snake,
                 App.Domain.Game.DraftModule.SettingsModule.TimeoutPolicy.NewTimeoutAfter(
@@ -258,10 +258,11 @@ public static class DependencyInjection
         services
             .AddSingleton<GameUpdatedDtoMapper, GameUpdatedDtoMapper>();
 
+        const double baseFormFactor = 3;
         services.AddSingleton<App.Simulator.Simple.SimulatorConfiguration>(sp =>
-            new SimulatorConfiguration(SkillImpactFactor: 1.95, AverageBigSkill: 7,
-                FlightToTakeoffRatio: 1, RandomAdditionsRatio: 1.25, TakeoffRatingPointsByForm: 5.15 * 0.9,
-                FlightRatingPointsByForm: 5.15 * 1.1));
+            new SimulatorConfiguration(SkillImpactFactor: 2, AverageBigSkill: 7,
+                FlightToTakeoffRatio: 1, RandomAdditionsRatio: 1, TakeoffRatingPointsByForm: baseFormFactor * 0.9,
+                FlightRatingPointsByForm: baseFormFactor * 1.1));
         services.AddSingleton<App.Domain.Simulation.IWeatherEngine, App.Simulator.Simple.WeatherEngine>(sp =>
             new WeatherEngine(sp.GetRequiredService<IRandom>(), sp.GetRequiredService<IMyLogger>(),
                 ConfigurationPresetFactory.StableTailwind));
@@ -288,7 +289,7 @@ public static class DependencyInjection
             .AddSingleton<App.Application.Game.Gate.IGameStartingGateSelectorFactory,
                 App.Application.Game.Gate.IterativeSimulatedFactory>(sp =>
             {
-                const JuryBravery juryBravery = JuryBravery.High;
+                const JuryBravery juryBravery = JuryBravery.Medium;
                 return new IterativeSimulatedFactory(sp.GetRequiredService<IJumpSimulator>(),
                     sp.GetRequiredService<IWeatherEngine>(),
                     juryBravery, sp.GetRequiredService<ICompetitionJumperAcl>(),

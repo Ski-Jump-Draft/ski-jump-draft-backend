@@ -1,17 +1,11 @@
 using App.Application.Commanding;
+using App.Application.OfflineTests;
 using App.Application.Utility;
 using App.Domain.Matchmaking;
-using Microsoft.Extensions.Hosting;
 
-namespace Playground.Game.Bot.Service;
+namespace App.Web.HostedServices.MockedFlow;
 
-public record MyPlayerData(string Nick);
-
-public class Joiner(
-    MyPlayerData myPlayer,
-    IMatchmakings repo,
-    ICommandBus bus,
-    IMyLogger log)
+public class BotJoiner(IMyPlayer myPlayer, IMatchmakings repo, ICommandBus bus, IMyLogger log)
     : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -33,7 +27,7 @@ public class Joiner(
 
             var oneSlotRemained = matchmaking.RemainingSlots == 1;
             var myPlayerIsPresent = matchmaking.Players_.Any(player =>
-                PlayerModule.NickModule.value(player.Nick) == myPlayer.Nick);
+                PlayerModule.NickModule.value(player.Nick) == myPlayer.GetNick());
             var needToWaitForMyPlayer = oneSlotRemained && myPlayerIsPresent;
 
             if (matchmaking.IsFull || needToWaitForMyPlayer)

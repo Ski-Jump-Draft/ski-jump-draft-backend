@@ -44,9 +44,7 @@ public class GameUpdatedDtoMapper(
     {
         var header = MapHeader(game);
         var (statusStr, preDraft, draft, mainComp, brk, ended) = await MapStatus(game);
-
-        myLogger.Warn("Last competition state: " + lastCompetitionState?.ToString() ?? "null");
-
+        
         return new GameUpdatedDto(
             Unwrap(game.Id_),
             SchemaVersion,
