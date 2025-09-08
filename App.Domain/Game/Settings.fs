@@ -17,6 +17,9 @@ type PreDraftSettings = private {
         else
             None
             
+    member this.CompetitionsCount =
+        this.Competitions.Length
+            
 type Settings = {
     PreDraftSettings: PreDraftSettings
     DraftSettings: Draft.Settings

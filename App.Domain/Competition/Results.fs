@@ -28,19 +28,6 @@ module JumpResult =
     module WindPoints =
         let value (WindPoints v) = v
 
-module Classification =
-    type Position = private Position of int
-
-    module Position =
-        let tryCreate (v: int) =
-            if v < 1 then None else Some(Position v)
-        let value (Position v) = v
-        
-    type JumperClassificationResult =
-        { JumperId: JumperId
-          Points: TotalPoints
-          Position: Position }
-
 open JumpResult
 
 type JumpResult =
@@ -52,6 +39,21 @@ type JumpResult =
       GatePoints: GatePoints option
       WindPoints: WindPoints option
       TotalPoints: TotalPoints }
+
+module Classification =
+    type Position = private Position of int
+
+    module Position =
+        let tryCreate (v: int) =
+            if v < 1 then None else Some(Position v)
+
+        let value (Position v) = v
+
+    type JumperClassificationResult =
+        { JumperId: JumperId
+          Points: TotalPoints
+          Position: Position
+          JumpResults: List<JumpResult> }
 
 module Results =
     type Error =
@@ -91,31 +93,33 @@ type Results =
             | 0.0 -> Option.None
             | s -> Some(TotalPoints s)
 
-    member this.FinalClassification=
-        let totals =
+    member this.FinalClassification =
+        let groupedResults =
             this.JumpResults
             |> List.groupBy _.Jump.JumperId
-            |> List.map (fun (cid, js) ->
-                let pts = js |> List.sumBy (fun j -> let (TotalPoints p) = j.TotalPoints in p)
-                cid, pts)
-            |> List.sortByDescending snd
+            |> List.map (fun (jumperId, jumpResults) ->
+                let sortedJumpResults = jumpResults |> List.sortBy _.RoundIndex
+                let totalPoints = jumpResults |> List.sumBy (fun j -> let (TotalPoints p) = j.TotalPoints in p)
+                jumperId, totalPoints, sortedJumpResults)
+            |> List.sortByDescending (fun (_, pts, _) -> pts)
 
         // nadaj miejsca z ex-aequo
         let mutable displayedRank = 0
         let mutable prevPts = nan
 
-        totals
-        |> List.mapi (fun i (cid, pts) ->
+        groupedResults
+        |> List.mapi (fun i (jumperId, totalPoints, jumpResults) ->
             let rank =
-                if pts <> prevPts then
+                if totalPoints <> prevPts then
                     displayedRank <- i + 1
 
-                prevPts <- pts
+                prevPts <- totalPoints
                 displayedRank
 
-            { Classification.JumperClassificationResult.JumperId = cid
-              Points = TotalPoints pts
-              Position = (Classification.Position.tryCreate rank).Value }
+            { Classification.JumperClassificationResult.JumperId = jumperId
+              Points = TotalPoints totalPoints
+              Position = (Classification.Position.tryCreate rank).Value
+              JumpResults = jumpResults }
             : Classification.JumperClassificationResult)
 
     member this.PositionOf(jumperId: JumperId) : Classification.Position option =

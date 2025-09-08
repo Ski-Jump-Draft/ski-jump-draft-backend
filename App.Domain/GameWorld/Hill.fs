@@ -52,7 +52,7 @@ type Hill =
     { Id: HillId
       Name: Name
       Location: Location
-      CountryId: CountryId
+      CountryId: CountryFisCode
       KPoint: KPoint
       HsPoint: HsPoint
       GatePoints: GatePoints
@@ -92,4 +92,4 @@ type IHills =
     abstract member GetAll: ct: CancellationToken -> Task<IEnumerable<Hill>>
     abstract member GetByFormattedName: searchFormattedName: SearchFormattedName * ct: CancellationToken -> Task<Hill option>
     abstract member GetById: hillId: HillId * ct: CancellationToken -> Task<Hill option>
-    abstract member GetByCountryId: countryId: CountryId * ct: CancellationToken -> Task<IEnumerable<Hill>>
+    abstract member GetByCountryFisCode: countryId: CountryFisCode * ct: CancellationToken -> Task<IEnumerable<Hill>>

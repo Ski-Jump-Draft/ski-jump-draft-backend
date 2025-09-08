@@ -1,5 +1,6 @@
 namespace App.Domain.Competition
 
+open System
 open FsToolkit.ErrorHandling
 
 module Competition =
@@ -26,6 +27,7 @@ module Competition =
         | InvalidStatus of Current: StatusTag * Expected: StatusTag list
         | Internal of string
         | CoachGateIncrease
+        | StartlistError of Error: Startlist.Error
 
 open Competition
 
@@ -40,6 +42,10 @@ type Competition =
           Results: Results
           Hill: Hill
           Jumpers: Jumper list }
+
+    member this.Jumpers_ = this.Jumpers
+
+    member this.Startlist_ = this.Startlist
 
     member this.GetStatusTag =
         match this.Status with
@@ -249,10 +255,13 @@ type Competition =
                     let nextStartlist =
                         this.BuildNextRoundStartlist(startlistAfter, nextRound, resultsAfter)
 
+                    if nextStartlist.IsError then
+                        raise (Exception($"Next round startlist internal error: {nextStartlist}"))
+
                     let updated =
                         { this with
                             Results = resultsAfter
-                            Startlist = nextStartlist
+                            Startlist = nextStartlist |> Result.toOption |> Option.get
                             Status = nextStatus }
 
                     return updated.ClearCoachChange()
@@ -269,7 +278,7 @@ type Competition =
 
     member private this.BuildNextRoundStartlist
         (prevStartlist: Startlist, nextRound: RoundIndex, currentResults: Results)
-        =
+        : Result<Startlist, Error> =
         let totalsSinceReset =
             currentResults.TotalsSinceReset this.Settings.PointsResets nextRound
 
@@ -326,8 +335,11 @@ type Competition =
             let ids = limited |> List.map fst
             if roundSettings.SortStartlist then ids |> List.rev else ids
 
-        Startlist.WithOrder prevStartlist ordered |> Result.toOption |> Option.get
+        let startlist = Startlist.WithOrder prevStartlist ordered
 
+        match startlist with
+        | Ok startlist -> Ok(startlist)
+        | Error error -> Error(Error.StartlistError error)
 
     member private this.IsLastRound(round: RoundIndex) =
         let (RoundIndex i) = round

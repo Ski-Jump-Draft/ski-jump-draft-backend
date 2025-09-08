@@ -73,7 +73,11 @@ public class Handler(
             matchmakingSchedule.StartMatchmaking(matchmaking.Id_.Item, matchmakingDuration);
         }
 
-        await matchmakingNotifier.MatchmakingUpdated(MatchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterJoin));
+        await matchmakingNotifier.PlayerJoined(
+            MatchmakingNotifierMappers.PlayerJoinedFromDomain(player.Id.Item, PlayerModule.NickModule.value(correctedNick), matchmakingAfterJoin));
+        await matchmakingNotifier.MatchmakingUpdated(
+            MatchmakingNotifierMappers.MatchmakingUpdatedFromDomain(matchmakingAfterJoin));
+
 
         myLogger.Info($"{player.Nick} joined the matchmaking ({matchmaking.Id_.Item})");
 

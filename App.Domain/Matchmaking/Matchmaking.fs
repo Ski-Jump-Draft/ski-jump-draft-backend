@@ -1,6 +1,7 @@
 namespace App.Domain.Matchmaking
 
 open System.Collections.Generic
+open App.Domain.Matchmaking.Settings
 
 type MatchmakingId = MatchmakingId of System.Guid
 
@@ -87,6 +88,14 @@ type Matchmaking =
                 )
         | _ -> Error(InvalidStatus this.Status)
 
+    member this.CanJoin: bool =
+        not (this.Players.Count >= Settings.MaxPlayers.value this.Settings.MaxPlayers)
+
+    member this.IsFull: bool =
+        this.Players.Count >= Settings.MaxPlayers.value this.Settings.MaxPlayers
+
+    member this.RemainingSlots: int =
+        MaxPlayers.value this.MaxPlayersCount - this.PlayersCount
 
     member this.Leave playerId =
         match this.Status with
@@ -118,7 +127,7 @@ type Matchmaking =
         match this.Status with
         | Running -> Ok({ this with Status = Failed reason })
         | _ -> Error(InvalidStatus this.Status)
-    
+
     member this.HasSucceeded =
         match this.Status with
         | Ended Succeeded -> true

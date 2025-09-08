@@ -11,8 +11,7 @@ public class InMemory : ICommandBus
 
     public Task SendAsync<TCommand>(
         TCommand command,
-        CancellationToken ct,
-        TimeSpan? delay = null) where TCommand : ICommand
+        CancellationToken ct) where TCommand : ICommand
     {
         var handler = _sp.GetRequiredService<ICommandHandler<TCommand>>();
         return handler.HandleAsync(command, ct);
@@ -20,8 +19,7 @@ public class InMemory : ICommandBus
 
     public Task<TResponse> SendAsync<TCommand, TResponse>(
         TCommand command,
-        CancellationToken ct,
-        TimeSpan? delay = null) where TCommand : ICommand<TResponse>
+        CancellationToken ct) where TCommand : ICommand<TResponse>
     {
         var handler = _sp.GetRequiredService<ICommandHandler<TCommand, TResponse>>();
         return handler.HandleAsync(command, ct);

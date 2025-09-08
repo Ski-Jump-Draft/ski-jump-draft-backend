@@ -49,7 +49,7 @@ public class Handler(
         //         runAt: now.AddSeconds(15),
         //         uniqueKey: $"SimulateJumpInGame:{gameGuid}_{now.ToUnixTimeSeconds()}",
         //         ct: ct);
-        //     await gameNotifier.GameUpdated(GameUpdatedDtoMapper.FromDomain(gameAfterPreDraftStart));       
+        //     await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterPreDraftStart));       
         // }
         // else
         // {

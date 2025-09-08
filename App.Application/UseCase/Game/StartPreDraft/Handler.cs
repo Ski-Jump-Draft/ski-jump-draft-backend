@@ -28,7 +28,8 @@ public class Handler(
     IScheduler scheduler,
     IClock clock,
     IGuid guid,
-    ISelectGameStartingGateService selectGameStartingGateService)
+    ISelectGameStartingGateService selectGameStartingGateService,
+    GameUpdatedDtoMapper gameUpdatedDtoMapper)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -56,7 +57,7 @@ public class Handler(
                 runAt: now.AddSeconds(5),
                 uniqueKey: $"SimulateJumpInGame:{gameGuid}_{now.ToUnixTimeSeconds()}",
                 ct: ct);
-            await gameNotifier.GameUpdated(GameUpdatedDtoMapper.FromDomain(gameAfterPreDraftStart));
+            await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterPreDraftStart));
         }
         else
         {

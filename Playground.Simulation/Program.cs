@@ -34,13 +34,45 @@ public static class Program
         var logger = new Dotnet(loggerFactory);
 
         var weatherEngine = new WeatherEngine(random, WindModule.create(0.2), logger);
-        var jumpSimulator = new JumpSimulator(random, logger);
+        var simulatorConfiguration = new SimulatorConfiguration(SkillImpactFactor: 1.95, AverageBigSkill: 7,
+            FlightToTakeoffRatio: 1, RandomAdditionsRatio: 1.25, TakeoffRatingPointsByForm: 5.15 * 0.9, FlightRatingPointsByForm: 5.15 * 1.1);
+        var jumpSimulator = new JumpSimulator(simulatorConfiguration, random, logger);
         var judgesSimulator = new JudgesSimulator(random, logger);
 
-        var jumper = new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(7).Value,
-            JumperSkillsModule.BigSkillModule.tryCreate(7).Value,
-            JumperSkillsModule.LandingSkillModule.tryCreate(8).Value, JumperSkillsModule.FormModule.tryCreate(5).Value,
-            JumperSkillsModule.LikesHillPolicy.None));
+        var jumpers = new List<Jumper>()
+        {
+            new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.LandingSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.FormModule.tryCreate(1).Value,
+                JumperSkillsModule.LikesHillPolicy.None)),
+            new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.LandingSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.FormModule.tryCreate(3).Value,
+                JumperSkillsModule.LikesHillPolicy.None)),
+            new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.LandingSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.FormModule.tryCreate(5).Value,
+                JumperSkillsModule.LikesHillPolicy.None)),
+            new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.LandingSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.FormModule.tryCreate(7).Value,
+                JumperSkillsModule.LikesHillPolicy.None)),
+            new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.LandingSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.FormModule.tryCreate(9).Value,
+                JumperSkillsModule.LikesHillPolicy.None)),
+            new Jumper(new JumperSkills(JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.BigSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.LandingSkillModule.tryCreate(8).Value,
+                JumperSkillsModule.FormModule.tryCreate(10).Value,
+                JumperSkillsModule.LikesHillPolicy.None)),
+        };
+
         const double pointsPerGate = 7.56;
         const double pointsPerMeter = 1.8;
         const double metersByGate = pointsPerGate / pointsPerMeter;
@@ -48,55 +80,63 @@ public static class Program
             new HillSimulationData(HillModule.HsPointModule.tryCreate(140).Value,
                 HillModule.MetersByGateModule.tryCreate(metersByGate).Value));
 
-        var gateSelector = new IterativeSimulated(jumpSimulator, weatherEngine, JuryBravery.Low,
-            [jumper, jumper, jumper, jumper, jumper, jumper], hill);
+        var gateSelector = new IterativeSimulated(jumpSimulator, weatherEngine, JuryBravery.Medium,
+        [
+            ..jumpers, ..jumpers, ..jumpers, ..jumpers, ..jumpers, ..jumpers, ..jumpers, ..jumpers, ..jumpers,
+            ..jumpers, ..jumpers, ..jumpers, ..jumpers, ..jumpers, ..jumpers, ..jumpers, ..jumpers, ..jumpers
+        ], hill);
 
         var gate = gateSelector.Select(new GameStartingGateSelectorContext());
         Console.WriteLine($"Chosen gate no. {gate}");
 
-        var distances = new List<double>();
-        var winds = new List<double>();
 
-        for (var i = 0; i < 300; i++)
+        const int jumpsPerJumper = 30;
+
+        foreach (var (jumper, index) in jumpers.Select((jumper, index) => (jumper, index)))
         {
-            var wind = weatherEngine.GetWind();
-            var windDouble = WindModule.averaged(wind);
-            var ctx = new SimulationContext(Gate.NewGate(gate), jumper, hill, wind);
-            var jump = jumpSimulator.Simulate(ctx);
+            Console.WriteLine($"##### JUMPER NO. {index + 1} ######");
+            var distances = new List<double>();
+            var winds = new List<double>();
+            for (var i = 0; i < jumpsPerJumper; i++)
+            {
+                var wind = weatherEngine.GetWind();
+                var windDouble = WindModule.averaged(wind);
+                var ctx = new SimulationContext(Gate.NewGate(gate), jumper, hill, wind);
+                var jump = jumpSimulator.Simulate(ctx);
 
-            var distanceDouble = DistanceModule.value(jump.Distance);
+                var distanceDouble = DistanceModule.value(jump.Distance);
 
-            distances.Add(distanceDouble);
-            winds.Add(windDouble);
+                distances.Add(distanceDouble);
+                winds.Add(windDouble);
 
-            Console.WriteLine(
-                $"Jump: {jump.Distance}m + {jump.Landing} ({windDouble:F2}m/s))"
-            );
+                Console.WriteLine(
+                    $"Jump: {jump.Distance}m + {jump.Landing} ({windDouble:F2}m/s))"
+                );
+            }
+
+            // Calculate statistics
+            var minDistance = distances.Min();
+            var maxDistance = distances.Max();
+            var averageDistance = distances.Average();
+            var stdDevDistance = CalculateStdDev(distances, averageDistance);
+
+            // var minWind = winds.Min();
+            // var maxWind = winds.Max();
+            // var averageWind = winds.Average();
+            // var stdDevWind = CalculateStdDev(winds, averageWind);
+
+            Console.WriteLine($"\nJump Distance Statistics (JUMPER NO. {index + 1}):");
+            Console.WriteLine($"  Min: {minDistance:F2}m");
+            Console.WriteLine($"  Max: {maxDistance:F2}m");
+            Console.WriteLine($"  Avg: {averageDistance:F2}m");
+            Console.WriteLine($"  StdDev: {stdDevDistance:F2}m\n\n");
+
+            // Console.WriteLine("\nWind Statistics:");
+            // Console.WriteLine($"  Min: {minWind:F2}m/s");
+            // Console.WriteLine($"  Max: {maxWind:F2}m/s");
+            // Console.WriteLine($"  Avg: {averageWind:F2}m/s");
+            // Console.WriteLine($"  StdDev: {stdDevWind:F2}m/s");
         }
-
-        // Calculate statistics
-        var minDistance = distances.Min();
-        var maxDistance = distances.Max();
-        var averageDistance = distances.Average();
-        var stdDevDistance = CalculateStdDev(distances, averageDistance);
-
-        var minWind = winds.Min();
-        var maxWind = winds.Max();
-        var averageWind = winds.Average();
-        var stdDevWind = CalculateStdDev(winds, averageWind);
-
-        // Print statistics summary
-        Console.WriteLine("\nJump Distance Statistics:");
-        Console.WriteLine($"  Min: {minDistance:F2}m");
-        Console.WriteLine($"  Max: {maxDistance:F2}m");
-        Console.WriteLine($"  Avg: {averageDistance:F2}m");
-        Console.WriteLine($"  StdDev: {stdDevDistance:F2}m");
-
-        Console.WriteLine("\nWind Statistics:");
-        Console.WriteLine($"  Min: {minWind:F2}m/s");
-        Console.WriteLine($"  Max: {maxWind:F2}m/s");
-        Console.WriteLine($"  Avg: {averageWind:F2}m/s");
-        Console.WriteLine($"  StdDev: {stdDevWind:F2}m/s");
 
         Console.WriteLine("\nFinished simulation run.");
     }

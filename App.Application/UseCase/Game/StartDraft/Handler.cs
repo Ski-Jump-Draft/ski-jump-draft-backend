@@ -23,7 +23,8 @@ public class Handler(
     IMyLogger logger,
     IRandom random,
     IClock clock,
-    IScheduler scheduler)
+    IScheduler scheduler,
+    GameUpdatedDtoMapper gameUpdatedDtoMapper)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -54,7 +55,7 @@ picks: {gameAfterStartDraft.DraftPicks}
 
         await DraftPassHelper.MaybeScheduleDraftPass(gameAfterStartDraft, scheduler, json, clock, ct);
 
-        await gameNotifier.GameUpdated(GameUpdatedDtoMapper.FromDomain(gameAfterStartDraft));
+        await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterStartDraft));
 
 
         return new Result();

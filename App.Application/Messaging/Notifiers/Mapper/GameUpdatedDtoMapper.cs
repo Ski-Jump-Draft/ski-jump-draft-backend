@@ -1,5 +1,11 @@
+using System.Collections.Immutable;
+using App.Application.Acl;
+using App.Application.Extensions;
+using App.Application.Utility;
 using App.Domain.Competition;
 using App.Domain.Game;
+using App.Domain.GameWorld;
+using Jumper = App.Domain.Competition.Jumper;
 using JumperId = App.Domain.Game.JumperId;
 
 namespace App.Application.Messaging.Notifiers.Mapper;
@@ -9,7 +15,10 @@ using System.Linq;
 using Microsoft.FSharp.Core;
 using Microsoft.FSharp.Reflection;
 
-public static class GameUpdatedDtoMapper
+public class GameUpdatedDtoMapper(
+    Func<Domain.Competition.JumperId, CancellationToken, Task<Domain.GameWorld.Jumper>>
+        gameWorldJumperByCompetitionJumperId,
+    IMyLogger myLogger)
 {
     private const int SchemaVersion = 1;
 
@@ -20,14 +29,6 @@ public static class GameUpdatedDtoMapper
     private static Guid Unwrap(App.Domain.Competition.JumperId x) => x.Item;
     private static Guid Unwrap(App.Domain.Competition.HillId x) => x.Item;
 
-    // ---------- Helpers: F# Option ----------
-    private static T? ToNullable<T>(FSharpOption<T> opt) where T : struct
-        => FSharpOption<T>.get_IsSome(opt) ? opt.Value : null;
-
-    private static T? ToRefOrNull<T>(FSharpOption<T> opt) where T : class
-        => FSharpOption<T>.get_IsSome(opt) ? opt.Value : null;
-
-    // ---------- Helpers: F# Union reflection ----------
     private static (string Case, object[] Fields) DeconstructUnion(object union)
     {
         var t = union.GetType();
@@ -38,27 +39,30 @@ public static class GameUpdatedDtoMapper
         return (uci.Name, fields);
     }
 
-    // ---------- Public API ----------
-    public static GameUpdatedDto FromDomain(App.Domain.Game.Game game, string changeType = "Snapshot")
+    public async Task<GameUpdatedDto> FromDomain(App.Domain.Game.Game game,
+        App.Domain.Competition.Competition? lastCompetitionState = null, string changeType = "Snapshot")
     {
         var header = MapHeader(game);
-        var (statusStr, preDraft, draft, mainComp, brk, ended) = MapStatus(game);
+        var (statusStr, preDraft, draft, mainComp, brk, ended) = await MapStatus(game);
+
+        myLogger.Warn("Last competition state: " + lastCompetitionState?.ToString() ?? "null");
 
         return new GameUpdatedDto(
             Unwrap(game.Id_),
             SchemaVersion,
             statusStr,
             changeType,
+            game.Settings.PreDraftSettings.CompetitionsCount,
             header,
             preDraft,
             draft,
             mainComp,
             brk,
-            ended
+            ended,
+            lastCompetitionState != null ? await MapCompetition(lastCompetitionState) : null
         );
     }
 
-    // ---------- Header ----------
     private static GameHeaderDto MapHeader(App.Domain.Game.Game game)
     {
         var players =
@@ -71,18 +75,17 @@ public static class GameUpdatedDtoMapper
                 .Select(j => new JumperDto(Unwrap(j.Id)))
                 .ToList();
 
-        Guid? hillId =
+        var hillId =
             game.Hill.Match(
                 some: hill => Unwrap(hill.Id),
                 none: () => (Guid?)null
             );
 
-        return new GameHeaderDto(hillId, players.Count, jumpers.Count);
+        return new GameHeaderDto(hillId, players, jumpers);
     }
 
-    // ---------- Status dispatcher ----------
-    private static (string, PreDraftDto?, DraftDto?, CompetitionDto?, BreakDto?, EndedDto?)
-        MapStatus(App.Domain.Game.Game game)
+    private async Task<(string, PreDraftDto?, DraftDto?, CompetitionDto?, BreakDto?, EndedDto?)> MapStatus(
+        App.Domain.Game.Game game)
     {
         var (caseName, fields) = DeconstructUnion(game.Status);
 
@@ -91,7 +94,7 @@ public static class GameUpdatedDtoMapper
             case "PreDraft":
             {
                 var pre = (App.Domain.Game.PreDraftStatus)fields[0];
-                return ("PreDraft", MapPreDraft(pre), null, null, null, null);
+                return ("PreDraft", await MapPreDraft(pre), null, null, null, null);
             }
 
             case "Draft":
@@ -103,7 +106,7 @@ public static class GameUpdatedDtoMapper
             case "MainCompetition":
             {
                 var comp = (Competition)fields[0];
-                return ("MainCompetition", null, null, MapCompetitionLight(comp), null, null);
+                return ("MainCompetition", null, null, await MapCompetition(comp), null, null);
             }
 
             case "Ended":
@@ -115,7 +118,8 @@ public static class GameUpdatedDtoMapper
             case "Break":
             {
                 var nextTag = (App.Domain.Game.StatusTag)fields[0];
-                return ("Break", null, null, null, MapBreak(nextTag), null);
+
+                return ($"Break {nextTag.ToString().Replace("Tag", "")}", null, null, null, MapBreak(nextTag), null);
             }
 
             default:
@@ -124,7 +128,7 @@ public static class GameUpdatedDtoMapper
     }
 
     // ---------- PreDraft ----------
-    private static PreDraftDto MapPreDraft(App.Domain.Game.PreDraftStatus pre)
+    private async Task<PreDraftDto> MapPreDraft(App.Domain.Game.PreDraftStatus pre)
     {
         var (caseName, fields) = DeconstructUnion(pre);
 
@@ -134,7 +138,7 @@ public static class GameUpdatedDtoMapper
             var indexVo = (App.Domain.Game.PreDraftCompetitionIndex)fields[0];
             var comp = (Competition)fields[1];
             var idx = PreDraftCompetitionIndexModule.value(indexVo);
-            return new PreDraftDto("Running", idx, MapCompetitionLight(comp));
+            return new PreDraftDto("Running", idx, await MapCompetition(comp));
         }
 
         if (caseName == "Break")
@@ -150,7 +154,7 @@ public static class GameUpdatedDtoMapper
     // ---------- Draft ----------
     private static DraftDto MapDraft(App.Domain.Game.Game game, App.Domain.Game.Draft draft)
     {
-        Guid? currentPlayerId =
+        var currentPlayerId =
             draft.CurrentTurn.Match(
                 some: turn => Unwrap(turn.PlayerId),
                 none: () => (Guid?)null
@@ -177,8 +181,7 @@ public static class GameUpdatedDtoMapper
         return new DraftDto(currentPlayerId, draft.Ended, picks);
     }
 
-    // ---------- Competition (light) ----------
-    private static CompetitionDto MapCompetitionLight(Competition comp)
+    private async Task<CompetitionDto> MapCompetition(Competition comp)
     {
         var status = comp.GetStatusTag switch
         {
@@ -197,7 +200,9 @@ public static class GameUpdatedDtoMapper
             );
 
         var gate = MapGate(comp.GateState);
-        return new CompetitionDto(status, nextJumperId, gate);
+        var results = await MapResults(comp.Jumpers_, comp.Classification, comp.Startlist_);
+
+        return new CompetitionDto(status, nextJumperId, gate, results.ToImmutableList());
     }
 
     private static GateDto MapGate(FSharpOption<GateState> gsOpt)
@@ -226,15 +231,76 @@ public static class GameUpdatedDtoMapper
         return new GateDto(starting, current, coachReduction);
     }
 
+    private async Task<IEnumerable<CompetitionResultDto>> MapResults(
+        IEnumerable<Jumper> competitionJumpers,
+        IEnumerable<Classification.JumperClassificationResult> classificationResults,
+        Startlist startlist,
+        CancellationToken ct = default)
+    {
+        var tasks = classificationResults.Select(async classificationResult =>
+        {
+            var jumperId = Unwrap(classificationResult.JumperId);
+            var jumperDomainId = Domain.Competition.JumperId.NewJumperId(jumperId);
+            var totalPoints = TotalPointsModule.value(classificationResult.Points);
+
+            var rank = Classification.PositionModule.value(classificationResult.Position);
+
+            var bib = startlist.BibOf(jumperDomainId);
+            if (bib.IsNone())
+                throw new InvalidOperationException($"Missing bib for jumper {jumperId}.");
+            var bibValue = StartlistModule.BibModule.value(bib.Value);
+
+            var competitionJumper = competitionJumpers.SingleOrDefault(jumper => jumper.Id.Equals(jumperDomainId));
+            if (competitionJumper is null)
+                throw new InvalidOperationException($"Missing jumper {jumperId} in competition.");
+
+            var gameWorldJumper = await gameWorldJumperByCompetitionJumperId(competitionJumper.Id, ct);
+
+            var competitionJumperDto = new CompetitionJumperDto(
+                gameWorldJumper.Name.Item,
+                gameWorldJumper.Surname.Item,
+                CountryFisCodeModule.value(gameWorldJumper.FisCountryCode)
+            );
+
+            var jumpResultDtos = classificationResult.JumpResults.Select(jumpResult =>
+            {
+                double? judgePoints = jumpResult.JudgePoints.IsSome()
+                    ? JumpResultModule.JudgePointsModule.value(jumpResult.JudgePoints.Value)
+                    : null;
+                double? windPoints = jumpResult.WindPoints.IsSome()
+                    ? JumpResultModule.WindPointsModule.value(jumpResult.WindPoints.Value)
+                    : null;
+                var windAverage = jumpResult.Jump.Wind.ToDouble();
+                return new CompetitionRoundResultDto(
+                    JumpModule.DistanceModule.value(jumpResult.Jump.Distance),
+                    jumpResult.TotalPoints.Item,
+                    judgePoints,
+                    windPoints,
+                    windAverage
+                );
+            });
+
+            return new CompetitionResultDto(
+                rank, bibValue, competitionJumperDto, totalPoints,
+                jumpResultDtos.ToImmutableList()
+            );
+        });
+
+        return
+            await Task.WhenAll(
+                tasks); // <- zbiera wszystkie Task<CompetitionResultDto> w IEnumerable<CompetitionResultDto>
+    }
+
+
     // ---------- Break / Ended ----------
     private static BreakDto MapBreak(App.Domain.Game.StatusTag nextTag)
     {
         var next = nextTag switch
         {
-            var v when v.IsPreDraftTag => "PreDraft",
-            var v when v.IsDraftTag => "Draft",
-            var v when v.IsMainCompetitionTag => "MainCompetition",
-            var v when v.IsEndedTag => "Ended",
+            { IsPreDraftTag: true } => "PreDraft",
+            { IsDraftTag: true } => "Draft",
+            { IsMainCompetitionTag: true } => "MainCompetition",
+            { IsEndedTag: true } => "Ended",
             _ => "Unknown"
         };
 
@@ -250,7 +316,17 @@ public static class GameUpdatedDtoMapper
             _ => "Classic"
         };
 
-        return new EndedDto(policy);
+        var ranking = ((Domain.Game.Status.Ended)game.Status).Item;
+        var positionAndPoints = ranking.PositionsAndPoints;
+
+        var positionAndPointsMap = positionAndPoints
+            .ToDictionary(
+                kvp => kvp.Key.Item,
+                kvp => (RankingModule.PositionModule.value(kvp.Value.Item1),
+                    RankingModule.PointsModule.value(kvp.Value.Item2))
+            );
+
+        return new EndedDto(policy, positionAndPointsMap);
     }
 }
 

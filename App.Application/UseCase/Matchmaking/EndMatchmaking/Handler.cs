@@ -48,7 +48,7 @@ public class Handler(
             matchmakingSchedule.EndMatchmaking(command.MatchmakingId);
         }
 
-        await notifier.MatchmakingUpdated(MatchmakingUpdatedDtoMapper.FromDomain(endedMatchmaking));
+        await notifier.MatchmakingUpdated(MatchmakingNotifierMappers.MatchmakingUpdatedFromDomain(endedMatchmaking));
 
         return new Result(hasSucceeded);
     }

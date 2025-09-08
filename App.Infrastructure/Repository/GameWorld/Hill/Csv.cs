@@ -1,8 +1,7 @@
+using App.Application.Extensions;
 using App.Application.Utility;
 using App.Domain.GameWorld;
-using App.Infrastructure.Repository.GameWorld.Hill;
 using App.Infrastructure.Helper.Csv;
-using App.Infrastructure.Helper.Csv.GameWorldCountryIdProvider;
 using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.FSharp.Core;
@@ -15,7 +14,6 @@ public interface IGameWorldHillsCsvStreamProvider : ICsvStreamProvider
 
 public class Csv(
     IGameWorldHillsCsvStreamProvider csvStreamProvider,
-    IGameWorldCountryIdProvider countryIdProvider,
     IMyLogger logger,
     CsvConfiguration csvConfig) : IHills
 {
@@ -32,12 +30,12 @@ public class Csv(
         public double TailwindPoints { get; set; }
     }
 
-    private static Domain.GameWorld.Hill Map(CsvHill src, Guid countryId) =>
+    private static Domain.GameWorld.Hill Map(CsvHill src) =>
         new(
             HillId.NewHillId(src.Id),
             HillModule.Name.NewName(src.Name),
             HillModule.Location.NewLocation(src.Location),
-            CountryId.NewCountryId(countryId),
+            CountryFisCodeModule.tryCreate(src.CountryFisCode) .OrThrow($"Invalid CountryFisCode format for a hill {src.Location} HS{src.HsPoint}"),
             HillModule.KPointModule.tryCreate(src.KPoint).Value,
             HillModule.HsPointModule.tryCreate(src.HsPoint).Value,
             HillModule.GatePointsModule.tryCreate(src.GatePoints).Value,
@@ -57,8 +55,7 @@ public class Csv(
         {
             try
             {
-                var countryId = await countryIdProvider.GetFromFisCode(csvHill.CountryFisCode, ct);
-                results.Add(Map(csvHill, countryId));
+                results.Add(Map(csvHill));
             }
             catch (Exception ex)
             {
@@ -104,9 +101,9 @@ public class Csv(
             : FSharpOption<Domain.GameWorld.Hill>.Some(found);
     }
 
-    public async Task<IEnumerable<Domain.GameWorld.Hill>> GetByCountryId(CountryId countryId, CancellationToken ct)
+    public async Task<IEnumerable<Domain.GameWorld.Hill>> GetByCountryFisCode(CountryFisCode countryFisCode, CancellationToken ct)
     {
         var all = await LoadAllAsync(ct);
-        return all.Where(j => j.CountryId.Equals(countryId)).ToList();
+        return all.Where(j => j.CountryId.Equals(countryFisCode)).ToList();
     }
 }

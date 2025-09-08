@@ -46,6 +46,14 @@ type Ranking =
                     assignPositions updated (Some currentPoints) (Some nextFreePosition) (nextFreePosition + 1) rest
 
         assignPositions Map.empty None None 1 playersSortedByPoints
+        
+    member this.PositionsAndPoints : Map<PlayerId, Ranking.Position * Ranking.Points> =
+        let (Ranking playerPoints) = this
+        this.AllPositions
+        |> Map.map (fun playerId pos ->
+            let points = playerPoints.[playerId]
+            (pos, points)
+        )
 
     member this.PositionOf(playerId: PlayerId) : Ranking.Position option =
         this.AllPositions |> Map.tryFind playerId

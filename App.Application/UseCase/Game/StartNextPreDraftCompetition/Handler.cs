@@ -32,7 +32,8 @@ public class Handler(
     IGuid guid,
     ICompetitionJumperAcl competitionJumperAcl,
     ISelectGameStartingGateService selectGameStartingGateService,
-    IMyLogger logger)
+    IMyLogger logger,
+    GameUpdatedDtoMapper gameUpdatedDtoMapper)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -69,7 +70,7 @@ public class Handler(
             runAt: now.AddSeconds(5),
             uniqueKey: $"SimulateJumpInGame:{game.Id_.Item}_{now.ToUnixTimeSeconds()}",
             ct: ct);
-        await gameNotifier.GameUpdated(GameUpdatedDtoMapper.FromDomain(gameAfterStartNextPreDraftCompetition));
+        await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterStartNextPreDraftCompetition));
         return new Result(competitionGuid);
     }
 }

@@ -118,6 +118,9 @@ type Game =
         | _ -> None
 
     member this.DraftPicks = this.Draft.Value.AllPicks
+    
+    member this.PicksOf playerId=
+        this.Draft.Value.PicksOf playerId
 
     member this.AvailableDraftPicks: IEnumerable<JumperId> =
         this.Draft.Value.AvailablePicks

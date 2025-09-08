@@ -254,9 +254,6 @@ builder.Services
             "hills",
             TimeSpan.FromMinutes(5));
     });
-builder.Services
-    .AddSingleton<App.Infrastructure.Helper.Csv.GameWorldCountryIdProvider.IGameWorldCountryIdProvider,
-        App.Infrastructure.Helper.Csv.GameWorldCountryIdProvider.Impl.Repository>();
 
 builder.Services.AddSingleton(new CsvConfiguration(CultureInfo.InvariantCulture)
 {

@@ -11,6 +11,7 @@ using App.Domain.Game;
 using App.Domain.GameWorld;
 using App.Domain.Matchmaking;
 using Microsoft.FSharp.Collections;
+using CompetitionJumperDto = App.Application.Acl.CompetitionJumperDto;
 using HillModule = App.Domain.Competition.HillModule;
 using PlayerId = App.Domain.Game.PlayerId;
 using PlayerModule = App.Domain.Game.PlayerModule;
@@ -38,7 +39,8 @@ public class Handler(
     ICompetitionJumperAcl competitionJumperAcl,
     IMyLogger logger,
     IHills hills,
-    ICompetitionHillAcl competitionHillAcl)
+    ICompetitionHillAcl competitionHillAcl,
+    GameUpdatedDtoMapper gameUpdatedDtoMapper)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -118,7 +120,7 @@ public class Handler(
                 uniqueKey: $"StartPreDraft:{gameGuid}", ct: ct
             );
             await gameNotifier.GameStartedAfterMatchmaking(command.MatchmakingId, gameGuid);
-            await gameNotifier.GameUpdated(GameUpdatedDtoMapper.FromDomain(game));
+            await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(game));
             return new Result(gameGuid);
         }
 

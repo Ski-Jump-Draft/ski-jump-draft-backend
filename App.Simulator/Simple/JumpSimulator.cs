@@ -3,7 +3,24 @@ using App.Domain.Simulation;
 
 namespace App.Simulator.Simple;
 
-public class JumpSimulator(IRandom random, IMyLogger logger) : IJumpSimulator
+/// <summary>
+/// Simulator's config
+/// </summary>
+/// <param name="SkillImpactFactor">Increases the impact of differences between "big" skills (takeoff and flight skills). SkillImpactFactor=2 indicates that differences are two times more intensive. </param>
+/// <param name="AverageBigSkill">Multiplies all random additions</param>
+/// <param name="TakeoffRatingPointsByForm">How many takeoff rating points by a one point of the form?</param>
+/// <param name="FlightRatingPointsByForm">How many flight rating points by a one point of the form?</param>
+/// <param name="FlightToTakeoffRatio">E.g. 3.5 means that flight has 3.5 times more impact to distance than takeoff</param>
+/// <param name="RandomAdditionsRatio">Multiplies all random additions</param>
+public record SimulatorConfiguration(
+    double SkillImpactFactor,
+    double AverageBigSkill,
+    double TakeoffRatingPointsByForm,
+    double FlightRatingPointsByForm,
+    double FlightToTakeoffRatio = 1,
+    double RandomAdditionsRatio = 1);
+
+public class JumpSimulator(SimulatorConfiguration configuration, IRandom random, IMyLogger logger) : IJumpSimulator
 {
     public Jump Simulate(SimulationContext context)
     {
@@ -12,7 +29,7 @@ public class JumpSimulator(IRandom random, IMyLogger logger) : IJumpSimulator
         var averageWind = WindModule.averaged(context.Wind);
         var distance = CalculateDistance(context, takeoffRating, flightRating, averageWind);
         var landing = GenerateLanding(context, distance);
-        logger.Info($"Distance: {distance}, AverageWind: {averageWind}, Landing: {landing}");
+        logger.Debug($"Distance: {distance}, AverageWind: {averageWind}, Landing: {landing}");
         return new Jump(DistanceModule.tryCreate(distance).Value, landing);
     }
 
@@ -31,26 +48,36 @@ public class JumpSimulator(IRandom random, IMyLogger logger) : IJumpSimulator
             < 0.15 => CalculateBadScenarioTakeoffRatingRandom(context),
             _ => CalculateMediumTakeoffRatingRandom(context),
         };
-        logger.Info($"TakeoffRandom: {randomAdditive}");
-        // Od 1 do 100
-        var takeoffRating = (takeoffSkill * 6) + (form * 4.5) + randomAdditive;
+        logger.Debug($"TakeoffRandom: {randomAdditive}");
+
+        var baseRatingContribution = configuration.AverageBigSkill * 6;
+        var skillDeviation = takeoffSkill - configuration.AverageBigSkill;
+        var scaledDeviationContribution = skillDeviation * 6 * configuration.SkillImpactFactor;
+        var formImpact = (form * configuration.TakeoffRatingPointsByForm);
+
+        var takeoffRating = baseRatingContribution + scaledDeviationContribution + formImpact + randomAdditive;
 
         return takeoffRating;
     }
 
     private double CalculateGoodScenarioTakeoffRatingRandom(SimulationContext context)
     {
-        return random.Gaussian(8, 7);
+        return GenerateGaussianWithRandomAdditionsRatio(8, 7);
     }
 
     private double CalculateBadScenarioTakeoffRatingRandom(SimulationContext context)
     {
-        return random.Gaussian(-18, 10);
+        return GenerateGaussianWithRandomAdditionsRatio(-18, 10);
     }
 
     private double CalculateMediumTakeoffRatingRandom(SimulationContext context)
     {
-        return random.Gaussian(0, 8);
+        return GenerateGaussianWithRandomAdditionsRatio(0, 8);
+    }
+
+    private double GenerateGaussianWithRandomAdditionsRatio(double mean, double stdDev)
+    {
+        return random.Gaussian(mean, stdDev) * configuration.RandomAdditionsRatio;
     }
 
     private double CalculateFlightRating(SimulationContext context)
@@ -68,9 +95,14 @@ public class JumpSimulator(IRandom random, IMyLogger logger) : IJumpSimulator
             < 0.15 => CalculateBadScenarioFlightRatingRandom(context),
             _ => CalculateMediumFlightRatingRandom(context),
         };
-        logger.Info($"FlightRandom: {randomAdditive}");
-        // Od 1 do 100
-        var rating = (flightSkill * 6 * 0.96) + (form * 4.5 * 1.04) + randomAdditive;
+        logger.Debug($"FlightRandom: {randomAdditive}");
+
+        var baseRatingContribution = configuration.AverageBigSkill * 6 * 0.96;
+        var skillDeviation = flightSkill - configuration.AverageBigSkill;
+        var scaledDeviationContribution = skillDeviation * 6 * 0.96 * configuration.SkillImpactFactor;
+        var formImpact = (form * configuration.FlightRatingPointsByForm);
+
+        var rating = baseRatingContribution + scaledDeviationContribution + formImpact + randomAdditive;
 
         return rating;
     }
@@ -142,24 +174,26 @@ public class JumpSimulator(IRandom random, IMyLogger logger) : IJumpSimulator
         var gate = context.Gate.Item;
 
         var gateAddition = metersByGate * gate;
-        logger.Info($"Gate: {gate}, MetersByGate: {metersByGate}, GateAddition: {
+        logger.Debug($"Gate: {gate}, MetersByGate: {metersByGate}, GateAddition: {
             gateAddition}");
 
         var kPoint = HillModule.KPointModule.value(context.Hill.KPoint);
         var startingDistance = kPoint / 2.5;
-        var metersByTakeoffRating = 0.2 * (kPoint / 100);
-        var metersByFlightRating = 0.2 * (kPoint / 100);
-        logger.Info($"KPoint: {kPoint}, startingDistance: {startingDistance}, metersByTakeoffRating: {
-            metersByTakeoffRating}, metersByFlightRating: {
-                metersByFlightRating}");
-        var takeoffAddition = metersByTakeoffRating * takeoffRating;
-        var flightAddition = metersByFlightRating * flightRating;
-        logger.Info($"TakeoffRating: {takeoffRating}, FlightRating: {flightRating}, TakeoffAddition: {takeoffAddition
+
+        // ZMIANA: Upraszczamy bazowy przelicznik punktów ratingu na metry
+        var metersByRatingPoint = 0.2 * (kPoint / 100);
+        logger.Debug($"KPoint: {kPoint}, startingDistance: {startingDistance}, metersByRatingPoint: {metersByRatingPoint
+        }");
+
+        var takeoffAddition = metersByRatingPoint * takeoffRating;
+        var flightAddition = metersByRatingPoint * flightRating * configuration.FlightToTakeoffRatio;
+
+        logger.Debug($"TakeoffRating: {takeoffRating}, FlightRating: {flightRating}, TakeoffAddition: {takeoffAddition
         }, FlightAddition: {flightAddition}");
-        var windAddition =
-            averageWind * 4 *
-            (kPoint / 50); // TODO: Dodać losowość większą, im większy wiatr. Dodać instability wiatru
-        logger.Info($"Wind: {averageWind}, WindAddition: {windAddition}");
+
+        var windAddition = averageWind * 4 * (kPoint / 50);
+        logger.Debug($"Wind: {averageWind}, WindAddition: {windAddition}");
+
         return startingDistance + gateAddition + takeoffAddition + flightAddition + windAddition;
     }
 }

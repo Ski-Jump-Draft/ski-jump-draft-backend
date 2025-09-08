@@ -20,6 +20,6 @@ public class Handler(IMatchmakings matchmakings, IMatchmakingNotifier notifier)
         var playerId = PlayerId.NewPlayerId(command.PlayerId);
         var matchmakingAfterLeave = matchmaking.Leave(playerId).ResultValue;
         await matchmakings.Add(matchmakingAfterLeave, ct);
-        await notifier.MatchmakingUpdated(MatchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterLeave));
+        await notifier.MatchmakingUpdated(MatchmakingNotifierMappers.MatchmakingUpdatedFromDomain(matchmakingAfterLeave));
     }
 }

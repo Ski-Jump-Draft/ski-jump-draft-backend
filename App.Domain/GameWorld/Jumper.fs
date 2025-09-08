@@ -42,7 +42,7 @@ type Jumper =
     { Id: JumperId
       Name: Name
       Surname: Surname
-      CountryId: CountryId
+      FisCountryCode: CountryFisCode
       Takeoff: BigSkill
       Flight: BigSkill
       Landing: LandingSkill
@@ -52,4 +52,4 @@ type IJumpers =
     abstract member GetAll: ct: CancellationToken -> Task<IEnumerable<Jumper>>
     abstract member GetFromIds: ids: IEnumerable<JumperId> * ct: CancellationToken -> Task<IEnumerable<Jumper>>
     abstract member GetById: jumperId: JumperId * ct: CancellationToken -> Task<Jumper option>
-    abstract member GetByCountryId: countryId: CountryId * ct: CancellationToken -> Task<IEnumerable<Jumper>>
+    abstract member GetByCountryFisCode: countryId: CountryFisCode * ct: CancellationToken -> Task<IEnumerable<Jumper>>

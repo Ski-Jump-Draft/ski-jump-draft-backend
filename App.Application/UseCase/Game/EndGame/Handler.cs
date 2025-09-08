@@ -21,7 +21,8 @@ public class Handler(
     IGames games,
     IGameNotifier gameNotifier,
     IMyLogger logger,
-    IGameRankingFactorySelector gameRankingFactorySelector)
+    IGameRankingFactorySelector gameRankingFactorySelector,
+    GameUpdatedDtoMapper gameUpdatedDtoMapper)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -47,7 +48,7 @@ public class Handler(
 
         var endedGame = endedGameResult.ResultValue;
         await games.Add(endedGame, ct);
-        await gameNotifier.GameUpdated(GameUpdatedDtoMapper.FromDomain(endedGame));
+        await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(endedGame));
 
         return new Result();
     }

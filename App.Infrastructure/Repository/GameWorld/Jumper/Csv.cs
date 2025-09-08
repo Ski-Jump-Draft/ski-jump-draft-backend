@@ -1,18 +1,19 @@
+using App.Application.Extensions;
 using App.Application.Utility;
 using CsvHelper;
 using Microsoft.FSharp.Core;
 using App.Domain.GameWorld;
 using App.Infrastructure.Helper.Csv;
-using App.Infrastructure.Helper.Csv.GameWorldCountryIdProvider;
 using CsvHelper.Configuration;
 
 namespace App.Infrastructure.Repository.GameWorld.Jumper;
 
-public interface IGameWorldJumpersCsvStreamProvider : ICsvStreamProvider { }
+public interface IGameWorldJumpersCsvStreamProvider : ICsvStreamProvider
+{
+}
 
 public class Csv(
     IGameWorldJumpersCsvStreamProvider csvStreamProvider,
-    IGameWorldCountryIdProvider countryIdProvider,
     IMyLogger logger,
     CsvConfiguration csvConfig) : IJumpers
 {
@@ -28,12 +29,13 @@ public class Csv(
         public int LiveForm { get; set; }
     }
 
-    private static Domain.GameWorld.Jumper Map(CsvJumper src, Guid countryId) =>
+    private static Domain.GameWorld.Jumper Map(CsvJumper src) =>
         new(
             JumperId.NewJumperId(src.Id),
             JumperModule.Name.NewName(src.Name),
             JumperModule.Surname.NewSurname(src.Surname),
-            CountryId.NewCountryId(countryId),
+            CountryFisCodeModule.tryCreate(src.CountryFisCode)
+                .OrThrow($"Invalid CountryFisCode format for a jumper {src.Name} {src.Surname}"),
             JumperModule.BigSkillModule.tryCreate(src.Takeoff).Value,
             JumperModule.BigSkillModule.tryCreate(src.Flight).Value,
             JumperModule.LandingSkillModule.tryCreate(src.Landing).Value,
@@ -52,8 +54,7 @@ public class Csv(
         {
             try
             {
-                var countryId = await countryIdProvider.GetFromFisCode(csvJumper.CountryFisCode, ct);
-                results.Add(Map(csvJumper, countryId));
+                results.Add(Map(csvJumper));
             }
             catch (Exception ex)
             {
@@ -83,9 +84,10 @@ public class Csv(
             : FSharpOption<Domain.GameWorld.Jumper>.Some(found);
     }
 
-    public async Task<IEnumerable<Domain.GameWorld.Jumper>> GetByCountryId(CountryId countryId, CancellationToken ct)
+    public async Task<IEnumerable<Domain.GameWorld.Jumper>> GetByCountryFisCode(CountryFisCode countryFisCode,
+        CancellationToken ct)
     {
         var all = await LoadAllAsync(ct);
-        return all.Where(j => j.CountryId.Equals(countryId)).ToList();
+        return all.Where(j => j.FisCountryCode.Equals(countryFisCode)).ToList();
     }
 }

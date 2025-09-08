@@ -16,22 +16,22 @@ public sealed record GameUpdatedDto(
     int SchemaVersion,
     string Status, // "PreDraft" | "Draft" | "MainCompetition" | "Ended" | "Break"
     string ChangeType, // "Snapshot" | "PhaseChanged" | "DraftPickMade" | "JumpAdded" | ...
+    int PreDraftsCount,
     GameHeaderDto Header,
     PreDraftDto? PreDraft,
     DraftDto? Draft,
     CompetitionDto? MainCompetition,
     BreakDto? Break,
-    EndedDto? Ended
+    EndedDto? Ended,
+    CompetitionDto? LastCompetitionState
 );
 
 // ───────── Header (stabilne słowniki referencyjne) ─────────
 
 public sealed record GameHeaderDto(
     Guid? HillId,
-    int Players,
-    int Jumpers
-    // IReadOnlyList<PlayerDto> Players,
-    // IReadOnlyList<JumperDto> Jumpers
+    IReadOnlyList<PlayerDto> Players,
+    IReadOnlyList<JumperDto> Jumpers
 );
 
 public sealed record PlayerDto(Guid PlayerId, string Nick);
@@ -60,14 +60,37 @@ public sealed record PlayerPicksDto(Guid PlayerId, IReadOnlyList<Guid> JumperIds
 
 public sealed record CompetitionDto(
     string Status, // "NotStarted" | "RoundInProgress" | "Suspended" | "Cancelled" | "Ended"
-    Guid? NextJumperId, // kolejny na liście startowej (bez BIB – domena nie wystawia)
-    GateDto Gate // aktualny stan belki
+    Guid? NextJumperId,
+    GateDto Gate,
+    IReadOnlyList<CompetitionResultDto> Results
+);
+
+public sealed record CompetitionResultDto(
+    double Rank,
+    int Bib,
+    CompetitionJumperDto Jumper,
+    double Total,
+    IReadOnlyList<CompetitionRoundResultDto> Rounds
+);
+
+public sealed record CompetitionRoundResultDto(
+    double Distance,
+    double Points,
+    double? JudgePoints,
+    double? WindPoints,
+    double? WindAverage
+);
+
+public sealed record CompetitionJumperDto(
+    string Name,
+    string Surname,
+    string CountryFisCode
 );
 
 public sealed record GateDto(
     int Starting,
     int CurrentJury,
-    int? CoachReduction // >=1 gdy trener obniżył; null gdy brak
+    int? CoachReduction
 );
 
 // ───────── Break / Ended ─────────
@@ -75,5 +98,6 @@ public sealed record GateDto(
 public sealed record BreakDto(string Next); // "PreDraft" | "Draft" | "MainCompetition" | "Ended"
 
 public sealed record EndedDto(
-    string Policy // "Classic" | "PodiumAtAllCosts" (opcjonalnie rozwiniesz później)
+    string Policy, // Classic | PodiumAtAllCosts
+    Dictionary<Guid, (int, int)> Ranking // position, points
 );

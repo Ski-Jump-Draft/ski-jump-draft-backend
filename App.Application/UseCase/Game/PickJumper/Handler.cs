@@ -24,7 +24,8 @@ public class Handler(
     IMyLogger logger,
     IClock clock,
     IScheduler scheduler,
-    IDraftPicksArchive draftPicksArchive)
+    IDraftPicksArchive draftPicksArchive,
+    GameUpdatedDtoMapper gameUpdatedDtoMapper)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -62,7 +63,7 @@ public class Handler(
                     ct: ct);
             }
 
-            await gameNotifier.GameUpdated(GameUpdatedDtoMapper.FromDomain(gameAfterPick));
+            await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterPick));
 
             return new Result();
         }

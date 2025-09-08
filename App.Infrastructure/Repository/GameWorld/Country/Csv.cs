@@ -11,12 +11,14 @@ public interface IGameWorldCountriesCsvStreamProvider : ICsvStreamProvider
 {
 }
 
-public class Csv(IGameWorldCountriesCsvStreamProvider csvStreamProvider, IMyLogger logger, CsvConfiguration csvConfiguration)
+public class Csv(
+    IGameWorldCountriesCsvStreamProvider csvStreamProvider,
+    IMyLogger logger,
+    CsvConfiguration csvConfiguration)
     : ICountries
 {
     private class CsvCountry
     {
-        public Guid Id { get; set; } = Guid.Empty;
         public string Alpha2 { get; set; } = null!;
         public string Alpha3 { get; set; } = null!;
         public string Fis { get; set; } = null!;
@@ -25,14 +27,14 @@ public class Csv(IGameWorldCountriesCsvStreamProvider csvStreamProvider, IMyLogg
     private static Domain.GameWorld.Country Map(CsvCountry csvCountry)
     {
         return new Domain.GameWorld.Country(
-            CountryId.NewCountryId(csvCountry.Id),
             Alpha2CodeModule.tryCreate(csvCountry.Alpha2.ToLower()).Value,
             Alpha3CodeModule.tryCreate(csvCountry.Alpha3.ToLower()).Value,
-            FisCodeModule.tryCreate(csvCountry.Fis.ToLower()).Value
+            CountryFisCodeModule.tryCreate(csvCountry.Fis.ToLower()).Value
         );
     }
 
-    public async Task<FSharpOption<Domain.GameWorld.Country>> GetById(CountryId jumperId, CancellationToken ct)
+    public async Task<FSharpOption<Domain.GameWorld.Country>> GetByFisCode(CountryFisCode countryFisCode,
+        CancellationToken ct)
     {
         await using var stream = await csvStreamProvider.Open(ct);
         using var reader = new StreamReader(stream);
@@ -42,7 +44,7 @@ public class Csv(IGameWorldCountriesCsvStreamProvider csvStreamProvider, IMyLogg
         {
             try
             {
-                if (csvCountry.Id == jumperId.Item)
+                if (csvCountry.Fis == CountryFisCodeModule.value(countryFisCode))
                     return FSharpOption<Domain.GameWorld.Country>.Some(Map(csvCountry));
             }
             catch (Exception ex)
@@ -54,7 +56,7 @@ public class Csv(IGameWorldCountriesCsvStreamProvider csvStreamProvider, IMyLogg
         return FSharpOption<Domain.GameWorld.Country>.None;
     }
 
-    public async Task<IEnumerable<Domain.GameWorld.Country>> GetAll(CountryId countryId, CancellationToken ct)
+    public async Task<IEnumerable<Domain.GameWorld.Country>> GetAll(CancellationToken ct)
     {
         var results = new List<Domain.GameWorld.Country>();
 
@@ -75,29 +77,5 @@ public class Csv(IGameWorldCountriesCsvStreamProvider csvStreamProvider, IMyLogg
         }
 
         return results;
-    }
-
-    public async Task<FSharpOption<Domain.GameWorld.Country>> GetByFisCode(FisCode fisCode, CancellationToken ct)
-    {
-        var target = FisCodeModule.value(fisCode).Trim();
-
-        await using var stream = await csvStreamProvider.Open(ct);
-        using var reader = new StreamReader(stream);
-        using var csv = new CsvReader(reader, csvConfiguration);
-
-        await foreach (var csvCountry in csv.GetRecordsAsync<CsvCountry>().WithCancellation(ct))
-        {
-            try
-            {
-                if (string.Equals(csvCountry.Fis?.Trim(), target, StringComparison.OrdinalIgnoreCase))
-                    return FSharpOption<Domain.GameWorld.Country>.Some(Map(csvCountry));
-            }
-            catch (Exception ex)
-            {
-                logger.Error($"bad row: {ex.Message}");
-            }
-        }
-
-        return FSharpOption<Domain.GameWorld.Country>.None;
     }
 }

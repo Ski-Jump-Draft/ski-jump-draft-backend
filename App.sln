@@ -23,6 +23,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Playground.Simulation", "Pl
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Playground.Game", "Playground.Game\Playground.Game.csproj", "{72CA6A3B-3C75-4352-A29C-F8AF28EC2D60}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Playground.Game.CompetitionView", "Playground.Game.CompetitionView\Playground.Game.CompetitionView.csproj", "{8FE9DBB6-2576-40ED-AE75-D74A7D459C7B}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -73,6 +75,10 @@ Global
 		{72CA6A3B-3C75-4352-A29C-F8AF28EC2D60}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{72CA6A3B-3C75-4352-A29C-F8AF28EC2D60}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{72CA6A3B-3C75-4352-A29C-F8AF28EC2D60}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8FE9DBB6-2576-40ED-AE75-D74A7D459C7B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8FE9DBB6-2576-40ED-AE75-D74A7D459C7B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8FE9DBB6-2576-40ED-AE75-D74A7D459C7B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8FE9DBB6-2576-40ED-AE75-D74A7D459C7B}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 	EndGlobalSection

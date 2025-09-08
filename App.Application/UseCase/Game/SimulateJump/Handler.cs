@@ -40,7 +40,8 @@ public class Handler(
     App.Domain.GameWorld.IJumpers gameWorldJumpers,
     IMyLogger logger,
     IJudgesSimulator judgesSimulator,
-    IGameCompetitionResultsArchive gameCompetitionResultsArchive)
+    IGameCompetitionResultsArchive gameCompetitionResultsArchive,
+    GameUpdatedDtoMapper gameUpdatedDtoMapper)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -110,6 +111,9 @@ public class Handler(
                 Domain.Competition.Classification.PositionModule.value(classificationResult.Position)}({
                     classificationResult.Points.Item
                 }pts)");
+            
+            Competition? previousCompetition = null;
+            
             if (gameAfterAddingJump.IsDuringCompetition)
             {
                 var now = clock.Now();
@@ -146,6 +150,7 @@ public class Handler(
                 else if (gameAfterAddingJump.Status.IsBreak &&
                          ((Domain.Game.Status.Break)gameAfterAddingJump.Status).Next.IsDraftTag)
                 {
+                    previousCompetition = addJumpOutcome.Competition;
                     var now = clock.Now();
                     await scheduler.ScheduleAsync(
                         jobType: "StartDraft",
@@ -157,6 +162,7 @@ public class Handler(
                 else if (gameAfterAddingJump.Status.IsBreak &&
                          ((Domain.Game.Status.Break)gameAfterAddingJump.Status).Next.IsEndedTag)
                 {
+                    previousCompetition = addJumpOutcome.Competition;
                     gameCompetitionResultsArchive.ArchiveMain(command.GameId,
                         addJumpOutcome.Classification.ToGameCompetitionResultsArchiveDto());
                     var now = clock.Now();
@@ -176,10 +182,7 @@ public class Handler(
                 }
             }
 
-            await gameNotifier.GameUpdated(GameUpdatedDtoMapper.FromDomain(gameAfterAddingJump));
-
-            var gameWorldCountry = await gameWorldCountries.GetById(gameWorldJumper.CountryId, ct)
-                .AwaitOrWrap(_ => new IdNotFoundException(gameWorldJumper.CountryId.Item));
+            await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterAddingJump, previousCompetition));
 
             var jumperResultInClassifiation = addJumpOutcome.Competition
                 .ClassificationResultOf(nextCompetitionJumper.Id)
@@ -187,7 +190,7 @@ public class Handler(
 
             var simulatedJumpDto = new SimulatedJumpDto(nextCompetitionJumper.Id.Item, gameWorldJumperDto.Id,
                 gameWorldJumper.Name.Item, gameWorldJumper.Surname.Item,
-                Domain.GameWorld.FisCodeModule.value(gameWorldCountry.FisCode),
+                Domain.GameWorld.CountryFisCodeModule.value(gameWorldJumper.FisCountryCode),
                 DistanceModule.value(simulatedJump.Distance),
                 JumpModule.JudgesModule.value(competitionJudges).ToArray(),
                 WindModule.averaged(simulationWind),
