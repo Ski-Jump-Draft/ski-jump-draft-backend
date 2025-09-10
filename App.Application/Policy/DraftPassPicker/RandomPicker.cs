@@ -2,11 +2,11 @@ using App.Application.Extensions;
 using App.Application.Utility;
 using App.Domain.Game;
 
-namespace App.Application.Draft.PassPicker;
+namespace App.Application.Policy.DraftPassPicker;
 
 public class RandomPicker(IRandom random) : IDraftPassPicker
 {
-    public JumperId Pick(Domain.Game.Game game)
+    public Task<Guid> Pick(Domain.Game.Game game, CancellationToken ct)
     {
         if (!game.StatusTag.IsDraftTag)
         {
@@ -14,7 +14,7 @@ public class RandomPicker(IRandom random) : IDraftPassPicker
         }
 
         var availablePicks = game.AvailableDraftPicks.ToList();
-        return availablePicks.GetRandomElement(random);
+        return Task.FromResult(availablePicks.GetRandomElement(random).Item);
     }
 }
 

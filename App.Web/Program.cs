@@ -24,7 +24,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddSignalR();
 
-const Mode mode = Mode.Offline;
+const Mode mode = Mode.Online;
 builder.Services.InjectDependencies(mode);
 
 var app = builder.Build();

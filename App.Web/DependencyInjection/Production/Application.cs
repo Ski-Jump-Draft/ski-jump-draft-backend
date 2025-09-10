@@ -8,11 +8,11 @@ using App.Application.Policy.GameJumpersSelector;
 using App.Domain.GameWorld;
 using App.Domain.Simulation;
 
-namespace App.Web.DependencyInjection.Local;
+namespace App.Web.DependencyInjection.Production;
 
 public static class Application
 {
-    public static IServiceCollection AddLocalApplication(this IServiceCollection services)
+    public static IServiceCollection AddProductionApplication(this IServiceCollection services)
     {
         services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.Fixed>(sp =>
             new Fixed("Zakopane HS140", sp.GetRequiredService<IHills>()));
@@ -29,7 +29,7 @@ public static class Application
         services
             .AddSingleton<App.Application.Matchmaking.IMatchmakingDurationCalculator,
                 App.Application.Matchmaking.FixedMatchmakingDurationCalculator>(sp =>
-                new FixedMatchmakingDurationCalculator(TimeSpan.FromSeconds(20)));
+                new FixedMatchmakingDurationCalculator(TimeSpan.FromSeconds(60)));
         services
             .AddSingleton<App.Application.Game.Gate.IGameStartingGateSelectorFactory,
                 App.Application.Game.Gate.IterativeSimulatedFactory>(sp =>

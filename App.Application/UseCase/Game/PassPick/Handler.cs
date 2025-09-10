@@ -1,17 +1,16 @@
 using App.Application.Acl;
 using App.Application.Commanding;
-using App.Application.Draft;
 using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Game.DraftPicks;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
+using App.Application.Policy.DraftPassPicker;
 using App.Application.Utility;
 using App.Domain.Game;
 using App.Domain.GameWorld;
 using Microsoft.FSharp.Collections;
 using JumperId = App.Domain.GameWorld.JumperId;
-
 
 namespace App.Application.UseCase.Game.PassPick;
 
@@ -41,13 +40,13 @@ public class Handler(
         var game = await games.GetById(GameId.NewGameId(command.GameId), ct)
             .AwaitOrWrap(_ => new IdNotFoundException(command.GameId));
 
-        var jumperToPick = picker.Pick(game);
+        var jumperToPick = await picker.Pick(game, ct);
 
-        logger.Info($"Pass-picking a Jumper ({jumperToPick.Item}) by a Player ({command.PlayerId}) in a Game ({
+        logger.Info($"Pass-picking a Jumper ({jumperToPick}) by a Player ({command.PlayerId}) in a Game ({
             command.GameId})");
 
         var gameAfterPassResult =
-            game.PickInDraft(PlayerId.NewPlayerId(command.PlayerId), jumperToPick);
+            game.PickInDraft(PlayerId.NewPlayerId(command.PlayerId), Domain.Game.JumperId.NewJumperId(jumperToPick));
 
         if (gameAfterPassResult.IsOk)
         {
@@ -75,9 +74,9 @@ public class Handler(
                     ct: ct);
             }
 
-            await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterPass));
+            await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterPass, ct: ct));
 
-            return new Result(jumperToPick.Item);
+            return new Result(jumperToPick);
         }
 
         var error = gameAfterPassResult.ErrorValue;

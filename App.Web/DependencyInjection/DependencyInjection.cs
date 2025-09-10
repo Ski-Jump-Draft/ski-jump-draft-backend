@@ -15,15 +15,17 @@ public static class DependencyInjection
     public static IServiceCollection InjectDependencies(this IServiceCollection services, Mode mode)
     {
         services.AddAcl().AddApplication().AddArchives().AddCommanding().AddMappers().AddRepositories().AddStorages()
-            .AddUtilities().AddLocalMyPlayer();
+            .AddUtilities();
 
         switch (mode)
         {
             case Mode.Offline:
                 services.AddLocalApplication().AddLocalGame().AddLocalHostedServices().AddLocalMatchmaking()
-                    .AddLocalNotifiers().AddLocalSimulation(); break;
+                    .AddLocalNotifiers().AddLocalSimulation().AddLocalMyPlayer(); break;
             case Mode.Online:
-                services.AddProductionHostedServices();
+                services.AddProductionApplication().AddProductionGame().AddProductionHostedServices()
+                    .AddProductionMatchmaking()
+                    .AddProductionNotifiers().AddProductionSimulation();
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(mode), mode, null);

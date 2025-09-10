@@ -3,6 +3,7 @@ using App.Application.Acl;
 using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Game.GameCompetitions;
+using App.Application.Service;
 using App.Domain.Competition;
 using App.Domain.Game;
 using App.Domain.GameWorld;
@@ -24,7 +25,8 @@ public class GameUpdatedDtoMapper(
     IGameJumperAcl gameJumperAcl,
     ICompetitionJumperAcl competitionJumperAcl,
     IGameCompetitionResultsArchive gameCompetitionResultsArchive,
-    IJumpers gameWorldJumpers)
+    IJumpers gameWorldJumpers,
+    PreDraftPositionsService preDraftPositionsService)
 {
     private const int SchemaVersion = 1;
 
@@ -147,22 +149,7 @@ public class GameUpdatedDtoMapper(
             .ToList()
             .AsReadOnly();
 
-        var positionsByGameJumper = new Dictionary<Guid, List<int>>();
-        var preDraftResults = gameCompetitionResultsArchive.GetPreDraftResults(game.Id.Item)
-                              ?? throw new InvalidOperationException(
-                                  $"Game {game.Id} does not have pre-draft results in archive.");
-
-        foreach (var preDraftCompetitionResults in preDraftResults)
-        {
-            foreach (var (competitionJumperId, gameJumperPosition, _) in preDraftCompetitionResults.Results)
-            {
-                var gameJumperId = competitionJumperAcl.GetGameJumper(competitionJumperId).Id;
-                if (!positionsByGameJumper.TryGetValue(gameJumperId, out var positionsList))
-                    positionsByGameJumper.Add(gameJumperId, [gameJumperPosition]);
-                else
-                    positionsList.Add(gameJumperPosition);
-            }
-        }
+        var positionsByGameJumper = preDraftPositionsService.GetPreDraftPositions(game.Id.Item).PositionsByGameJumper;
 
         var tasks = draft.AvailablePicks.Select(async gameJumperId =>
         {

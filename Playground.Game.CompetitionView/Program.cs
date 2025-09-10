@@ -44,7 +44,10 @@ class Program
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine($"Render error: {ex.Message}");
+                    if (!ex.Message.Contains("Unknown"))
+                    {
+                        Console.Error.WriteLine($"Render error: {ex.Message}");
+                    }
                 }
             }
         });
