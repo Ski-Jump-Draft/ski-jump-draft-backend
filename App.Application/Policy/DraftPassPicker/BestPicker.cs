@@ -12,7 +12,7 @@ namespace App.Application.Policy.DraftPassPicker;
 public class BestPicker(
     IGameJumperAcl gameJumperAcl,
     ICompetitionJumperAcl competitionJumperAcl,
-    IJumpers gameWorldJumper,
+    IJumpers gameWorldJumpersRepository,
     IGameCompetitionResultsArchive gameCompetitionResultsArchive,
     PreDraftPositionsService preDraftPositionsService,
     IRandom random,
@@ -27,9 +27,12 @@ public class BestPicker(
         var gameWorldJumpers = await RetrieveGameWorldJumpersFromDraftPicks(game, ct);
         var preDraftCompetitionResults = RetrievePreDraftCompetitionResultsOrThrow(game);
         var maxPosition = CalculateMaxPositionFromResults(preDraftCompetitionResults);
+        logger.Debug("Max position: " + maxPosition);
         UpdatePreDraftPositionsByJumper(game);
         var averagePositionByJumper = CreateAveragePositions(preDraftCompetitionResults);
         var ratingByGameJumper = CalculateGameJumperRatings(gameWorldJumpers, averagePositionByJumper, maxPosition);
+        logger.Info($"ratingByGameJumper = {
+            JsonSerializer.Serialize(ratingByGameJumper, new JsonSerializerOptions { WriteIndented = true })}");
         return DrawJumper(ratingByGameJumper);
     }
 
@@ -43,7 +46,8 @@ public class BestPicker(
         CancellationToken ct)
     {
         var availableGameJumpers = game.AvailableDraftPicks;
-        var gameWorldJumpers = await availableGameJumpers.ToGameWorldJumpers(gameJumperAcl, gameWorldJumper, ct);
+        var gameWorldJumpers =
+            await availableGameJumpers.ToGameWorldJumpers(gameJumperAcl, gameWorldJumpersRepository, ct);
         return gameWorldJumpers;
     }
 
@@ -70,16 +74,16 @@ public class BestPicker(
         _preDraftPositionsByJumper = preDraftPositionsService.GetPreDraftPositions(game.Id.Item).PositionsByGameJumper;
     }
 
-
-    private static Dictionary<Guid, double> CalculateGameJumperRatings(IEnumerable<Jumper> gameWorldJumpers,
+    private Dictionary<Guid, double> CalculateGameJumperRatings(IEnumerable<Jumper> gameWorldJumpers,
         Dictionary<Guid, double> averagePositionByJumper,
         int maxPosition)
     {
         Dictionary<Guid, double> gameJumperRating = new();
         foreach (var gameWorldJumper in gameWorldJumpers)
         {
-            var averagePosition = averagePositionByJumper[gameWorldJumper.Id.Item];
-            gameJumperRating[gameWorldJumper.Id.Item] = CalculateRating(gameWorldJumper, maxPosition, averagePosition);
+            var gameJumperId = gameJumperAcl.GetGameJumper(gameWorldJumper.Id.Item).Id;
+            var averagePosition = averagePositionByJumper[gameJumperId];
+            gameJumperRating[gameJumperId] = CalculateRating(gameWorldJumper, maxPosition, averagePosition);
         }
 
         return gameJumperRating;
@@ -106,29 +110,41 @@ public class BestPicker(
             }
         }
 
+        logger.Debug($"averagePosition = {
+            JsonSerializer.Serialize(averagePosition, new JsonSerializerOptions { WriteIndented = true })}");
+
+
         return averagePosition;
     }
 
     private static double CalculatePositionsAverage(IEnumerable<double> positions, double p)
     {
         var list = positions.ToList();
-        if (list.Count == 0) return 0;
-
-        return Math.Abs(p) < 1e-9
-            ? Math.Exp(list.Average(Math.Log))
-            : Math.Pow(list.Average(x => Math.Pow(x, p)), 1.0 / p);
+        return list.Count switch
+        {
+            0 => 0,
+            1 => list.First(),
+            _ => Math.Abs(p) < 1e-9
+                ? Math.Exp(list.Average(Math.Log))
+                : Math.Pow(list.Average(x => Math.Pow(x, p)), 1.0 / p)
+        };
     }
 
 
-    private static double CalculateRating(Jumper gameWorldJumper, int maxPosition, double averagePosition)
+    private double CalculateRating(Jumper gameWorldJumper, int maxPosition, double averagePosition)
     {
         const double rootN = 1.5;
-        var rating = (maxPosition - averagePosition).NthRoot(rootN);
+        const double positionImpactFactor = 4;
+        logger.Debug($"max position: {maxPosition}, average position: {averagePosition}, rootN: {rootN}");
+        var rating = (maxPosition - averagePosition).NthRoot(rootN) * positionImpactFactor;
+        logger.Debug($"rating: {rating}");
+
         var takeoff = JumperModule.BigSkillModule.value(gameWorldJumper.Takeoff);
         var flight = JumperModule.BigSkillModule.value(gameWorldJumper.Flight);
         var takeoffAndFlightAverage = (takeoff + flight) / 2;
         const double alpha = 1.5; // alpha = 1 oznacza: różnica 1 w danym skillu odpowiada różnicy 1 średniej pozycji
         rating += takeoffAndFlightAverage * alpha;
+        logger.Debug($"rating2: {rating}");
         return rating;
     }
 

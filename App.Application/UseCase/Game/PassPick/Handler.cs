@@ -85,7 +85,6 @@ public class Handler(
             throw new Exception("Draft auto-picker tried to pick not allowed jumper");
         }
 
-
         throw new Exception($@"
 Error during auto-picking a Jumper ({jumperToPick})
 by a Player (ID: {command.PlayerId})

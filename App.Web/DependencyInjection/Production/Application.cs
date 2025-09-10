@@ -29,7 +29,7 @@ public static class Application
         services
             .AddSingleton<App.Application.Matchmaking.IMatchmakingDurationCalculator,
                 App.Application.Matchmaking.FixedMatchmakingDurationCalculator>(sp =>
-                new FixedMatchmakingDurationCalculator(TimeSpan.FromSeconds(60)));
+                new FixedMatchmakingDurationCalculator(TimeSpan.FromSeconds(35)));
         services
             .AddSingleton<App.Application.Game.Gate.IGameStartingGateSelectorFactory,
                 App.Application.Game.Gate.IterativeSimulatedFactory>(sp =>

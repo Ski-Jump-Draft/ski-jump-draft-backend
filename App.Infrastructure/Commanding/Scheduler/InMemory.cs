@@ -29,7 +29,6 @@ public class InMemory(ICommandBus commandBus, IJson json, IMyLogger myLogger) : 
                 await Task.Delay(delay, ct);
                 Console.WriteLine($"[Job:{jobType}] payload={payloadJson}");
 
-
                 switch (jobType)
                 {
                     case "EndMatchmaking":
