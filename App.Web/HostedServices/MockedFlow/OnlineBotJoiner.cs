@@ -1,22 +1,18 @@
 using App.Application.Commanding;
-using App.Application.OfflineTests;
 using App.Application.Utility;
 using App.Domain.Matchmaking;
 
 namespace App.Web.HostedServices.MockedFlow;
 
-public class BotJoiner(IMyPlayer myPlayer, IMatchmakings repo, ICommandBus bus, IMyLogger log)
+public class OnlineBotJoiner(IMatchmakings repo, ICommandBus bus, IMyLogger log)
     : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
-        var rnd = new Random();
-
         while (!ct.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromSeconds(2), ct);
-
-            // wybierz jakieś matchmaking in progress
+            await Task.Delay(TimeSpan.FromSeconds(10), ct);
+            
             var all = await repo.GetInProgress(ct);
             var matchmaking = all.FirstOrDefault();
 
@@ -26,11 +22,8 @@ public class BotJoiner(IMyPlayer myPlayer, IMatchmakings repo, ICommandBus bus, 
             }
 
             var oneSlotRemained = matchmaking.RemainingSlots == 1;
-            var myPlayerIsPresent = matchmaking.Players_.Any(player =>
-                PlayerModule.NickModule.value(player.Nick) == myPlayer.GetNick());
-            var needToWaitForMyPlayer = oneSlotRemained && myPlayerIsPresent;
 
-            if (matchmaking.IsFull || needToWaitForMyPlayer)
+            if (matchmaking.IsFull || oneSlotRemained)
             {
                 continue;
             }

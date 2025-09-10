@@ -6,7 +6,7 @@ public static class HostedServices
 {
     public static IServiceCollection AddProductionHostedServices(this IServiceCollection services)
     {
-        services.AddHostedService<BotJoiner>();
+        services.AddHostedService<OnlineBotJoiner>();
         return services;
     }
 }
