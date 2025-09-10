@@ -64,6 +64,15 @@ public class Csv(
 
         return results;
     }
+    //
+    // App[0]
+    // Scheduler job SimulateJumpInGame failed: The given key was not present in the dictionary.
+    //     fail: App[0]
+    // Stack trace:    at App.Application.Extensions.FSharpAsyncExt.AwaitOrWrap[T](Task`1 task, Func`2 wrap) in /home/konrad/programming-projects/real_apps/sj_draft/Game/App.Application/Extensions/FSharpAsyncExt.cs:line 71
+    // at App.Application.UseCase.Game.SimulateJump.Handler.HandleAsync(Command command, CancellationToken ct) in /home/konrad/programming-projects/real_apps/sj_draft/Game/App.Application/UseCase/Game/SimulateJump/Handler.cs:line 69
+    // at App.Infrastructure.Commanding.Scheduler.InMemory.HandleSimulateJumpInGame(String payloadJson, CancellationToken ct) in /home/konrad/programming-projects/real_apps/sj_draft/Game/App.Infrastructure/Commanding/Scheduler/InMemory.cs:line 122
+    // at App.Infrastructure.Commanding.Scheduler.InMemory.<>c__DisplayClass5_0.<<ScheduleAsync>b__0>d.MoveNext() in /home/konrad/programming-projects/real_apps/sj_draft/Game/App.Infrastructure/Commanding/Scheduler/InMemory.cs:line 45
+    //
 
     public async Task<IEnumerable<Domain.GameWorld.Jumper>> GetAll(CancellationToken ct) =>
         await LoadAllAsync(ct);

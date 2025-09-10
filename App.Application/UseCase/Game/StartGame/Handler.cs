@@ -68,6 +68,8 @@ public class Handler(
         var gameGuid = guid.NewGuid();
         var gameId = Domain.Game.GameId.NewGameId(gameGuid);
 
+        Dictionary<Guid, Guid> gamePlayerByMatchmakingPlayer = new();
+
         var endedMatchmakingPlayers = matchmaking.Players_;
         var gamePlayersEnumerable = endedMatchmakingPlayers.Select(matchmakingPlayer =>
         {
@@ -77,6 +79,7 @@ public class Handler(
                 Domain.Matchmaking.PlayerModule.NickModule.value(matchmakingPlayer.Nick)!;
             var gamePlayerNick = PlayerModule.NickModule.createWithSuffix(matchmakingPlayerNickString).Value;
             var gamePlayer = new Domain.Game.Player(gamePlayerId, gamePlayerNick);
+            gamePlayerByMatchmakingPlayer.Add(matchmakingPlayer.Id.Item, gamePlayerGuid);
             return gamePlayer;
         });
         var gamePlayers = Domain.Game.PlayersModule.create(ListModule.OfSeq(gamePlayersEnumerable)).ResultValue;
@@ -137,8 +140,9 @@ public class Handler(
                 runAt: clock.Now().AddSeconds(7),
                 uniqueKey: $"StartPreDraft:{gameGuid}", ct: ct
             );
-            await gameNotifier.GameStartedAfterMatchmaking(command.MatchmakingId, gameGuid);
-            await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(game));
+            await gameNotifier.GameStartedAfterMatchmaking(command.MatchmakingId, gameGuid,
+                gamePlayerByMatchmakingPlayer);
+            await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(game, ct: ct));
             return new Result(gameGuid);
         }
 

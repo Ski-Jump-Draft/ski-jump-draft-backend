@@ -7,9 +7,9 @@ public static class Simulation
 {
     public static IServiceCollection AddLocalSimulation(this IServiceCollection services)
     {
-        const double baseFormFactor = 3;
+        const double baseFormFactor = 2;
         services.AddSingleton<App.Simulator.Simple.SimulatorConfiguration>(sp =>
-            new SimulatorConfiguration(SkillImpactFactor: 2.4, AverageBigSkill: 7,
+            new SimulatorConfiguration(SkillImpactFactor: 1.5, AverageBigSkill: 7,
                 FlightToTakeoffRatio: 1, RandomAdditionsRatio: 1, TakeoffRatingPointsByForm: baseFormFactor * 0.9,
                 FlightRatingPointsByForm: baseFormFactor * 1.1));
         services.AddSingleton<App.Domain.Simulation.IWeatherEngine, App.Simulator.Simple.WeatherEngine>(sp =>

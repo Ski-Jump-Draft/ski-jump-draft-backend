@@ -7,9 +7,15 @@ public class InMemory : IGameCompetitionResultsArchive
     private readonly Dictionary<Guid, List<CompetitionResultsDto>> _preDraft = new();
     private readonly Dictionary<Guid, CompetitionResultsDto> _main = new();
 
-    public void ArchivePreDraft(Guid gameId, List<CompetitionResultsDto> competitionResults)
+    public void ArchivePreDraft(Guid gameId, CompetitionResultsDto competitionResults)
     {
-        _preDraft[gameId] = competitionResults;
+        if (!_preDraft.TryGetValue(gameId, out var competitionResultsDtos))
+        {
+            competitionResultsDtos = new List<CompetitionResultsDto>();
+            _preDraft.Add(gameId, competitionResultsDtos);
+        }
+
+        competitionResultsDtos.Add(competitionResults);
     }
 
     public List<CompetitionResultsDto>? GetPreDraftResults(Guid gameId)

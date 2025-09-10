@@ -16,7 +16,7 @@ public static class Game
                 .ResultValue;
             var preDraftSettings = App.Domain.Game.PreDraftSettings.Create(ListModule.OfSeq(
                     new List<App.Domain.Competition.Settings>
-                        { preDraftCompetitionSettings }))
+                        { preDraftCompetitionSettings/*, preDraftCompetitionSettings*/ }))
                 .Value;
             var mainCompetitionSettings = App.Domain.Competition.Settings.Create(ListModule.OfSeq(new[]
             {
@@ -35,7 +35,7 @@ public static class Game
                 App.Domain.Game.DraftModule.SettingsModule.UniqueJumpersPolicy.Unique,
                 App.Domain.Game.DraftModule.SettingsModule.Order.Snake,
                 App.Domain.Game.DraftModule.SettingsModule.TimeoutPolicy.NewTimeoutAfter(
-                    TimeSpan.FromSeconds(3)));
+                    TimeSpan.FromSeconds(4)));
             return new App.Domain.Game.Settings(preDraftSettings, draftSettings, mainCompetitionSettings,
                 App.Domain.Game.RankingPolicy.Classic);
         });

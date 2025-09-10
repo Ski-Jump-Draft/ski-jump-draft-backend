@@ -15,7 +15,7 @@ type DraftError =
 
 module Draft =
     type Picks = Map<PlayerId, Set<JumperId>>
-    
+
     module Settings =
         type TargetPicks = private TargetPicks of int
 
@@ -224,3 +224,24 @@ type Draft =
             let taken = this.Picks |> Seq.collect (fun kv -> kv.Value) |> Set.ofSeq
             this.AllJumpers - taken
         | NotUnique -> this.AllJumpers
+
+    member this.TurnQueueRemaining: PlayerId list =
+        if this.Ended then
+            []
+        else
+            let i = TurnIndex.value this.CurrentTurnIndex
+            this.TurnOrder |> List.skip i
+
+    member this.PicksUntil(pid: PlayerId) : int option =
+        if this.Ended then
+            None
+        else
+            let i = TurnIndex.value this.CurrentTurnIndex
+
+            match
+                this.TurnOrder
+                |> List.tryFindIndex (fun p -> p = pid)
+                |> Option.map (fun j -> j - i)
+            with
+            | Some d when d >= 0 -> Some d
+            | _ -> None

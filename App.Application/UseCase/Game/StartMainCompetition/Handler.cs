@@ -68,7 +68,7 @@ public class Handler(
         await scheduler.ScheduleAsync(
             jobType: "SimulateJumpInGame",
             payloadJson: json.Serialize(new { GameId = game.Id_.Item }),
-            runAt: now.AddSeconds(4),
+            runAt: now.AddSeconds(3),
             uniqueKey: $"SimulateJumpInGame:{game.Id_.Item}_{now.ToUnixTimeSeconds()}",
             ct: ct);
         await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterMainCompetitionStart));

@@ -2,11 +2,11 @@ namespace App.Application.Messaging.Notifiers;
 
 public class ComposeGameNotifier(IEnumerable<IGameNotifier> notifiers) : IGameNotifier
 {
-    public Task GameStartedAfterMatchmaking(Guid matchmakingId, Guid gameId)
+    public Task GameStartedAfterMatchmaking(Guid matchmakingId, Guid gameId, Dictionary<Guid, Guid> playersMapping)
     {
         foreach (var notifier in notifiers)
         {
-            notifier.GameStartedAfterMatchmaking(matchmakingId, gameId);
+            notifier.GameStartedAfterMatchmaking(matchmakingId, gameId, playersMapping);
         }
 
         return Task.CompletedTask;

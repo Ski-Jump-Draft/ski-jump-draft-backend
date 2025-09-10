@@ -15,7 +15,7 @@ public static class Application
     public static IServiceCollection AddLocalApplication(this IServiceCollection services)
     {
         services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.Fixed>(sp =>
-            new Fixed("Zakopane HS240", sp.GetRequiredService<IHills>()));
+            new Fixed("Zakopane HS140", sp.GetRequiredService<IHills>()));
         services.AddSingleton<IGameJumpersSelector, App.Application.Policy.GameJumpersSelector.All>();
         services
             .AddSingleton<App.Application.Draft.IDraftPassPicker, App.Application.Draft.PassPicker.RandomPicker>();

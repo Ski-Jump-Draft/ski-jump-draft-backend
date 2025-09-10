@@ -118,9 +118,8 @@ type Game =
         | _ -> None
 
     member this.DraftPicks = this.Draft.Value.AllPicks
-    
-    member this.PicksOf playerId=
-        this.Draft.Value.PicksOf playerId
+
+    member this.PicksOf playerId = this.Draft.Value.PicksOf playerId
 
     member this.AvailableDraftPicks: IEnumerable<JumperId> =
         this.Draft.Value.AvailablePicks
@@ -276,9 +275,11 @@ type Game =
                     | Competition.Competition.StatusTag.EndedTag -> Some newStatus
                     | _ -> None
 
+                let newGame = { this with Status = newStatus }
+
                 Ok
-                    { Game = { this with Status = newStatus }
-                      Classification = this.CurrentCompetitionClassification
+                    { Game = newGame
+                      Classification = comp'.Classification
                       Competition = comp'
                       PhaseChangedTo = phaseChanged }
 
@@ -294,9 +295,11 @@ type Game =
                     else
                         Status.MainCompetition comp'
 
+                let newGame = { this with Status = newStatus }
+
                 Ok
-                    { Game = { this with Status = newStatus }
-                      Classification = this.CurrentCompetitionClassification
+                    { Game = newGame
+                      Classification = comp'.Classification
                       Competition = comp'
                       PhaseChangedTo = if ended then Some newStatus else None }
 

@@ -10,6 +10,8 @@ using App.Application.Messaging.Notifiers;
 
 class Program
 {
+    private static readonly HashSet<string> SeenJumpers = new();
+
     static async Task<int> Main(string[] args)
     {
         if (args.Length < 1 || !Guid.TryParse(args[0], out var gameId))
@@ -18,7 +20,7 @@ class Program
             return 1;
         }
 
-        var hubUrl = "http://127.0.0.1:5150/game/hub"; // dopasuj adres WebAPI
+        const string hubUrl = "http://127.0.0.1:5150/game/hub";
         var connection = new HubConnectionBuilder()
             .WithUrl(hubUrl)
             .WithAutomaticReconnect()
@@ -28,19 +30,20 @@ class Program
 
         connection.On<GameUpdatedDto>("GameUpdated", dto =>
         {
-            // uruchom render synchronicznie, blokując wątki, bo AnsiConsole nie jest thread-safe
             lock (renderLock)
             {
                 try
                 {
                     var compDto = ExtractCompetitionDto(dto);
+                    var current = compDto.Results.Select(UniqueKey).ToList();
+                    var newOnes = current.Where(k => !SeenJumpers.Contains(k)).ToHashSet();
+                    SeenJumpers.UnionWith(current);
                     if (ShouldClearConsole(dto)) AnsiConsole.Clear();
                     AnsiConsole.MarkupLine($"[bold]{GetCompetitionTitle(dto)}[/]");
-                    AnsiConsole.Write(BuildTable(compDto));
+                    AnsiConsole.Write(BuildTable(compDto, newOnes));
                 }
                 catch (Exception ex)
                 {
-                    // log minimalnie na stdout — SignalR klient jest w tym samym procesie
                     Console.Error.WriteLine($"Render error: {ex.Message}");
                 }
             }
@@ -105,38 +108,50 @@ class Program
         };
     }
 
-    private static Spectre.Console.Table BuildTable(CompetitionDto competitionDto)
+    private static Table BuildTable(CompetitionDto competitionDto, ISet<string> newOnes)
     {
-        var table = new Table().Border(TableBorder.Rounded);
-        table.AddColumn("Rank");
-        table.AddColumn("Bib");
-        table.AddColumn("Jumper");
-        table.AddColumn("Country");
-        table.AddColumn("Distance 1");
-        table.AddColumn("Points 1");
-        table.AddColumn("Distance 2");
-        table.AddColumn("Points 2");
-        table.AddColumn("Total");
+        var t = new Table().Border(TableBorder.Rounded);
+        t.AddColumn("Rank");
+        t.AddColumn("Bib");
+        t.AddColumn("Jumper");
+        t.AddColumn("Country");
+        t.AddColumn("Distance 1");
+        t.AddColumn("Points 1");
+        t.AddColumn("Distance 2");
+        t.AddColumn("Points 2");
+        t.AddColumn("Total");
 
         foreach (var r in competitionDto.Results)
         {
+            var k = UniqueKey(r);
+            var hl = newOnes.Contains(k);
+
             var rounds = r.Rounds;
             var d1 = rounds.Count > 0 ? rounds[0].Distance : 0.0;
             var p1 = rounds.Count > 0 ? rounds[0].Points : 0.0;
             double? d2 = rounds.Count > 1 ? rounds[1].Distance : null;
             double? p2 = rounds.Count > 1 ? rounds[1].Points : null;
-            table.AddRow(
-                r.Rank.ToString(CultureInfo.InvariantCulture),
-                r.Bib.ToString(),
-                $"{r.Jumper.Name} {r.Jumper.Surname}",
-                r.Jumper.CountryFisCode,
-                $"{d1:F1}", $"{p1:F1}",
-                $"{(d2.HasValue ? d2.Value.ToString("F1") : "---")}",
-                $"{(p2.HasValue ? p2.Value.ToString("F1") : "---")}",
-                $"{r.Total:F1}"
+
+            t.AddRow(
+                Cell(r.Rank.ToString(CultureInfo.InvariantCulture), hl),
+                Cell(r.Bib.ToString(), hl),
+                Cell($"{r.Jumper.Name} {r.Jumper.Surname}", hl),
+                Cell(r.Jumper.CountryFisCode, hl),
+                Cell($"{d1:F1}", hl), Cell($"{p1:F1}", hl),
+                Cell($"{(d2.HasValue ? d2.Value.ToString("F1") : "---")}", hl),
+                Cell($"{(p2.HasValue ? p2.Value.ToString("F1") : "---")}", hl),
+                Cell($"{r.Total:F1}", hl)
             );
         }
 
-        return table;
+        return t;
     }
+
+    private static string UniqueKey(CompetitionResultDto r)
+        => r.Jumper.Id != Guid.Empty
+            ? r.Jumper.Id.ToString()
+            : $"{r.Jumper.Name}|{r.Jumper.Surname}|{r.Jumper.CountryFisCode}";
+
+    private static string Cell(string text, bool hl)
+        => hl ? $"[bold yellow]{Markup.Escape(text)}[/]" : Markup.Escape(text);
 }

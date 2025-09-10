@@ -7,10 +7,12 @@ namespace App.Web.Notifiers.Game;
 
 public class SignalRGameNotifier(IHubContext<GameHub> hub, IMyLogger logger) : IGameNotifier
 {
-    public Task GameStartedAfterMatchmaking(Guid matchmakingId, Guid gameId)
+    public Task GameStartedAfterMatchmaking(Guid matchmakingId, Guid gameId,
+        Dictionary<Guid, Guid> playersMapping)
     {
         return hub.Clients.Group(GameHub.GroupNameForMatchmaking(matchmakingId))
-            .SendAsync("GameStartedAfterMatchmaking", new { MatchmakingId = matchmakingId, GameId = gameId });
+            .SendAsync("GameStartedAfterMatchmaking",
+                new { MatchmakingId = matchmakingId, GameId = gameId, PlayersMapping = playersMapping });
     }
 
     public Task GameUpdated(GameUpdatedDto dto)

@@ -23,14 +23,20 @@ public static class Notifiers
                 new Web.Notifiers.Game.SignalRGameNotifier(sp.GetRequiredService<IHubContext<GameHub>>(), logger);
 
             IGameNotifier actionNotifier = new ActionGameNotifier(gameStartedAfterMatchmakingAction:
-                (matchmakingId, gameId) =>
+                (matchmakingId, gameId, playersMapping) =>
                 {
                     logger.Info($"# Gra rozpoczęta po matchmakingu: {matchmakingId} ### {gameId}");
 
                     if (matchmakingId != myPlayer.GetMatchmakingId()) return;
+                    var myMatchmakingPlayerId = myPlayer.GetMatchmakingPlayerId();
+                    if (myMatchmakingPlayerId is null) throw new Exception("My player id is null");
+                    var gamePlayerId = playersMapping[myMatchmakingPlayerId.Value];
+                    
+                    myPlayer.SetGameId(gameId);
+                    myPlayer.SetGamePlayerId(gamePlayerId);
 
                     logger.Info("Nasza gra się rozpoczęła");
-                    var psi = new ProcessStartInfo()
+                    var competitionViewProcess = new ProcessStartInfo()
                     {
                         FileName = "gnome-terminal",
                         Arguments =
@@ -38,7 +44,17 @@ public static class Notifiers
                                 gameId}; exec bash\"",
                         UseShellExecute = true
                     };
-                    Process.Start(psi);
+                    var draftConsoleProcess = new ProcessStartInfo()
+                    {
+                        FileName = "gnome-terminal",
+                        Arguments =
+                            $"-- bash -c \"dotnet run --project /home/konrad/programming-projects/real_apps/sj_draft/Game/Playground.Game.DraftConsole/Playground.Game.DraftConsole.csproj -- {
+                                gameId} {gamePlayerId} http://localhost:5150; exec bash\"",
+                        UseShellExecute = true
+                    };
+
+                    Process.Start(competitionViewProcess);
+                    Process.Start(draftConsoleProcess);
                 });
 
             return new ComposeGameNotifier([signalRNotifier, actionNotifier]);

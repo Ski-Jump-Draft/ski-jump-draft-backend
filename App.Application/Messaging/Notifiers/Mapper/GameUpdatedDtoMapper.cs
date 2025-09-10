@@ -1,7 +1,8 @@
 using System.Collections.Immutable;
 using App.Application.Acl;
+using App.Application.Exceptions;
 using App.Application.Extensions;
-using App.Application.Utility;
+using App.Application.Game.GameCompetitions;
 using App.Domain.Competition;
 using App.Domain.Game;
 using App.Domain.GameWorld;
@@ -18,14 +19,19 @@ using Microsoft.FSharp.Reflection;
 public class GameUpdatedDtoMapper(
     Func<Domain.Competition.JumperId, CancellationToken, Task<Domain.GameWorld.Jumper>>
         gameWorldJumperByCompetitionJumperId,
-    IMyLogger myLogger)
+    // Func<Domain.Game.JumperId, CancellationToken, Task<Domain.GameWorld.Jumper>>
+    //     gameWorldJumperByGameJumperId,
+    IGameJumperAcl gameJumperAcl,
+    ICompetitionJumperAcl competitionJumperAcl,
+    IGameCompetitionResultsArchive gameCompetitionResultsArchive,
+    IJumpers gameWorldJumpers)
 {
     private const int SchemaVersion = 1;
 
     // ---------- Helpers: unwrap F# single-case VOs ----------
     private static Guid Unwrap(GameId x) => x.Item;
     private static Guid Unwrap(PlayerId x) => x.Item;
-    private static Guid Unwrap(JumperId x) => x.Item;
+    private static Guid Unwrap(App.Domain.Game.JumperId x) => x.Item;
     private static Guid Unwrap(App.Domain.Competition.JumperId x) => x.Item;
     private static Guid Unwrap(App.Domain.Competition.HillId x) => x.Item;
 
@@ -39,12 +45,14 @@ public class GameUpdatedDtoMapper(
         return (uci.Name, fields);
     }
 
+
     public async Task<GameUpdatedDto> FromDomain(App.Domain.Game.Game game,
-        App.Domain.Competition.Competition? lastCompetitionState = null, string changeType = "Snapshot")
+        App.Domain.Competition.Competition? lastCompetitionState = null,
+        string changeType = "Snapshot", CancellationToken ct = default)
     {
         var header = MapHeader(game);
-        var (statusStr, preDraft, draft, mainComp, brk, ended) = await MapStatus(game);
-        
+        var (statusStr, preDraft, draft, mainComp, brk, ended) = await MapStatus(game, ct);
+
         return new GameUpdatedDto(
             Unwrap(game.Id_),
             SchemaVersion,
@@ -61,68 +69,42 @@ public class GameUpdatedDtoMapper(
         );
     }
 
-    private static GameHeaderDto MapHeader(App.Domain.Game.Game game)
+    // ────────────────────────────── Header ──────────────────────────────
+    private GameHeaderDto MapHeader(App.Domain.Game.Game game)
     {
-        var players =
-            PlayersModule.toList(game.Players)
-                .Select(p => new PlayerDto(Unwrap(p.Id), PlayerModule.NickModule.value(p.Nick)))
-                .ToList();
+        var players = PlayersModule.toList(game.Players)
+            .Select(p => new PlayerDto(Unwrap(p.Id), PlayerModule.NickModule.value(p.Nick)))
+            .ToList();
 
-        var jumpers =
-            JumpersModule.toList(game.Jumpers)
-                .Select(j => new JumperDto(Unwrap(j.Id)))
-                .ToList();
+        var jumpers = JumpersModule.toList(game.Jumpers)
+            .Select(j => new JumperDto(Unwrap(j.Id)))
+            .ToList();
 
-        var hillId =
-            game.Hill.Match(
-                some: hill => Unwrap(hill.Id),
-                none: () => (Guid?)null
-            );
+        var hillId = game.Hill.Match(
+            some: hill => Unwrap(hill.Id),
+            none: () => (Guid?)null
+        );
 
         return new GameHeaderDto(hillId, players, jumpers);
     }
 
     private async Task<(string, PreDraftDto?, DraftDto?, CompetitionDto?, BreakDto?, EndedDto?)> MapStatus(
-        App.Domain.Game.Game game)
+        App.Domain.Game.Game game, CancellationToken ct)
     {
         var (caseName, fields) = DeconstructUnion(game.Status);
 
-        switch (caseName)
+        return caseName switch
         {
-            case "PreDraft":
-            {
-                var pre = (App.Domain.Game.PreDraftStatus)fields[0];
-                return ("PreDraft", await MapPreDraft(pre), null, null, null, null);
-            }
-
-            case "Draft":
-            {
-                var draft = (App.Domain.Game.Draft)fields[0];
-                return ("Draft", null, MapDraft(game, draft), null, null, null);
-            }
-
-            case "MainCompetition":
-            {
-                var comp = (Competition)fields[0];
-                return ("MainCompetition", null, null, await MapCompetition(comp), null, null);
-            }
-
-            case "Ended":
-            {
-                // W bieżącej wersji Game nie przechowuje rankingu do DTO — tylko polityka
-                return ("Ended", null, null, null, null, MapEnded(game));
-            }
-
-            case "Break":
-            {
-                var nextTag = (App.Domain.Game.StatusTag)fields[0];
-
-                return ($"Break {nextTag.ToString().Replace("Tag", "")}", null, null, null, MapBreak(nextTag), null);
-            }
-
-            default:
-                throw new InvalidOperationException($"Unknown Game.Status case '{caseName}'.");
-        }
+            "PreDraft" => ("PreDraft", await MapPreDraft((App.Domain.Game.PreDraftStatus)fields[0]), null, null, null,
+                null),
+            "Draft" => ("Draft", null, await MapDraft(game, (App.Domain.Game.Draft)fields[0], ct), null, null, null),
+            "MainCompetition" => ("MainCompetition", null, null, await MapCompetition((Competition)fields[0]), null,
+                null),
+            "Ended" => ("Ended", null, null, null, null, MapEnded(game)),
+            "Break" => ($"Break {fields[0].ToString()!.Replace("Tag", "")}", null, null, null,
+                MapBreak((App.Domain.Game.StatusTag)fields[0]), null),
+            _ => throw new InvalidOperationException($"Unknown Game.Status case '{caseName}'.")
+        };
     }
 
     // ---------- PreDraft ----------
@@ -130,54 +112,96 @@ public class GameUpdatedDtoMapper(
     {
         var (caseName, fields) = DeconstructUnion(pre);
 
-        if (caseName == "Running")
+        return caseName switch
         {
-            // Running(Index: PreDraftCompetitionIndex * Competition: Competition.Competition)
-            var indexVo = (App.Domain.Game.PreDraftCompetitionIndex)fields[0];
-            var comp = (Competition)fields[1];
-            var idx = PreDraftCompetitionIndexModule.value(indexVo);
-            return new PreDraftDto("Running", idx, await MapCompetition(comp));
-        }
-
-        if (caseName == "Break")
-        {
-            var indexVo = (App.Domain.Game.PreDraftCompetitionIndex)fields[0];
-            var idx = PreDraftCompetitionIndexModule.value(indexVo);
-            return new PreDraftDto("Break", idx, null);
-        }
-
-        throw new InvalidOperationException($"Unknown PreDraftStatus case '{caseName}'.");
+            "Running" => new PreDraftDto(
+                "Running",
+                PreDraftCompetitionIndexModule.value((App.Domain.Game.PreDraftCompetitionIndex)fields[0]),
+                await MapCompetition((Competition)fields[1])),
+            "Break" => new PreDraftDto(
+                "Break",
+                PreDraftCompetitionIndexModule.value((App.Domain.Game.PreDraftCompetitionIndex)fields[0]),
+                null),
+            _ => throw new InvalidOperationException($"Unknown PreDraftStatus case '{caseName}'.")
+        };
     }
 
     // ---------- Draft ----------
-    private static DraftDto MapDraft(App.Domain.Game.Game game, App.Domain.Game.Draft draft)
+    private async Task<DraftDto> MapDraft(App.Domain.Game.Game game, App.Domain.Game.Draft draft, CancellationToken ct)
     {
-        var currentPlayerId =
-            draft.CurrentTurn.Match(
-                some: turn => Unwrap(turn.PlayerId),
-                none: () => (Guid?)null
-            );
+        var currentPlayerId = draft.CurrentTurn.Match(
+            some: turn => Unwrap(turn.PlayerId),
+            none: () => (Guid?)null
+        );
 
-        var players = PlayersModule.toList(game.Players);
-
-        var picks = players
+        var picks = PlayersModule.toList(game.Players)
             .Select(pl =>
             {
-                var picked =
-                    draft.PicksOf(pl.Id)
-                        .Match(
-                            some: lst => lst.Select(Unwrap).ToList(),
-                            none: () => new List<Guid>()
-                        )
-                        .AsReadOnly();
-
+                var picked = draft.PicksOf(pl.Id)
+                    .Match(
+                        some: lst => lst.Select(Unwrap).ToList(),
+                        none: () => new List<Guid>()
+                    );
                 return new PlayerPicksDto(Unwrap(pl.Id), picked);
             })
             .ToList()
             .AsReadOnly();
 
-        return new DraftDto(currentPlayerId, draft.Ended, picks);
+        var positionsByGameJumper = new Dictionary<Guid, List<int>>();
+        var preDraftResults = gameCompetitionResultsArchive.GetPreDraftResults(game.Id.Item)
+                              ?? throw new InvalidOperationException(
+                                  $"Game {game.Id} does not have pre-draft results in archive.");
+
+        foreach (var preDraftCompetitionResults in preDraftResults)
+        {
+            foreach (var (competitionJumperId, gameJumperPosition, _) in preDraftCompetitionResults.Results)
+            {
+                var gameJumperId = competitionJumperAcl.GetGameJumper(competitionJumperId).Id;
+                if (!positionsByGameJumper.TryGetValue(gameJumperId, out var positionsList))
+                    positionsByGameJumper.Add(gameJumperId, [gameJumperPosition]);
+                else
+                    positionsList.Add(gameJumperPosition);
+            }
+        }
+
+        var tasks = draft.AvailablePicks.Select(async gameJumperId =>
+        {
+            var gameWorldJumperId = gameJumperAcl.GetGameWorldJumper(gameJumperId.Item).Id;
+            var gameWorldJumper = await gameWorldJumpers
+                .GetById(Domain.GameWorld.JumperId.NewJumperId(gameWorldJumperId), ct)
+                .AwaitOrWrap(_ => new IdNotFoundException(gameWorldJumperId));
+
+            return new DraftPickOptionDto(
+                gameJumperId.Item,
+                gameWorldJumper.Name.Item,
+                gameWorldJumper.Surname.Item,
+                CountryFisCodeModule.value(gameWorldJumper.FisCountryCode),
+                positionsByGameJumper[gameJumperId.Item]
+            );
+        });
+
+        var availableJumpers = await Task.WhenAll(tasks);
+
+        int? timeoutInSeconds = game.Settings.DraftSettings.TimeoutPolicy switch
+        {
+            DraftModule.SettingsModule.TimeoutPolicy.TimeoutAfter timeoutAfter => timeoutAfter.Time.Seconds,
+            var timeoutPolicy when timeoutPolicy.IsNoTimeout => null,
+            _ => throw new InvalidOperationException($"Unknown DraftSettings.TimeoutPolicy: {
+                game.Settings.DraftSettings.TimeoutPolicy}")
+        };
+        var nextPlayers = draft.TurnQueueRemaining.Select(id => id.Item);
+        var orderPolicyString = game.Settings.DraftSettings.Order switch
+        {
+            var v when v.IsClassic => "Classic",
+            var v when v.IsSnake => "Snake",
+            var v when v.IsRandom => "Random",
+            _ => throw new InvalidOperationException(
+                $"Unknown DraftSettings.Order: {game.Settings.DraftSettings.Order}")
+        };
+        return new DraftDto(currentPlayerId, timeoutInSeconds, draft.Ended, orderPolicyString, picks,
+            availableJumpers.ToList().AsReadOnly(), nextPlayers.ToList());
     }
+
 
     private async Task<CompetitionDto> MapCompetition(Competition comp)
     {
@@ -237,24 +261,25 @@ public class GameUpdatedDtoMapper(
     {
         var tasks = classificationResults.Select(async classificationResult =>
         {
-            var jumperId = Unwrap(classificationResult.JumperId);
-            var jumperDomainId = Domain.Competition.JumperId.NewJumperId(jumperId);
+            var competitionJumperId = Unwrap(classificationResult.JumperId);
+            var jumperDomainId = Domain.Competition.JumperId.NewJumperId(competitionJumperId);
             var totalPoints = TotalPointsModule.value(classificationResult.Points);
 
             var rank = Classification.PositionModule.value(classificationResult.Position);
 
             var bib = startlist.BibOf(jumperDomainId);
             if (bib.IsNone())
-                throw new InvalidOperationException($"Missing bib for jumper {jumperId}.");
+                throw new InvalidOperationException($"Missing bib for jumper {competitionJumperId}.");
             var bibValue = StartlistModule.BibModule.value(bib.Value);
 
             var competitionJumper = competitionJumpers.SingleOrDefault(jumper => jumper.Id.Equals(jumperDomainId));
             if (competitionJumper is null)
-                throw new InvalidOperationException($"Missing jumper {jumperId} in competition.");
+                throw new InvalidOperationException($"Missing jumper {competitionJumperId} in competition.");
 
             var gameWorldJumper = await gameWorldJumperByCompetitionJumperId(competitionJumper.Id, ct);
 
             var competitionJumperDto = new CompetitionJumperDto(
+                competitionJumperId,
                 gameWorldJumper.Name.Item,
                 gameWorldJumper.Surname.Item,
                 CountryFisCodeModule.value(gameWorldJumper.FisCountryCode)

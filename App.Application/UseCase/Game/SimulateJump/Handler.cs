@@ -43,7 +43,8 @@ public class Handler(
     IJudgesSimulator judgesSimulator,
     IGameCompetitionResultsArchive gameCompetitionResultsArchive,
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
-    IJumperGameFormStorage jumperGameFormStorage)
+    IJumperGameFormStorage jumperGameFormStorage,
+    IGameCompetitionResultsArchive competitionResultsArchive)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -64,9 +65,16 @@ public class Handler(
         var gameJumperDto = competitionJumperAcl.GetGameJumper(nextCompetitionJumper.Id.Item);
         var gameWorldJumperDto = gameJumperAcl.GetGameWorldJumper(gameJumperDto.Id);
 
+        logger.Debug($"$Now jumps GameWorld Jumper with ID {gameWorldJumperDto.Id}. (GameJumper ID: {gameJumperDto.Id
+        }, CompetitionJumper ID: {nextCompetitionJumper.Id}");
+
         var gameWorldJumper =
             await gameWorldJumpers.GetById(Domain.GameWorld.JumperId.NewJumperId(gameWorldJumperDto.Id), ct)
-                .AwaitOrWrap(_ => new IdNotFoundException(gameWorldJumperDto.Id));
+                .AwaitOrWrap(_ =>
+                {
+                    logger.Error($"GameWorld Jumper with ID {gameWorldJumperDto.Id} not found.");
+                    return new IdNotFoundException(gameWorldJumperDto.Id);
+                });
 
         var gameForm = jumperGameFormStorage.GetGameForm(gameJumperDto.Id);
         var simulationJumper = gameWorldJumper.ToSimulationJumper(likesHill: null, form: gameForm);
@@ -140,6 +148,7 @@ public class Handler(
                 if (gameAfterAddingJump.Status.IsPreDraft &&
                     ((Domain.Game.Status.PreDraft)gameAfterAddingJump.Status).Item.IsBreak)
                 {
+                    ArchivePreDraftCompetitionResults(addJumpOutcome, command.GameId);
                     var preDraftStatus = (Domain.Game.Status.PreDraft)gameAfterAddingJump.Status;
                     var preDraftBreak = (Domain.Game.PreDraftStatus.Break)preDraftStatus.Item;
                     var nextPreDraftCompetitionIndex = PreDraftCompetitionIndexModule.value(preDraftBreak.NextIndex);
@@ -154,6 +163,7 @@ public class Handler(
                 else if (gameAfterAddingJump.Status.IsBreak &&
                          ((Domain.Game.Status.Break)gameAfterAddingJump.Status).Next.IsDraftTag)
                 {
+                    ArchivePreDraftCompetitionResults(addJumpOutcome, command.GameId);
                     previousCompetition = addJumpOutcome.Competition;
                     var now = clock.Now();
                     await scheduler.ScheduleAsync(
@@ -206,6 +216,16 @@ public class Handler(
         }
 
         throw new Exception("Error adding a jump to game.");
+    }
+
+    private void ArchivePreDraftCompetitionResults(AddJumpOutcome addJumpOutcome, Guid gameId)
+    {
+        var competitionResultRecords = addJumpOutcome.Classification.Select(result =>
+            new ResultRecord(result.JumperId.Item,
+                Classification.PositionModule.value(result.Position),
+                TotalPointsModule.value(result.Points)));
+        competitionResultsArchive.ArchivePreDraft(gameId,
+            new CompetitionResultsDto(competitionResultRecords.ToList()));
     }
 }
 

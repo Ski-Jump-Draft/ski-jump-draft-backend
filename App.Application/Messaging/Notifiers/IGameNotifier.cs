@@ -4,7 +4,9 @@ using System;
 
 public interface IGameNotifier
 {
-    Task GameStartedAfterMatchmaking(Guid matchmakingId, Guid gameId);
+    Task GameStartedAfterMatchmaking(Guid matchmakingId, Guid gameId,
+        Dictionary<Guid, Guid> playersMapping);
+
     Task GameUpdated(GameUpdatedDto matchmaking);
     Task GameEnded(Guid gameId);
 }
@@ -49,10 +51,20 @@ public sealed record PreDraftDto(
 // ───────── Draft ─────────
 
 public sealed record DraftDto(
-    Guid? CurrentPlayerId, // null jeśli draft się skończył
+    Guid? CurrentPlayerId,
+    int? TimeoutInSeconds,
     bool Ended,
-    IReadOnlyList<PlayerPicksDto> Picks // Picks per gracz
-);
+    string OrderPolicy, // Classic | Snake | Random
+    IReadOnlyList<PlayerPicksDto> Picks,
+    IReadOnlyList<DraftPickOptionDto> AvailableJumpers,
+    IReadOnlyList<Guid> NextPlayers);
+
+public sealed record DraftPickOptionDto(
+    Guid GameJumperId,
+    string Name,
+    string Surname,
+    string CountryFisCode,
+    IEnumerable<int> TrainingRanks);
 
 public sealed record PlayerPicksDto(Guid PlayerId, IReadOnlyList<Guid> JumperIds);
 
@@ -82,6 +94,7 @@ public sealed record CompetitionRoundResultDto(
 );
 
 public sealed record CompetitionJumperDto(
+    Guid Id,
     string Name,
     string Surname,
     string CountryFisCode

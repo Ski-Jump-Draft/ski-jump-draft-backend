@@ -165,10 +165,10 @@ type Startlist =
                           Bib = bib }
                         : Startlist.Entry)
 
-                let newBibMap =
-                    previous.BibOfMap |> Map.filter (fun jid _ -> Set.contains jid provided)
+                // let newBibMap =
+                //     previous.BibOfMap |> Map.filter (fun jid _ -> Set.contains jid provided)
 
                 Ok
                     { Remaining = entries
                       Done = []
-                      BibOfMap = newBibMap }
+                      BibOfMap = previous.BibOfMap }

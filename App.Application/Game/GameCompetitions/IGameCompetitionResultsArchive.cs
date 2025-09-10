@@ -6,7 +6,7 @@ public record ResultRecord(Guid CompetitionJumperId, int Position, double Points
 
 public interface IGameCompetitionResultsArchive
 {
-    void ArchivePreDraft(Guid gameId, List<CompetitionResultsDto> competitionResults);
+    void ArchivePreDraft(Guid gameId, CompetitionResultsDto competitionResults);
     List<CompetitionResultsDto>? GetPreDraftResults(Guid gameId);
     void ArchiveMain(Guid gameId, CompetitionResultsDto competitionResults);
     CompetitionResultsDto? GetMainResults(Guid gameId);
