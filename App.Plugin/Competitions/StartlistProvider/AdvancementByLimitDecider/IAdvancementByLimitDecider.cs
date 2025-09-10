@@ -1,12 +1,14 @@
 using App.Domain.Competition;
 using App.Domain.Competition.Results;
-using App.Domain.Competition.Results.ResultObjects;
+using App.Domain.Competition.Results;
 using App.Plugin.Engine.Classic;
 
 namespace App.Plugin.Competitions.StartlistProvider.AdvancementByLimitDecider;
 
 public interface IAdvancementByLimitDecider
 {
-    IEnumerable<StartlistModule.EntityModule.Id> Decide(
-        Dictionary<StartlistModule.EntityModule.Id, RankedResults.Position> position, RoundParticipantsLimit limit);
+    // IEnumerable<StartlistModule.EntityModule.Id> Decide(
+    //     Dictionary<StartlistModule.EntityModule.Id, RankedResults.Position> position, RoundParticipantsLimit limit);
+    IEnumerable<ParticipantResult> Decide(Dictionary<ParticipantResultModule.Id, RankedResults.Position> position,
+        RoundParticipantsLimit limit);
 }

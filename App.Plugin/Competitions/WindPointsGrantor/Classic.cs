@@ -1,4 +1,4 @@
-using App.Domain.Competition.Results.ResultObjects;
+using App.Domain.Competition.Results;
 using App.Domain.Competition.Jump;
 using App.Plugin.Competitions.WindAggregator;
 using Abstractions = App.Domain.Competition.Results.Abstractions;

@@ -19,9 +19,10 @@ public class DraftCreateTests
         // act
         var result = App.Domain.Draft.Draft.Create(
             draftId,
-            AggregateVersion.AggregateVersion.NewAggregateVersion(0u),
+            AggregateVersion.zero,
             settings,
             ListModule.OfSeq(participants),
+            
             1234ul);
 
         // assert

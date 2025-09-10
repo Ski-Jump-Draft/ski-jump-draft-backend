@@ -1,7 +1,7 @@
 using App.Domain.Competition;
 using App.Domain.Competition.Jump;
 using App.Domain.Competition.Results;
-using App.Domain.Competition.Results.ResultObjects;
+using App.Domain.Competition.Results;
 using IGatePointsGrantor = App.Domain.Competition.Results.Abstractions.IGatePointsGrantor;
 
 namespace App.Plugin.Competitions.GatePointsGrantor;
@@ -48,7 +48,7 @@ public class ClassicGatePointsGrantor : IGatePointsGrantor
         if (_coachGatePointsPolicy != CoachGatePointsPolicy.RequireHsPercent)
             return FullGatePoints(realGateStatus);
 
-        var hs = HillModule.HSPointModule.value(jump.HSPoint);
+        var hs = HillModule.HsPointModule.value(jump.HsPoint);
         var distance = DistanceModule.value(jump.Distance);
         var requiredDistance = hs * _requiredHsPercentForCoachGatePoints!.Value;
 

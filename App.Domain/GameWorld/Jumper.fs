@@ -1,41 +1,55 @@
 namespace App.Domain.GameWorld
 
+open System.Collections.Generic
+open System.Threading
+open System.Threading.Tasks
+
+type JumperId = JumperId of System.Guid
+
 module Jumper =
-    [<Struct>]
-    type Id = Id of System.Guid
-    
-    [<Struct>]
-    type Name = private Name of string
+    type Name = Name of string
+    type Surname = Surname of string
 
-    module Name =
-        let tryCreate (s: string) =
-            let trimmed = s.Trim()
+    let private inRange (minv: 'a) (maxv: 'a) (v: 'a) : bool when 'a: comparison = v >= minv && v <= maxv
 
-            if trimmed.Length > 0 then
-                Some(Name trimmed)
-            else
-                None
+    type BigSkill = private BigSkill of double
 
-        let value (Name n) = n
+    module BigSkill =
+        let tryCreate (v: double) : BigSkill option =
+            if inRange 0.0 10.0 v then Some(BigSkill v) else None
 
-    [<Struct>]
-    type Surname = private Surname of string
+        let value (BigSkill s) = s
 
-    module Surname =
-        let tryCreate (s: string) =
-            let trimmed = s.Trim()
+    type LandingSkill = private LandingSkill of int
 
-            if trimmed.Length > 0 then
-                Some(Surname trimmed)
-            else
-                None
+    module LandingSkill =
+        let tryCreate (v: int) : LandingSkill option =
+            if inRange 1 10 v then Some(LandingSkill v) else None
 
-        let value (Surname n) = n
-        
+        let value (LandingSkill s) = s
+
+    type LiveForm = private LiveForm of int
+
+    module LiveForm =
+        let tryCreate (v: int) : LiveForm option =
+            if inRange 0 10 v then Some(LiveForm v) else None
+
+        let value (LiveForm s) = s
+
+open Jumper
 
 type Jumper =
-    { Id: Jumper.Id
-      Name: Jumper.Name
-      Surname: Jumper.Surname
-      CountryId: Country.Id
-    }
+    { Id: JumperId
+      Name: Name
+      Surname: Surname
+      FisCountryCode: CountryFisCode
+      Takeoff: BigSkill
+      Flight: BigSkill
+      Landing: LandingSkill
+      LiveForm: LiveForm }
+
+type IJumpers =
+    abstract member GetAll: ct: CancellationToken -> Task<IEnumerable<Jumper>>
+    abstract member GetFromIds: ids: IEnumerable<JumperId> * ct: CancellationToken -> Task<IEnumerable<Jumper>>
+    abstract member GetById: jumperId: JumperId * ct: CancellationToken -> Task<Jumper option>
+    abstract member GetByCountryFisCode: countryId: CountryFisCode * ct: CancellationToken -> Task<IEnumerable<Jumper>>

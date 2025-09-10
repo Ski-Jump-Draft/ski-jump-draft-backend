@@ -1,0 +1,61 @@
+Id,Name,Surname,CountryFisCode,Takeoff,Flight,Landing,LiveForm
+96276609-ccdc-48f0-a3ff-200010d44881,Jan,Hoerl,AUT,9.5,8.5,8,5
+892f7e39-5ab3-4258-95d7-b67e4045513e,Daniel,Tschofenig,AUT,9.5,9.0,8,5
+f6c8b628-e203-4ad8-8ecb-94019b40dcfc,Stefan,Kraft,AUT,9.0,9.5,10,5
+28bdf5a4-99ca-49d7-a807-2d0afbfb45ec,Maximilian,Ortner,AUT,8.5,8.5,9,5
+81c1a04b-24cf-4501-81a0-822c268ead83,Manuel,Fettner,AUT,8.5,8.5,6,5
+9d3415b3-833e-42e5-9743-1463ae0dc9ba,Domen,Prevc,SLO,8 ,9.5 ,7,5
+852ee2a3-e821-4fff-8928-309be6f37de4,Timi,Zajc,SLO,8 ,9 ,7,5
+2384f316-7f1b-48cb-ac01-c38da66d2ecb,Anze,Lanisek,SLO,9 ,9,8,5
+6bd84154-16e3-47df-ab6b-e888094c97b3,Lovro,Kos,SLO,8.5,8.5,7,5
+0cdcd060-1392-433c-9c5d-f74458c86a62,Marius,Lindvik,NOR,9,8.5,7,5
+44cd9a39-74c9-4135-a12a-58f99b9b14fa,Halvor,Egner Granerud,NOR,8.5,8,7,5
+a272be9f-fd11-454b-b5f3-6e78a74c8d67,Kristoffer,Eriksen Sundal,NOR,8.5,8.5,7,5
+b6e7c599-8e8b-464d-86c2-7997db35db83,Johann,Andre Forfang,NOR,8,9,7,5
+33e9136e-ade6-4aa1-b765-4a4a24907941,Philipp,Raimund,GER,9,7,5,5
+ca4395a6-4919-4414-87cf-6a3c6be8bf17,Karl,Geiger,GER,9,8,7,5
+464158af-3609-478d-a258-fef55285a476,Pius,Paschke,GER,8.5,8.5,6,5
+1ed03f2a-9111-416f-8787-958ff8fb897a,Andreas,Wellinger,GER,9,8.5,9,5
+38663c16-d592-448b-acd8-8f43db740dd8,Kamil,Stoch,POL,8.0,8.0,10,5
+501a8c21-45f9-4ccb-818e-f43b1f506fa4,Pawel,Wasek,POL,8.5,8,8,5
+19de9c50-52af-4121-b928-91d49a0b8364,Dawid,Kubacki,POL,8.5,7.5,7,5
+37b4c952-bd64-4606-834f-8e1ff8472285,Piotr,Zyla,POL,8,8.5,7,5
+e90b968b-e2d7-4bd9-95f1-b2aade58ec58,Ryoyu,Kobayashi,JAP,9.5,9,7,5
+0bce0894-4f68-46c4-b201-8184e511d2da,Ren,Nikaido,JAP,8.5,8,7,5
+de9fec5e-b9e9-4e54-84d4-f3cf511f2d76,Sakutaro,Kobayashi,JAP,8,7,6,5
+5652bd79-1a0c-4423-b05a-a79dbacebf43,Naoki,Nakamura,JAP,7.5,7.5,7,5
+d7cfb01a-60a5-4f78-96c1-11355bdea99d,Gregor,Deschwanden,SUI,9,8,6,5
+9ab2756a-f9d7-4196-ad6d-fffd73fbe382,Killian,Peier,SUI,8.5,6.5,7,5
+be0e2486-c578-4e39-8a0d-48527bf26349,Simon,Ammann,SUI,7.5,7.5,3,5
+1e38a563-cc32-4e2b-a358-725fd1cdf49c,Yanick,Wasser,SUI,8,7,6,5
+918546f9-816e-4c46-8f80-62daeada128c,Antti,Aalto,FIN,8,7.5,8,5
+d369dca9-94ae-4461-991c-c18585a2678e,Eetu,Nousiainen,FIN,7.5,7.5,6,5
+0aa59fb5-58b6-4b42-94dc-f581d4f74571,Kasperi,Valto,FIN,7.5,7,5,5
+72b79e4b-e5db-463e-94e5-5fdb41e4a61a,Niko,Kytosaho,FIN,7.5,8,6,5
+42ea1750-1aef-476a-b68a-ffce51f410ab,Kevin,Bickner,USA,8.5,7,6,5
+f7619fc7-642e-46f6-a7b2-8f05ad1dbd8d,Andrew,Urlaub,USA,7.5,6.5,5,5
+13c5ad05-e789-45d0-a6c7-b8028f51a6bb,Tate,Frantz,USA,8,8,6,5
+666dbbaa-43c5-46fe-956d-955f697ec12d,Casey,Larson,USA,7,7,5,5
+814a5640-8d32-4df7-a86b-2fc606094961,Alex,Insam,ITA,8,7.5,8,5
+018694b6-7856-4c9f-980e-90a4f0051a24,Francesco,Cecon,ITA,7.5,7.5,6,5
+36bcca29-4351-420b-aa1e-238f13438883,Giovanni,Bresadola,ITA,8.0,8.0,8,5
+48169072-86cd-498b-a778-75fb74a87b1d,Artti,Aigro,EST,8,8,5,5
+b8c3b94d-dc48-42d8-95a0-26993a420185,Kaimar,Vagul,EST,7,7,5,5
+36777c09-172b-40fd-a098-93c6af9f2112,Mihnea,Alexandru Spulber,EST,6.5,6.5,5,5
+b715a87e-6a4d-4a65-921d-2258252e96ef,Vladimir,Zografski,BUL,8.5,7.5,5,5
+5d8f6c70-9ca2-439e-92eb-466ffb997d42,Danil,Vassilyev,KAZ,8,7.5,5,5
+ae9d60eb-717c-4bd0-8ca6-2054233fa411,Ilya,Mizernykh,KAZ,8,6.5,7,5
+09554439-a837-4628-baa1-32ac77e93b8b,MacKenzie,Boyd-Clowes,CAN,8,7,7,5
+3e27df05-519c-497c-955c-981555ceed11,Roman,Koudelka,CZE,8,7,7,5
+457f0493-88ab-4b8b-858e-5c15d3ad50e9,Qiwu,Song,CHN,6.5,6.5,6,5
+316ecaab-9549-4662-a6cf-79a454c6bcb0,Fatih,Arda Ipcioglu,TUR,8,6,4,5
+f271a7b8-fb39-4664-845f-42681409e578,Muhammed,Ali Bedir,TUR,6.5,6.5,5,5
+e7a6b9fe-458f-41ae-889f-f290fe1d2780,Valentin,Foubert,FRA,8.5,7.5,8,5
+09969ee5-90ba-45c7-aa23-4f36769d8553,Jules,Chervet,FRA,6.5,6.5,5,5
+2a7a9071-14eb-4891-8ed4-7e8f3fbd033b,Ari,Repellin,FRA,6.5,6.5,5,5
+8a49c04e-db29-4e31-ad67-bfdc2b401140,Enzo,Milesi,FRA,7,7,5,5
+42e176bd-3760-4f32-b6d4-6797cad4c5ab,Yevhen,Marusiak,UKR,7.5,8,6,5
+91be0c2c-3e91-4944-8e1b-a8b1b85960d3,Vitaliy,Kalinichenko,UKR,7,6.5,6,5
+7e39a82d-0004-407b-ace9-566227b8b7ee,Heung-Chul,Choi,KOR,6.2,6.2,5,5
+ac8ff9fe-1ddf-4ff4-b90b-58ccc97e4e40,Hektor,Kapustik,SVK,6.5,6.5,6,5
+949177f4-abd2-4447-ab44-f14d22d4bcab,Daniel,Andrei Cacina,ROU,7.5,6.5,6,5

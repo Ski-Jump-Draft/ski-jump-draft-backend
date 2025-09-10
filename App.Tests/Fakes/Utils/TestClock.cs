@@ -5,5 +5,6 @@ namespace App.Tests.Fakes.Utils;
 
 public class TestClock(DateTimeOffset now) : IClock
 {
-    public DateTimeOffset UtcNow => now;
+    public DateTimeOffset Now => now;
+    public DateTime UtcNow => now.UtcDateTime;
 }

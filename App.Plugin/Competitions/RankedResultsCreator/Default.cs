@@ -1,16 +1,19 @@
-using App.Application.Util;
+using App.Util;
 using App.Domain.Competition;
 using App.Domain.Competition.Results;
+using Microsoft.FSharp.Collections;
 using Microsoft.FSharp.Core;
-using ParticipantResultModule = App.Domain.Competition.Results.ResultObjects.ParticipantResultModule;
+using ParticipantResultModule = App.Domain.Competition.Results.ParticipantResultModule;
 
 namespace App.Plugin.Competitions.RankedResultsCreator;
 
 public class Default(RankedResults.ExAequoPolicy exAequoPolicy)
-    : RankedResults.IRankedResultsCreator
+    : RankedResults.IRankedResultsFactory
 {
-    public RankedResults.RankedResults Create(ResultsModule.Results results, FSharpOption<Phase.RoundIndex> roundIndex)
+    public RankedResults.RankedResults Create(FSharpList<ParticipantResult> participantResults,
+        FSharpOption<Phase.RoundIndex> roundIndex)
     {
+        var results = ResultsModule.Results.FromState(participantResults).ResultValue;
         var totalPointsById = results.MapTotalPointsByRound(roundIndex);
 
         var sorted = totalPointsById

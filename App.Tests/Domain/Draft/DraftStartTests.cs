@@ -11,7 +11,7 @@ public class DraftStartTests
     private static App.Domain.Draft.Draft NewDraftNotStarted() =>
         App.Domain.Draft.Draft.Create(
             Id.Id.NewId(Guid.NewGuid()),
-            AggregateVersion.AggregateVersion.NewAggregateVersion(0u),
+            AggregateVersion.zero,
             new Settings.Settings(Order.Classic, 1, true, Picks.PickTimeout.Unlimited),
             ListModule.OfSeq([Participant.Id.NewId(Guid.NewGuid())]),
             1ul).ResultValue.Item1;

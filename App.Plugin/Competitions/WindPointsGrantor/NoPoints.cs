@@ -1,6 +1,6 @@
 using App.Domain.Competition.Jump;
 using App.Domain.Competition.Results;
-using App.Domain.Competition.Results.ResultObjects;
+using App.Domain.Competition.Results;
 using App.Plugin.Competitions.WindAggregator;
 using Results_Abstractions = App.Domain.Competition.Results.Abstractions;
 

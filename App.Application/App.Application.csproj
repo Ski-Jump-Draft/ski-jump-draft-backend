@@ -2,16 +2,13 @@
 
     <PropertyGroup>
         <TargetFramework>net9.0</TargetFramework>
+        <RootNamespace>App.Application</RootNamespace>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
     </PropertyGroup>
-    
+
     <ItemGroup>
-        <ProjectReference Include="..\App.Domain\App.Domain.fsproj" />
-    </ItemGroup>
-    
-    <ItemGroup>
-      <Folder Include="UseCase\" />
+      <ProjectReference Include="..\App.Domain\App.Domain.fsproj" />
     </ItemGroup>
 
 </Project>

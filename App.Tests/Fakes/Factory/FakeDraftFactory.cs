@@ -13,7 +13,7 @@ public static class FakeDraftFactory
         var settings = new App.Domain.Draft.Settings.Settings(order, 4, true, Picks.PickTimeout.Unlimited);
         var initialDraft = Draft.Create(
             id,
-            AggregateVersion.AggregateVersion.NewAggregateVersion(1u),
+            AggregateVersion.zero,
             settings,
             OfSeq(participants),
             seed: 1234ul
@@ -34,7 +34,7 @@ public static class FakeDraftFactory
         // 1. Utwórz draft i start
         var createdResult = Draft.Create(
             id,
-            AggregateVersion.AggregateVersion.NewAggregateVersion(1u),
+            AggregateVersion.zero,
             settings,
             OfSeq(participants),
             seed: 1234ul

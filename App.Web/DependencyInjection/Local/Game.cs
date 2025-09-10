@@ -1,0 +1,45 @@
+using Microsoft.FSharp.Collections;
+
+namespace App.Web.DependencyInjection.Local;
+
+public static class Game
+{
+    public static IServiceCollection AddLocalGame(this IServiceCollection services)
+    {
+        services.AddSingleton<App.Domain.Game.Settings>(sp =>
+        {
+            var preDraftCompetitionSettings = App.Domain.Competition.Settings.Create(ListModule.OfSeq(new[]
+                {
+                    new App.Domain.Competition.RoundSettings(App.Domain.Competition.RoundLimit.NoneLimit, false,
+                        false)
+                }))
+                .ResultValue;
+            var preDraftSettings = App.Domain.Game.PreDraftSettings.Create(ListModule.OfSeq(
+                    new List<App.Domain.Competition.Settings>
+                        { preDraftCompetitionSettings/*, preDraftCompetitionSettings*/ }))
+                .Value;
+            var mainCompetitionSettings = App.Domain.Competition.Settings.Create(ListModule.OfSeq(new[]
+            {
+                new App.Domain.Competition.RoundSettings(
+                    App.Domain.Competition.RoundLimit.NewSoft(App.Domain.Competition.RoundLimitValueModule
+                        .tryCreate(50)
+                        .ResultValue), false, false),
+                new App.Domain.Competition.RoundSettings(
+                    App.Domain.Competition.RoundLimit.NewSoft(App.Domain.Competition.RoundLimitValueModule
+                        .tryCreate(20)
+                        .ResultValue), true, true)
+            })).ResultValue;
+            var draftSettings = new App.Domain.Game.DraftModule.Settings(
+                App.Domain.Game.DraftModule.SettingsModule.TargetPicksModule.create(2).Value,
+                App.Domain.Game.DraftModule.SettingsModule.MaxPicksModule.create(2).Value,
+                App.Domain.Game.DraftModule.SettingsModule.UniqueJumpersPolicy.Unique,
+                App.Domain.Game.DraftModule.SettingsModule.Order.Snake,
+                App.Domain.Game.DraftModule.SettingsModule.TimeoutPolicy.NewTimeoutAfter(
+                    TimeSpan.FromSeconds(4)));
+            return new App.Domain.Game.Settings(preDraftSettings, draftSettings, mainCompetitionSettings,
+                App.Domain.Game.RankingPolicy.Classic);
+        });
+
+        return services;
+    }
+}

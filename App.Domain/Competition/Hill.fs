@@ -1,52 +1,41 @@
 namespace App.Domain.Competition
 
+type HillId = HillId of System.Guid
+
 module Hill =
-    [<Struct>]
-    type Id = Id of System.Guid
-    
-    [<Struct>]
     type KPoint = private KPoint of double
+
     module KPoint =
         let tryCreate (v: double) =
-            if v >= 0.0 then Some(KPoint v) else None
+            if v >= 0.0 then Some(KPoint v) else Option.None
 
         let value (KPoint v) = v
 
-    [<Struct>]
-    type HSPoint = private HSPoint of double
-    module HSPoint =
+    type HsPoint = private HsPoint of double
+
+    module HsPoint =
         let tryCreate (v: double) =
-            if v >= 0.0 then Some(HSPoint v) else None
+            if v >= 0.0 then Some(HsPoint v) else Option.None
 
-        let value (HSPoint v) = v
-        
-    [<Struct>]
-    type PointsForMeter = PointsForMeter of double
-    module PointsForMeter =
+        let value (HsPoint v) = v
+
+    type GatePoints = private GatePoints of double
+
+    module GatePoints =
         let tryCreate (v: double) =
-            if v > 0 then Some(PointsForMeter v) else None
+            if v > 0 then Some(GatePoints v) else Option.None
 
-        let value (PointsForMeter v) = v
+        let value (GatePoints v) = v
 
-        let fromK (KPoint k) =
-            let points =
-                match k with
-                | k when k < 25.0 -> 4.8
-                | k when k < 30.0 -> 4.4
-                | k when k < 35.0 -> 4.0
-                | k when k < 40.0 -> 3.6
-                | k when k < 50.0 -> 3.2
-                | k when k < 60.0 -> 2.8
-                | k when k < 70.0 -> 2.4
-                | k when k < 80.0 -> 2.2
-                | k when k < 100.0 -> 2.0
-                | k when k < 135.0 -> 1.8
-                | k when k < 180.0 -> 1.6
-                | _ -> 1.2
+    type WindPoints = private WindPoints of double
 
-            PointsForMeter points
-    
-    type Type =
+    module WindPoints =
+        let tryCreate (v: double) =
+            if v > 0 then Some(WindPoints v) else Option.None
+
+        let value (WindPoints v) = v
+
+    type Kind =
         | Small
         | Medium
         | Normal
@@ -54,43 +43,21 @@ module Hill =
         | Big
         | SkiFlying
 
-    module Type =
-        let fromHS (HSPoint hs) =
-            match hs with
-            | hs when hs < 50.0 -> Type.Small
-            | hs when hs < 85.0 -> Type.Medium
-            | hs when hs < 110.0 -> Type.Normal
-            | hs when hs < 150.0 -> Type.Large
-            | hs when hs < 185 -> Type.Big
-            | _ -> Type.SkiFlying
+        static member FromHs(hsPoint: HsPoint) =
+            match HsPoint.value hsPoint with
+            | v when v < 50.0 -> Small
+            | v when v < 85.0 -> Medium
+            | v when v < 110.0 -> Normal
+            | v when v < 150.0 -> Large
+            | v when v < 200.0 -> Big
+            | _ -> SkiFlying
 
-
-    [<Struct>]
-    type PointsPerKPoint = PointsPerKPoint of double
-
-    module PointsPerKPoint =
-        let fromHillType =
-            function
-            | SkiFlying -> PointsPerKPoint 120
-            | _ -> PointsPerKPoint 60
-
-open Hill
 type Hill =
-    {
-        Id: Hill.Id
-        KPoint: Hill.KPoint
-        HSPoint: Hill.HSPoint
-    }
-    
-    member this.HillType=
-        Hill.Type.fromHS this.HSPoint 
+    { Id: HillId
+      KPoint: Hill.KPoint
+      HsPoint: Hill.HsPoint
+      GatePoints: Hill.GatePoints
+      HeadwindPoints: Hill.WindPoints
+      TailwindPoints: Hill.WindPoints }
 
-    member this.PointsPerMeter =
-        this.KPoint
-        |> PointsForMeter.fromK
-
-
-    member this.PointsPerKPoint =
-        this.HSPoint
-        |> Hill.Type.fromHS
-        |> PointsPerKPoint.fromHillType
+    member this.Kind = Hill.Kind.FromHs this.HsPoint

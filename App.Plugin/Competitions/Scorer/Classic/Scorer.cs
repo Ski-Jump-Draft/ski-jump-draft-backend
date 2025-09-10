@@ -1,7 +1,7 @@
 using App.Domain.Competition;
 using App.Domain.Competition.Jump;
 using App.Domain.Competition.Results;
-using ResultObjects = App.Domain.Competition.Results.ResultObjects;
+using ResultObjects = App.Domain.Competition.Results;
 using static Microsoft.FSharp.Collections.ListModule;
 using Abstractions = App.Domain.Competition.Results.Abstractions;
 
@@ -18,7 +18,7 @@ public sealed class ClassicJumpScorer(
     {
         var distance = DistanceModule.value(jump.Distance);
         var kPoint = HillModule.KPointModule.value(jump.KPoint);
-        var hsPoint = HillModule.HSPointModule.value(jump.HSPoint);
+        var hsPoint = HillModule.HsPointModule.value(jump.HsPoint);
         var hillType = ClassifyByHs(hsPoint);
 
         var distancePoints = PointsPerKPoint(hillType) + ((distance - kPoint) * PointsPerMeter(kPoint));
@@ -119,10 +119,5 @@ public sealed class ClassicJumpScorer(
             < 185.0 => HillType.Big,
             _ => HillType.SkiFlying
         };
-    }
-
-    public a Evaluate<a>(Jump Jump)
-    {
-        throw new NotImplementedException();
     }
 }
