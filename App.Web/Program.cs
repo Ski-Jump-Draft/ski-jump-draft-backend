@@ -22,6 +22,8 @@ builder.Services.AddCors(options =>
         });
 });
 
+DotNetEnv.Env.Load(".env");
+
 builder.Services.AddSignalR();
 
 const Mode mode = Mode.Online;
