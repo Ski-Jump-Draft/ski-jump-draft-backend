@@ -28,4 +28,4 @@ Ski Jump Draft heavily relies on:
 
 ## Quickstart
 1. Copy `.env.example` → `.env`
-<To fill up!>
+2. Fill up the environment variables
