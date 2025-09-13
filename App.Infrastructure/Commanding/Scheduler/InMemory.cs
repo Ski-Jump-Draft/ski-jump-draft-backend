@@ -4,7 +4,7 @@ using App.Application.Utility;
 
 namespace App.Infrastructure.Commanding.Scheduler;
 
-public class InMemory(ICommandBus commandBus, IJson json, IMyLogger myLogger) : IScheduler
+public class InMemory(ICommandBus commandBus, IJson json, IMyLogger logger) : IScheduler
 {
     private readonly ConcurrentDictionary<string, Task> _jobs = new();
 
@@ -15,51 +15,56 @@ public class InMemory(ICommandBus commandBus, IJson json, IMyLogger myLogger) : 
         string? uniqueKey = null,
         CancellationToken ct = default)
     {
+        logger.Debug("Scheduling job: " + jobType + "");
         // jeśli chcesz unikalność
         if (uniqueKey != null && _jobs.ContainsKey(uniqueKey))
+        {
+            logger.Debug($"Job key is not unique ({uniqueKey})");
             return;
+        }
 
         var delay = runAt - DateTimeOffset.UtcNow;
+        logger.Debug($"[Job:{jobType}]: delay {delay}.");
         if (delay < TimeSpan.Zero) delay = TimeSpan.Zero;
 
         var job = Task.Run(async () =>
         {
             try
             {
-                await Task.Delay(delay, ct);
-                Console.WriteLine($"[Job:{jobType}] payload={payloadJson}");
+                await Task.Delay(delay);
+                logger.Info($"[Job:{jobType}] payload={payloadJson}");
 
                 switch (jobType)
                 {
                     case "EndMatchmaking":
-                        await HandleEndMatchmaking(payloadJson, ct);
+                        await HandleEndMatchmaking(payloadJson, CancellationToken.None);
                         break;
                     case "StartGame":
-                        await HandleStartGame(payloadJson, ct);
+                        await HandleStartGame(payloadJson, CancellationToken.None);
                         break;
                     case "StartPreDraft":
-                        await HandleStartPreDraft(payloadJson, ct);
+                        await HandleStartPreDraft(payloadJson, CancellationToken.None);
                         break;
                     case "SimulateJumpInGame":
-                        await HandleSimulateJumpInGame(payloadJson, ct);
+                        await HandleSimulateJumpInGame(payloadJson, CancellationToken.None);
                         break;
                     case "StartNextPreDraftCompetition":
-                        await HandleStartNextPreDraftCompetition(payloadJson, ct);
+                        await HandleStartNextPreDraftCompetition(payloadJson, CancellationToken.None);
                         break;
                     case "StartDraft":
-                        await HandleStartDraft(payloadJson, ct);
+                        await HandleStartDraft(payloadJson, CancellationToken.None);
                         break;
                     case "StartMainCompetition":
-                        await HandleStartMainCompetition(payloadJson, ct);
+                        await HandleStartMainCompetition(payloadJson, CancellationToken.None);
                         break;
                     case "PickJumper":
-                        await HandlePickJumper(payloadJson, ct);
+                        await HandlePickJumper(payloadJson, CancellationToken.None);
                         break;
                     case "PassPick":
-                        await HandlePassPick(payloadJson, ct);
+                        await HandlePassPick(payloadJson, CancellationToken.None);
                         break;
                     case "EndGame":
-                        await HandleEndGame(payloadJson, ct);
+                        await HandleEndGame(payloadJson, CancellationToken.None);
                         break;
 
                     default:
@@ -72,11 +77,11 @@ public class InMemory(ICommandBus commandBus, IJson json, IMyLogger myLogger) : 
             }
             catch (Exception ex)
             {
-                myLogger.Error($"Scheduler job {jobType} failed: {ex.Message}");
-                myLogger.Error($"Stack trace: {ex.StackTrace}");
+                logger.Error($"Scheduler job {jobType} failed: {ex.Message}");
+                logger.Error($"Stack trace: {ex.StackTrace}");
                 throw;
             }
-        }, ct);
+        });
 
         if (uniqueKey != null)
             _jobs[uniqueKey] = job;
@@ -99,7 +104,7 @@ public class InMemory(ICommandBus commandBus, IJson json, IMyLogger myLogger) : 
     {
         var payload = json.Deserialize<StartGamePayload>(payloadJson);
         var command = new Application.UseCase.Game.StartGame.Command(payload.MatchmakingId);
-        myLogger.Debug("Sending StartGame command to a command bus...");
+        logger.Debug("Sending StartGame command to a command bus...");
         await commandBus
             .SendAsync<Application.UseCase.Game.StartGame.Command, Application.UseCase.Game.StartGame.Result>(
                 command, ct);
@@ -157,7 +162,7 @@ public class InMemory(ICommandBus commandBus, IJson json, IMyLogger myLogger) : 
             new Application.UseCase.Game.PickJumper.Command(payload.GameId, payload.PlayerId, payload.JumperId);
         await commandBus
             .SendAsync<Application.UseCase.Game.PickJumper.Command,
-                Application.UseCase.Game.PickJumper.Result>(command, ct);
+                Application.UseCase.Game.PickJumper.Result>(command, CancellationToken.None);
     }
 
     private async Task HandlePassPick(string payloadJson, CancellationToken ct)

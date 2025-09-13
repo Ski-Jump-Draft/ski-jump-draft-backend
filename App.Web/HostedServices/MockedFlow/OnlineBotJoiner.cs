@@ -11,7 +11,7 @@ public class OnlineBotJoiner(IMatchmakings repo, ICommandBus bus, IMyLogger log)
     {
         while (!ct.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromSeconds(10), ct);
+            await Task.Delay(TimeSpan.FromSeconds(4), ct);
             
             var all = await repo.GetInProgress(ct);
             var matchmaking = all.FirstOrDefault();

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using App.Application.Acl;
 using App.Application.Exceptions;
 using App.Application.Extensions;
+using App.Application.Game;
 using App.Application.Game.GameCompetitions;
 using App.Application.Service;
 using App.Domain.Competition;
@@ -26,7 +27,8 @@ public class GameUpdatedDtoMapper(
     ICompetitionJumperAcl competitionJumperAcl,
     IGameCompetitionResultsArchive gameCompetitionResultsArchive,
     IJumpers gameWorldJumpers,
-    PreDraftPositionsService preDraftPositionsService)
+    PreDraftPositionsService preDraftPositionsService,
+    IGameSchedule gameSchedule)
 {
     private const int SchemaVersion = 1;
 
@@ -53,12 +55,14 @@ public class GameUpdatedDtoMapper(
         string changeType = "Snapshot", CancellationToken ct = default)
     {
         var header = MapHeader(game);
+        var nextStatus = MapNextStatus(game);
         var (statusStr, preDraft, draft, mainComp, brk, ended) = await MapStatus(game, ct);
 
         return new GameUpdatedDto(
             Unwrap(game.Id_),
             SchemaVersion,
             statusStr,
+            nextStatus,
             changeType,
             game.Settings.PreDraftSettings.CompetitionsCount,
             header,
@@ -88,6 +92,17 @@ public class GameUpdatedDtoMapper(
         );
 
         return new GameHeaderDto(hillId, players, jumpers);
+    }
+
+    private NextStatusDto? MapNextStatus(App.Domain.Game.Game game)
+    {
+        var gameId = game.Id.Item;
+        var schedule = gameSchedule.GetGameSchedule(gameId);
+        if (schedule is null) return null;
+        if (schedule.BreakPassed) return null;
+        var (caseName, _) = DeconstructUnion(game.Status);
+        var nextStatusDto = new NextStatusDto(caseName, schedule.In);
+        return nextStatusDto;
     }
 
     private async Task<(string, PreDraftDto?, DraftDto?, CompetitionDto?, BreakDto?, EndedDto?)> MapStatus(

@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using App.Application.Matchmaking;
 using App.Application.Utility;
 
-namespace App.Infrastructure.Matchmaking.Schedule;
+namespace App.Infrastructure.Schedule.Matchmaking;
 
 public sealed class InMemory(IClock clock) : IMatchmakingSchedule
 {

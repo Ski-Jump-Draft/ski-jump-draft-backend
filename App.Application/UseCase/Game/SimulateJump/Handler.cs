@@ -2,6 +2,7 @@ using App.Application.Acl;
 using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
+using App.Application.Game;
 using App.Application.Game.GameCompetitions;
 using App.Application.JumpersForm;
 using App.Application.Mapping;
@@ -44,7 +45,8 @@ public class Handler(
     IGameCompetitionResultsArchive gameCompetitionResultsArchive,
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
     IJumperGameFormStorage jumperGameFormStorage,
-    IGameCompetitionResultsArchive competitionResultsArchive)
+    IGameCompetitionResultsArchive competitionResultsArchive,
+    IGameSchedule gameSchedule)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -128,11 +130,12 @@ public class Handler(
 
             if (gameAfterAddingJump.IsDuringCompetition)
             {
+                var timeToNextJump = gameAfterAddingJump.Settings.CompetitionJumpInterval.Value;
                 var now = clock.Now();
                 await scheduler.ScheduleAsync(
                     jobType: "SimulateJumpInGame",
                     payloadJson: json.Serialize(new { GameId = command.GameId }),
-                    runAt: now.AddSeconds(3),
+                    runAt: now.Add(timeToNextJump),
                     uniqueKey: $"SimulateJumpInGame:{command.GameId}_{now.ToUnixTimeSeconds()}",
                     ct: ct);
             }
@@ -152,11 +155,15 @@ public class Handler(
                     var preDraftStatus = (Domain.Game.Status.PreDraft)gameAfterAddingJump.Status;
                     var preDraftBreak = (Domain.Game.PreDraftStatus.Break)preDraftStatus.Item;
                     var nextPreDraftCompetitionIndex = PreDraftCompetitionIndexModule.value(preDraftBreak.NextIndex);
+                    var timeToNextPreDraftCompetition = gameAfterAddingJump.Settings.BreakSettings
+                        .BreakBetweenPreDraftCompetitions.Value;
                     var now = clock.Now();
+                    gameSchedule.SchedulePhase(command.GameId, GamePhase.PreDraftNextCompetition,
+                        timeToNextPreDraftCompetition);
                     await scheduler.ScheduleAsync(
                         jobType: "StartNextPreDraftCompetition",
                         payloadJson: json.Serialize(new { GameId = command.GameId }),
-                        runAt: now.AddSeconds(15),
+                        runAt: now.Add(timeToNextPreDraftCompetition),
                         uniqueKey: $"StartNextPreDraftCompetition:{command.GameId}_{nextPreDraftCompetitionIndex}",
                         ct: ct);
                 }
@@ -165,11 +172,15 @@ public class Handler(
                 {
                     ArchivePreDraftCompetitionResults(addJumpOutcome, command.GameId);
                     previousCompetition = addJumpOutcome.Competition;
+                    var timeToDraft = gameAfterAddingJump.Settings.BreakSettings
+                        .BreakBeforeDraft.Value;
+                    gameSchedule.SchedulePhase(command.GameId, GamePhase.Draft,
+                        timeToDraft);
                     var now = clock.Now();
                     await scheduler.ScheduleAsync(
                         jobType: "StartDraft",
                         payloadJson: json.Serialize(new { GameId = command.GameId }),
-                        runAt: now.AddSeconds(7),
+                        runAt: now.Add(timeToDraft),
                         uniqueKey: $"StartDraft:{command.GameId}",
                         ct: ct);
                 }
@@ -179,11 +190,14 @@ public class Handler(
                     previousCompetition = addJumpOutcome.Competition;
                     gameCompetitionResultsArchive.ArchiveMain(command.GameId,
                         addJumpOutcome.Classification.ToGameCompetitionResultsArchiveDto());
+                    var timeToEnd = gameAfterAddingJump.Settings.BreakSettings
+                        .BreakBeforeEnd.Value;
+                    gameSchedule.SchedulePhase(command.GameId, GamePhase.End, timeToEnd);
                     var now = clock.Now();
                     await scheduler.ScheduleAsync(
                         jobType: "EndGame",
                         payloadJson: json.Serialize(new { GameId = command.GameId }),
-                        runAt: now.AddSeconds(15),
+                        runAt: now.Add(timeToEnd),
                         uniqueKey: $"EndGame:{command.GameId}",
                         ct: ct);
                 }
@@ -197,7 +211,7 @@ public class Handler(
             }
 
             await gameNotifier.GameUpdated(
-                await gameUpdatedDtoMapper.FromDomain(gameAfterAddingJump, previousCompetition));
+                await gameUpdatedDtoMapper.FromDomain(gameAfterAddingJump, previousCompetition, ct: ct));
 
             var jumperResultInClassifiation = addJumpOutcome.Competition
                 .ClassificationResultOf(nextCompetitionJumper.Id)

@@ -78,7 +78,7 @@ public static class Application
                 App.Application.UseCase.Game.EndGame.Handler>();
 
         services.AddSingleton<App.Application.Service.PreDraftPositionsService, App.Application.Service.PreDraftPositionsService>();
-        services.AddSingleton<IMatchmakingSchedule, App.Infrastructure.Matchmaking.Schedule.InMemory>();
+        services.AddSingleton<IMatchmakingSchedule, Infrastructure.Schedule.Matchmaking.InMemory>();
         return services;
     }
 }

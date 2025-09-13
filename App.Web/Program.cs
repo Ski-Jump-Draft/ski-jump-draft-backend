@@ -46,10 +46,35 @@ app.MapPost("/matchmaking/join",
         CancellationToken ct) =>
     {
         var command = new App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command(nick);
-        var (matchmakingId, correctedNick, playerId) = await commandBus
-            .SendAsync<App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command,
-                App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Result>(command, ct);
-        return Results.Ok(new { MatchmakingId = matchmakingId, CorrectedNick = correctedNick, PlayerId = playerId });
+        try
+        {
+            var (matchmakingId, correctedNick, playerId) = await commandBus
+                .SendAsync<App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command,
+                    App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Result>(command, ct);
+
+            return Results.Ok(new
+                { MatchmakingId = matchmakingId, CorrectedNick = correctedNick, PlayerId = playerId });
+        }
+        catch (App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.MultipleGamesNotSupportedException)
+        {
+            return Results.Conflict(new
+            {
+                error = "MultipleGamesNotSupported",
+                message = "Aktualnie można prowadzić tylko jedną grę, poczekaj aż się zakończy."
+            });
+        }
+        catch (App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.PlayerAlreadyJoinedException)
+        {
+            return Results.Conflict(new { error = "AlreadyJoined", message = "Gracz już dołączył." });
+        }
+        catch (App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.RoomIsFullException)
+        {
+            return Results.Conflict(new { error = "RoomIsFull", message = "Pokój jest pełny." });
+        }
+        catch (Exception)
+        {
+            return Results.InternalServerError();
+        }
     });
 
 app.MapDelete("/matchmaking/leave",

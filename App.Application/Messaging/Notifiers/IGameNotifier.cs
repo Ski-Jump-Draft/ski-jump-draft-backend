@@ -17,6 +17,7 @@ public sealed record GameUpdatedDto(
     Guid GameId,
     int SchemaVersion,
     string Status, // "PreDraft" | "Draft" | "MainCompetition" | "Ended" | "Break"
+    NextStatusDto? NextStatus,
     string ChangeType, // "Snapshot" | "PhaseChanged" | "DraftPickMade" | "JumpAdded" | ...
     int PreDraftsCount,
     GameHeaderDto Header,
@@ -39,6 +40,10 @@ public sealed record GameHeaderDto(
 public sealed record PlayerDto(Guid PlayerId, string Nick);
 
 public sealed record JumperDto(Guid JumperId);
+
+// ───────── Next Status ─────────
+
+public sealed record NextStatusDto(string Status, TimeSpan In);
 
 // ───────── PreDraft ─────────
 

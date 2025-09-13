@@ -6,4 +6,5 @@ riderModule.iml
 .env
 .env.development
 .env.local
+.env
 .env.staging

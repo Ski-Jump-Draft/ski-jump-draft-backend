@@ -63,14 +63,15 @@ public class Handler(
 
         var gameAfterStartNextPreDraftCompetition = gameAfterStartNextPreDraftCompetitionResult.ResultValue;
         await games.Add(gameAfterStartNextPreDraftCompetition, ct);
+        var timeToJump = game.Settings.CompetitionJumpInterval.Value;
         var now = clock.Now();
         await scheduler.ScheduleAsync(
             jobType: "SimulateJumpInGame",
             payloadJson: json.Serialize(new { GameId = game.Id_.Item }),
-            runAt: now.AddSeconds(3),
+            runAt: now.Add(timeToJump),
             uniqueKey: $"SimulateJumpInGame:{game.Id_.Item}_{now.ToUnixTimeSeconds()}",
             ct: ct);
-        await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterStartNextPreDraftCompetition));
+        await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterStartNextPreDraftCompetition, ct: ct));
         return new Result(competitionGuid);
     }
 }

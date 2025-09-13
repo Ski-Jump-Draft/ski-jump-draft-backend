@@ -48,7 +48,7 @@ public class Handler(
 
         var endedGame = endedGameResult.ResultValue;
         await games.Add(endedGame, ct);
-        await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(endedGame));
+        await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(endedGame, ct: ct));
 
         return new Result();
     }

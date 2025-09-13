@@ -1,6 +1,7 @@
 using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
+using App.Application.Game;
 using App.Application.Game.DraftPicks;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
@@ -25,7 +26,8 @@ public class Handler(
     IClock clock,
     IScheduler scheduler,
     IDraftPicksArchive draftPicksArchive,
-    GameUpdatedDtoMapper gameUpdatedDtoMapper)
+    GameUpdatedDtoMapper gameUpdatedDtoMapper,
+    IGameSchedule gameSchedule)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -54,16 +56,18 @@ public class Handler(
             {
                 draftPicksArchive.Archive(command.GameId,
                     pickOutcome.Picks.ToDictionary().ToEnumerableValues());
+                var timeToMainCompetition = gameAfterPick.Settings.BreakSettings.BreakBeforeMainCompetition.Value;
+                gameSchedule.SchedulePhase(command.GameId, GamePhase.MainCompetition, timeToMainCompetition);
                 var now = clock.Now();
                 await scheduler.ScheduleAsync(
                     jobType: "StartMainCompetition",
                     payloadJson: json.Serialize(new { GameId = game.Id_.Item }),
-                    runAt: now.AddSeconds(5),
+                    runAt: now.Add(timeToMainCompetition),
                     uniqueKey: $"StartMainCompetition:{game.Id_.Item}",
                     ct: ct);
             }
 
-            await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterPick));
+            await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterPick, ct: ct));
 
             return new Result();
         }

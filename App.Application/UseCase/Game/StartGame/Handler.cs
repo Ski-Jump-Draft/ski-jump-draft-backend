@@ -3,6 +3,7 @@ using App.Application.Acl;
 using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
+using App.Application.Game;
 using App.Application.JumpersForm;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
@@ -44,7 +45,8 @@ public class Handler(
     ICompetitionHillAcl competitionHillAcl,
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
     IJumperGameFormAlgorithm jumperGameFormAlgorithm,
-    IJumperGameFormStorage jumperGameFormStorage)
+    IJumperGameFormStorage jumperGameFormStorage,
+    IGameSchedule gameSchedule)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -131,15 +133,15 @@ public class Handler(
         if (gameResult.IsOk)
         {
             var game = gameResult.ResultValue;
-            logger.Debug($"Started game: {game}");
-
+            var timeToPreDraft = game.Settings.BreakSettings.BreakBeforePreDraft.Value;
             await games.Add(game, ct);
             await scheduler.ScheduleAsync(
                 jobType: "StartPreDraft",
                 payloadJson: json.Serialize(new { GameId = gameGuid }),
-                runAt: clock.Now().AddSeconds(7),
+                runAt: clock.Now().Add(timeToPreDraft),
                 uniqueKey: $"StartPreDraft:{gameGuid}", ct: ct
             );
+            gameSchedule.SchedulePhase(gameGuid, GamePhase.PreDraft, timeToPreDraft);
             await gameNotifier.GameStartedAfterMatchmaking(command.MatchmakingId, gameGuid,
                 gamePlayerByMatchmakingPlayer);
             await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(game, ct: ct));
