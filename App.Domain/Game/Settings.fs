@@ -25,7 +25,7 @@ type PhaseDuration =
         { PhaseDuration: TimeSpan }
 
     static member Create(v: TimeSpan) =
-        if v.TotalSeconds < 0 then
+        if v.TotalSeconds > 0 then
             Some({ PhaseDuration = v })
         else
             None

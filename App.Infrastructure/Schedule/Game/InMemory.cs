@@ -12,16 +12,24 @@ public sealed class InMemory(IClock clock) : IGameSchedule
     {
         var now = clock.Now();
         var scheduledAt = now + @in;
+        if (!CanSchedulePhaseFor(gameId)) return;
         var dto = new GameScheduleDto(gameId, phase, @in, scheduledAt);
-        if (!CanSchedule(dto)) return;
+        if (!CanBeScheduled(dto)) return;
         _dtos[gameId] = dto;
     }
 
+
     public bool Remove(Guid gameId) => _dtos.Remove(gameId, out _);
 
-    private static bool CanSchedule(GameScheduleDto? dto)
+    private bool CanBeScheduled(GameScheduleDto dto)
     {
-        return dto is null || dto.BreakPassed;
+        return !dto.BreakPassed(clock);
+    }
+
+    private bool CanSchedulePhaseFor(Guid gameId)
+    {
+        var existingDto = _dtos.GetValueOrDefault(gameId);
+        return existingDto is null || !existingDto.BreakPassed(clock);
     }
 
     public GameScheduleDto? GetGameSchedule(Guid gameId)

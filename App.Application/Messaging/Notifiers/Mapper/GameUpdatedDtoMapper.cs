@@ -1,10 +1,11 @@
 using System.Collections.Immutable;
+using System.Text.Json;
 using App.Application.Acl;
 using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Game;
-using App.Application.Game.GameCompetitions;
 using App.Application.Service;
+using App.Application.Utility;
 using App.Domain.Competition;
 using App.Domain.Game;
 using App.Domain.GameWorld;
@@ -21,14 +22,12 @@ using Microsoft.FSharp.Reflection;
 public class GameUpdatedDtoMapper(
     Func<Domain.Competition.JumperId, CancellationToken, Task<Domain.GameWorld.Jumper>>
         gameWorldJumperByCompetitionJumperId,
-    // Func<Domain.Game.JumperId, CancellationToken, Task<Domain.GameWorld.Jumper>>
-    //     gameWorldJumperByGameJumperId,
     IGameJumperAcl gameJumperAcl,
-    ICompetitionJumperAcl competitionJumperAcl,
-    IGameCompetitionResultsArchive gameCompetitionResultsArchive,
     IJumpers gameWorldJumpers,
     PreDraftPositionsService preDraftPositionsService,
-    IGameSchedule gameSchedule)
+    IGameSchedule gameSchedule,
+    IMyLogger logger,
+    IClock clock)
 {
     private const int SchemaVersion = 1;
 
@@ -55,8 +54,11 @@ public class GameUpdatedDtoMapper(
         string changeType = "Snapshot", CancellationToken ct = default)
     {
         var header = MapHeader(game);
-        var nextStatus = MapNextStatus(game);
+        var nextStatus = MapNextStatus(game.Id.Item);
         var (statusStr, preDraft, draft, mainComp, brk, ended) = await MapStatus(game, ct);
+
+        var nextStatusStr = nextStatus != null ? $"{nextStatus.Status} IN {nextStatus.In.TotalSeconds}" : null;
+        logger.Info($"(Game {game.Id.Item}) next status: {nextStatusStr}");
 
         return new GameUpdatedDto(
             Unwrap(game.Id_),
@@ -94,14 +96,12 @@ public class GameUpdatedDtoMapper(
         return new GameHeaderDto(hillId, players, jumpers);
     }
 
-    private NextStatusDto? MapNextStatus(App.Domain.Game.Game game)
+    private NextStatusDto? MapNextStatus(Guid gameId)
     {
-        var gameId = game.Id.Item;
         var schedule = gameSchedule.GetGameSchedule(gameId);
         if (schedule is null) return null;
-        if (schedule.BreakPassed) return null;
-        var (caseName, _) = DeconstructUnion(game.Status);
-        var nextStatusDto = new NextStatusDto(caseName, schedule.In);
+        if (schedule.BreakPassed(clock)) return null;
+        var nextStatusDto = new NextStatusDto(schedule.Phase.ToString(), schedule.In);
         return nextStatusDto;
     }
 

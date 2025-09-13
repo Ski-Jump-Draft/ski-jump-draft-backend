@@ -1,4 +1,5 @@
 using App.Application.Commanding;
+using App.Application.Game;
 using App.Application.Matchmaking;
 
 namespace App.Web.DependencyInjection.Shared;
@@ -68,17 +69,13 @@ public static class Application
                 App.Application.UseCase.Game.StartMainCompetition.Handler>();
         services
             .AddSingleton<
-                ICommandHandler<App.Application.UseCase.Game.LeaveGame.Command,
-                    App.Application.UseCase.Game.LeaveGame.Result>,
-                App.Application.UseCase.Game.LeaveGame.Handler>();
-        services
-            .AddSingleton<
                 ICommandHandler<App.Application.UseCase.Game.EndGame.Command,
                     App.Application.UseCase.Game.EndGame.Result>,
                 App.Application.UseCase.Game.EndGame.Handler>();
 
         services.AddSingleton<App.Application.Service.PreDraftPositionsService, App.Application.Service.PreDraftPositionsService>();
         services.AddSingleton<IMatchmakingSchedule, Infrastructure.Schedule.Matchmaking.InMemory>();
+        services.AddSingleton<IGameSchedule, Infrastructure.Schedule.Game.InMemory>();
         return services;
     }
 }

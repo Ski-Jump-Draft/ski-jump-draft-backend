@@ -26,12 +26,17 @@ public class IterativeSimulated(
 
         var isGoingHigher = !SomeoneJumpedOverHs(currentGate);
 
+        const int allowedOvershoots = 2;
+
         while (tries < maxTries)
         {
             tries++;
+
+            var overshoots = CountOvershoots(currentGate);
+
             if (isGoingHigher)
             {
-                if (SomeoneJumpedOverHs(currentGate))
+                if (overshoots > allowedOvershoots)
                 {
                     currentGate--;
                     break;
@@ -41,11 +46,12 @@ public class IterativeSimulated(
             }
             else
             {
-                if (!SomeoneJumpedOverHs(currentGate))
+                if (overshoots <= allowedOvershoots)
                     break;
                 currentGate--;
             }
         }
+
 
         if (tries >= maxTries)
             throw new MaxTriesExceededException(maxTries, $"Could not find suitable gate after {maxTries} tries");
@@ -59,6 +65,21 @@ public class IterativeSimulated(
         };
 
         return currentGate;
+
+        int CountOvershoots(int gate)
+        {
+            var count = 0;
+            foreach (var jumper in simulationJumpers)
+            {
+                var wind = weatherEngine.GetWind();
+                var simCtx = new SimulationContext(Gate.NewGate(gate), jumper, simulationHill, wind);
+                var result = simulator.Simulate(simCtx);
+                if (DistanceModule.value(result.Distance) > hsPoint)
+                    count++;
+            }
+
+            return count;
+        }
 
         bool SomeoneJumpedOverHs(int gate)
         {

@@ -60,7 +60,7 @@ app.MapPost("/matchmaking/join",
             return Results.Conflict(new
             {
                 error = "MultipleGamesNotSupported",
-                message = "Aktualnie można prowadzić tylko jedną grę, poczekaj aż się zakończy."
+                message = "Nie udało się dołączyć do gry. Spróbuj ponownie za kilka minut. Pracujemy nad poprawą naszych serwerów, żeby utrzymywały wiele gier na raz."
             });
         }
         catch (App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.PlayerAlreadyJoinedException)
@@ -105,26 +105,26 @@ app.MapGet("/matchmaking",
         }
     });
 
-app.MapGet("/game/{gameId:guid}/leave",
-    async (Guid gameId, Guid playerId, [FromServices] ICommandBus commandBus,
-        [FromServices] App.Domain.Game.IGames repo, [FromServices] App.Application.Utility.IMyLogger myLogger,
-        CancellationToken ct) =>
-    {
-        var command = new App.Application.UseCase.Game.LeaveGame.Command(gameId, playerId);
-        try
-        {
-            var result = await commandBus
-                .SendAsync<App.Application.UseCase.Game.LeaveGame.Command,
-                    App.Application.UseCase.Game.LeaveGame.Result>(command, ct);
-            var hasLeft = result.HasLeft;
-            return !hasLeft ? Results.NotFound() : Results.Ok(result);
-        }
-        catch (Exception e)
-        {
-            myLogger.Error($"Error during leaving a game: {e.Message} (gameId: {gameId}, playerId: {playerId})");
-            return Results.InternalServerError();
-        }
-    });
+// app.MapGet("/game/{gameId:guid}/leave",
+//     async (Guid gameId, Guid playerId, [FromServices] ICommandBus commandBus,
+//         [FromServices] App.Domain.Game.IGames repo, [FromServices] App.Application.Utility.IMyLogger myLogger,
+//         CancellationToken ct) =>
+//     {
+//         var command = new App.Application.UseCase.Game.LeaveGame.Command(gameId, playerId);
+//         try
+//         {
+//             var result = await commandBus
+//                 .SendAsync<App.Application.UseCase.Game.LeaveGame.Command,
+//                     App.Application.UseCase.Game.LeaveGame.Result>(command, ct);
+//             var hasLeft = result.HasLeft;
+//             return !hasLeft ? Results.NotFound() : Results.Ok(result);
+//         }
+//         catch (Exception e)
+//         {
+//             myLogger.Error($"Error during leaving a game: {e.Message} (gameId: {gameId}, playerId: {playerId})");
+//             return Results.InternalServerError();
+//         }
+//     });
 
 
 app.MapPost("/game/{gameId:guid}/pick",

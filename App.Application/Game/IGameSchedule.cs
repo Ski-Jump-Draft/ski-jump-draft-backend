@@ -1,3 +1,5 @@
+using App.Application.Utility;
+
 namespace App.Application.Game;
 
 public record GameScheduleDto(
@@ -6,7 +8,12 @@ public record GameScheduleDto(
     TimeSpan In,
     DateTimeOffset ScheduledAt)
 {
-    public bool BreakPassed => In.TotalMilliseconds <= 0;
+    public TimeSpan BreakRemaining(IClock clock) => In - (clock.Now() - ScheduledAt);
+    
+    public bool BreakPassed(IClock clock)
+    {
+        return BreakRemaining(clock) <= TimeSpan.Zero;
+    }
 };
 
 public interface IGameSchedule

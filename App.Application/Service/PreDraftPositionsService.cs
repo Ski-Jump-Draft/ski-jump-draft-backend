@@ -9,8 +9,7 @@ public record PreDraftPositions(
 
 public class PreDraftPositionsService(
     IGameCompetitionResultsArchive gameCompetitionResultsArchive,
-    ICompetitionJumperAcl competitionJumperAcl,
-    IGameJumperAcl gameJumperAcl)
+    ICompetitionJumperAcl competitionJumperAcl)
 {
     public PreDraftPositions GetPreDraftPositions(Guid gameId)
     {

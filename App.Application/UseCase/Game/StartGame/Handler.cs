@@ -135,13 +135,13 @@ public class Handler(
             var game = gameResult.ResultValue;
             var timeToPreDraft = game.Settings.BreakSettings.BreakBeforePreDraft.Value;
             await games.Add(game, ct);
+            gameSchedule.SchedulePhase(gameGuid, GamePhase.PreDraft, timeToPreDraft);
             await scheduler.ScheduleAsync(
                 jobType: "StartPreDraft",
                 payloadJson: json.Serialize(new { GameId = gameGuid }),
                 runAt: clock.Now().Add(timeToPreDraft),
                 uniqueKey: $"StartPreDraft:{gameGuid}", ct: ct
             );
-            gameSchedule.SchedulePhase(gameGuid, GamePhase.PreDraft, timeToPreDraft);
             await gameNotifier.GameStartedAfterMatchmaking(command.MatchmakingId, gameGuid,
                 gamePlayerByMatchmakingPlayer);
             await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(game, ct: ct));
