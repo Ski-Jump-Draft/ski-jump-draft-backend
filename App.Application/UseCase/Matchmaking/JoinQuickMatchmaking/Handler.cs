@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using App.Application.Bot;
 using App.Application.Commanding;
 using App.Application.Extensions;
 using App.Application.Matchmaking;
@@ -28,9 +29,9 @@ public class Handler(
     IClock clock,
     IMatchmakingSchedule matchmakingSchedule,
     IMatchmakingNotifier matchmakingNotifier,
-    IJumpers jumpers,
     IMatchmakingDurationCalculator matchmakingDurationCalculator,
-    IGames games)
+    IGames games,
+    IBotRegistry botRegistry)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -43,6 +44,34 @@ public class Handler(
 
         var nick = nickOption.Value;
         var (matchmaking, justCreated) = await FindOrCreateMatchmakingAsync(ct);
+
+        return await JoinPlayerToMatchmaking(nick, matchmaking, justCreated, ct);
+    }
+
+    private async Task<MatchmakingDto> FindOrCreateMatchmakingAsync(CancellationToken ct)
+    {
+        var matchmmakingsInProgress = (await matchmakings.GetInProgress(ct)).ToImmutableArray();
+        var gamesInProgress = await games.GetInProgressCount(ct);
+        switch (matchmmakingsInProgress.Length, gamesInProgress)
+        {
+            case (_, >= 1):
+                throw new MultipleGamesNotSupportedException();
+            case (1, 0):
+                return new MatchmakingDto(matchmmakingsInProgress.Single(), JustCreated: false);
+            // 0 matchmakings, 0 games
+            default:
+            {
+                var newMatchmaking =
+                    Domain.Matchmaking.Matchmaking.Create(MatchmakingId.NewMatchmakingId(guid.NewGuid()),
+                        globalMatchmakingSettings);
+                return new MatchmakingDto(newMatchmaking, JustCreated: true);
+            }
+        }
+    }
+
+    private async Task<Result> JoinPlayerToMatchmaking(PlayerModule.Nick nick,
+        Domain.Matchmaking.Matchmaking matchmaking, bool justCreated, CancellationToken ct)
+    {
         var player = new Domain.Matchmaking.Player(PlayerId.NewPlayerId(guid.NewGuid()), nick);
         var joinResult = matchmaking.Join(player);
         if (joinResult.IsError)
@@ -73,8 +102,10 @@ public class Handler(
             matchmakingSchedule.StartMatchmaking(matchmaking.Id_.Item, matchmakingDuration);
         }
 
+        botRegistry.RegisterMatchmakingBot(matchmaking.Id_.Item, player.Id.Item);
         await matchmakingNotifier.PlayerJoined(
-            MatchmakingNotifierMappers.PlayerJoinedFromDomain(player.Id.Item, PlayerModule.NickModule.value(correctedNick), matchmakingAfterJoin));
+            MatchmakingNotifierMappers.PlayerJoinedFromDomain(player.Id.Item,
+                PlayerModule.NickModule.value(correctedNick), matchmakingAfterJoin));
         await matchmakingNotifier.MatchmakingUpdated(
             MatchmakingNotifierMappers.MatchmakingUpdatedFromDomain(matchmakingAfterJoin));
 
@@ -82,27 +113,6 @@ public class Handler(
         myLogger.Info($"{correctedNick} joined the matchmaking ({matchmaking.Id_.Item})");
 
         return new Result(matchmaking.Id_.Item, PlayerModule.NickModule.value(correctedNick), player.Id.Item);
-    }
-
-    private async Task<MatchmakingDto> FindOrCreateMatchmakingAsync(CancellationToken ct)
-    {
-        var matchmmakingsInProgress = (await matchmakings.GetInProgress(ct)).ToImmutableArray();
-        var gamesInProgress = await games.GetInProgressCount(ct);
-        switch (matchmmakingsInProgress.Length, gamesInProgress)
-        {
-            case (_, >= 1):
-                throw new MultipleGamesNotSupportedException();
-            case (1, 0):
-                return new MatchmakingDto(matchmmakingsInProgress.Single(), JustCreated: false);
-            // 0 matchmakings, 0 games
-            default:
-            {
-                var newMatchmaking =
-                    Domain.Matchmaking.Matchmaking.Create(MatchmakingId.NewMatchmakingId(guid.NewGuid()),
-                        globalMatchmakingSettings);
-                return new MatchmakingDto(newMatchmaking, JustCreated: true);
-            }
-        }
     }
 
     private record MatchmakingDto(Domain.Matchmaking.Matchmaking Matchmaking, bool JustCreated);

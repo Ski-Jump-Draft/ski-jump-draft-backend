@@ -1,8 +1,8 @@
+using App.Application.Bot;
 using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Matchmaking;
-using App.Application.Messaging;
 using App.Application.Messaging.Notifiers;
 using App.Application.Utility;
 using App.Domain.Matchmaking;
@@ -21,18 +21,34 @@ public class Handler(
     IMatchmakingNotifier notifier,
     IMatchmakingSchedule matchmakingSchedule,
     IScheduler scheduler,
-    IClock clock, IMyLogger logger)
+    IClock clock,
+    IMyLogger logger,
+    IBotRegistry botRegistry)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
     {
-        var matchmaking = await matchmakings.GetById(MatchmakingId.NewMatchmakingId(command.MatchmakingId), ct).AwaitOrWrap(_ => new IdNotFoundException(command.MatchmakingId));;
+        var matchmaking = await matchmakings.GetById(MatchmakingId.NewMatchmakingId(command.MatchmakingId), ct)
+            .AwaitOrWrap(_ => new IdNotFoundException(command.MatchmakingId));
+
+        var matchmakingBots = botRegistry.MatchmakingBots(command.MatchmakingId);
+        var onlyBotsExist = matchmakingBots.Count == matchmaking.PlayersCount;
+        if (onlyBotsExist)
+        {
+            logger.Info($"Did not start a matchmaking cause only bots are present. MatchmakingId: {command.MatchmakingId
+            }, bots count: {matchmakingBots.Count}.");
+            var failedMatchmaking = matchmaking.Fail("Can not end a matchmaking only with bots").ResultValue;
+            await PersistMatchmaking(failedMatchmaking, ct);
+            matchmakingSchedule.EndMatchmaking(command.MatchmakingId);
+            return new Result(false);
+        }
 
         var (endedMatchmaking, hasSucceeded) = matchmaking.End().ResultValue;
-        
-        logger.Info($"Tried to end matchmaking. MatchmakingId: {command.MatchmakingId}. hasSucceeded: {hasSucceeded}. Status: {endedMatchmaking.Status_}. Players count: {endedMatchmaking.PlayersCount}.");
 
-        await matchmakings.Add(endedMatchmaking, ct);
+        logger.Info($"Tried to end matchmaking. MatchmakingId: {command.MatchmakingId}. hasSucceeded: {hasSucceeded
+        }. Status: {endedMatchmaking.Status_}. Players count: {endedMatchmaking.PlayersCount}.");
+
+        await PersistMatchmaking(endedMatchmaking, ct);
 
         if (hasSucceeded)
         {
@@ -51,5 +67,10 @@ public class Handler(
         await notifier.MatchmakingUpdated(MatchmakingNotifierMappers.MatchmakingUpdatedFromDomain(endedMatchmaking));
 
         return new Result(hasSucceeded);
+    }
+
+    private async Task PersistMatchmaking(Domain.Matchmaking.Matchmaking endedMatchmaking, CancellationToken ct)
+    {
+        await matchmakings.Add(endedMatchmaking, ct);
     }
 }

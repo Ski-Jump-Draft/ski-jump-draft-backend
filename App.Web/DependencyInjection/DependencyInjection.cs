@@ -15,7 +15,7 @@ public static class DependencyInjection
     public static IServiceCollection InjectDependencies(this IServiceCollection services, Mode mode)
     {
         services.AddAcl().AddApplication().AddArchives().AddCommanding().AddMappers().AddRepositories().AddStorages()
-            .AddUtilities();
+            .AddUtilities().AddBot();
 
         switch (mode)
         {

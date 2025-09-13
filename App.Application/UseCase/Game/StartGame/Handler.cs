@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using App.Application.Acl;
+using App.Application.Bot;
 using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
@@ -46,7 +47,8 @@ public class Handler(
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
     IJumperGameFormAlgorithm jumperGameFormAlgorithm,
     IJumperGameFormStorage jumperGameFormStorage,
-    IGameSchedule gameSchedule)
+    IGameSchedule gameSchedule,
+    IBotRegistry botRegistry)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -82,6 +84,7 @@ public class Handler(
             var gamePlayerNick = PlayerModule.NickModule.createWithSuffix(matchmakingPlayerNickString).Value;
             var gamePlayer = new Domain.Game.Player(gamePlayerId, gamePlayerNick);
             gamePlayerByMatchmakingPlayer.Add(matchmakingPlayer.Id.Item, gamePlayerGuid);
+            botRegistry.RegisterGameBot(gameGuid, gamePlayerGuid);
             return gamePlayer;
         });
         var gamePlayers = Domain.Game.PlayersModule.create(ListModule.OfSeq(gamePlayersEnumerable)).ResultValue;
