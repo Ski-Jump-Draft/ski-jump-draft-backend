@@ -31,13 +31,13 @@ public class InMemory : IBotRegistry
 
     public IReadOnlyList<MatchmakingBotDto> MatchmakingBots(Guid matchmakingId) =>
         _matchmakingBots.TryGetValue(matchmakingId, out var set)
-            ? set.Select(p => new MatchmakingBotDto(p)).ToList()
+            ? set.Select(playerId => new MatchmakingBotDto(playerId)).ToList()
             : Array.Empty<MatchmakingBotDto>();
 
-    public IReadOnlyList<MatchmakingBotDto> GameBots(Guid gameId) =>
+    public IReadOnlyList<GameBotDto> GameBots(Guid gameId) =>
         _gameBots.TryGetValue(gameId, out var set)
-            ? set.Select(p => new MatchmakingBotDto(p)).ToList()
-            : Array.Empty<MatchmakingBotDto>();
+            ? set.Select(playerId => new GameBotDto(playerId)).ToList()
+            : Array.Empty<GameBotDto>();
 
     public bool IsMatchmakingBot(Guid matchmakingId, Guid playerId) =>
         _matchmakingBots.TryGetValue(matchmakingId, out var set) && set.Contains(playerId);

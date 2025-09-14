@@ -5,7 +5,11 @@ using App.Domain.Matchmaking;
 
 namespace App.Web.HostedServices.MockedFlow;
 
-public class OfflineBotJoiner(IMyPlayer myPlayer, IMatchmakings repo, ICommandBus bus, IMyLogger log)
+public class OfflineBotJoiner(
+    IMyPlayer myPlayer,
+    IMatchmakings repo,
+    ICommandBus bus,
+    IMyLogger log)
     : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -34,13 +38,13 @@ public class OfflineBotJoiner(IMyPlayer myPlayer, IMatchmakings repo, ICommandBu
             }
 
             const string nickBase = "Bot";
-            var cmd = new App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command(nickBase);
+            var command = new App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command(nickBase, IsBot: true);
 
             try
             {
-                var (matchmakingId, correctedNick, _) = await bus
+                var (matchmakingId, correctedNick, playerId) = await bus
                     .SendAsync<App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command,
-                        App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Result>(cmd, ct);
+                        App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Result>(command, ct);
 
                 log.Debug($"Bot {correctedNick} joined {matchmakingId}");
             }

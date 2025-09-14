@@ -4,6 +4,7 @@ using App.Application.Commanding;
 using App.Application.Extensions;
 using App.Application.Matchmaking;
 using App.Application.Messaging.Notifiers;
+using App.Application.Messaging.Notifiers.Mapper;
 using App.Application.Utility;
 using App.Domain.Game;
 using App.Domain.GameWorld;
@@ -14,7 +15,8 @@ using PlayerModule = App.Domain.Matchmaking.PlayerModule;
 namespace App.Application.UseCase.Matchmaking.JoinQuickMatchmaking;
 
 public record Command(
-    string Nick
+    string Nick,
+    bool IsBot
 ) : ICommand<Result>;
 
 public record Result(Guid MatchmakingId, string Nick, Guid PlayerId);
@@ -31,7 +33,9 @@ public class Handler(
     IMatchmakingNotifier matchmakingNotifier,
     IMatchmakingDurationCalculator matchmakingDurationCalculator,
     IGames games,
-    IBotRegistry botRegistry)
+    IBotRegistry botRegistry,
+    MatchmakingUpdatedDtoMapper matchmakingUpdatedDtoMapper
+)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -45,7 +49,7 @@ public class Handler(
         var nick = nickOption.Value;
         var (matchmaking, justCreated) = await FindOrCreateMatchmakingAsync(ct);
 
-        return await JoinPlayerToMatchmaking(nick, matchmaking, justCreated, ct);
+        return await JoinPlayerToMatchmaking(nick, matchmaking, justCreated, command.IsBot, ct);
     }
 
     private async Task<MatchmakingDto> FindOrCreateMatchmakingAsync(CancellationToken ct)
@@ -70,7 +74,7 @@ public class Handler(
     }
 
     private async Task<Result> JoinPlayerToMatchmaking(PlayerModule.Nick nick,
-        Domain.Matchmaking.Matchmaking matchmaking, bool justCreated, CancellationToken ct)
+        Domain.Matchmaking.Matchmaking matchmaking, bool justCreated, bool isBot, CancellationToken ct)
     {
         var player = new Domain.Matchmaking.Player(PlayerId.NewPlayerId(guid.NewGuid()), nick);
         var joinResult = matchmaking.Join(player);
@@ -102,13 +106,14 @@ public class Handler(
             matchmakingSchedule.StartMatchmaking(matchmaking.Id_.Item, matchmakingDuration);
         }
 
-        botRegistry.RegisterMatchmakingBot(matchmaking.Id_.Item, player.Id.Item);
-        await matchmakingNotifier.PlayerJoined(
-            MatchmakingNotifierMappers.PlayerJoinedFromDomain(player.Id.Item,
-                PlayerModule.NickModule.value(correctedNick), matchmakingAfterJoin));
-        await matchmakingNotifier.MatchmakingUpdated(
-            MatchmakingNotifierMappers.MatchmakingUpdatedFromDomain(matchmakingAfterJoin));
+        if (isBot)
+        {
+            botRegistry.RegisterMatchmakingBot(matchmaking.Id_.Item, player.Id.Item);
+        }
 
+        await matchmakingNotifier.MatchmakingUpdated(matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterJoin));
+        await matchmakingNotifier.PlayerJoined(matchmakingUpdatedDtoMapper.PlayerJoinedFromDomain(player.Id.Item,
+            PlayerModule.NickModule.value(player.Nick), matchmakingAfterJoin));
 
         myLogger.Info($"{correctedNick} joined the matchmaking ({matchmaking.Id_.Item})");
 

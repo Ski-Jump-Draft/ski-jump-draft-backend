@@ -1,9 +1,11 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using App.Application.Acl;
+using App.Application.Bot;
 using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Game;
+using App.Application.Mapping;
 using App.Application.Service;
 using App.Application.Utility;
 using App.Domain.Competition;
@@ -22,12 +24,14 @@ using Microsoft.FSharp.Reflection;
 public class GameUpdatedDtoMapper(
     Func<Domain.Competition.JumperId, CancellationToken, Task<Domain.GameWorld.Jumper>>
         gameWorldJumperByCompetitionJumperId,
-    IGameJumperAcl gameJumperAcl,
-    IJumpers gameWorldJumpers,
     PreDraftPositionsService preDraftPositionsService,
     IGameSchedule gameSchedule,
     IMyLogger logger,
-    IClock clock)
+    IClock clock,
+    IBotRegistry botRegistry,
+    IGameJumperAcl gameJumperAcl,
+    IJumpers gameWorldJumpers,
+    ICompetitionJumperAcl competitionJumperAcl)
 {
     private const int SchemaVersion = 1;
 
@@ -50,15 +54,34 @@ public class GameUpdatedDtoMapper(
 
 
     public async Task<GameUpdatedDto> FromDomain(App.Domain.Game.Game game,
-        App.Domain.Competition.Competition? lastCompetitionState = null,
+        App.Domain.Competition.Competition? lastCompetitionState = null, Guid? lastCompetitionJumperId = null,
         string changeType = "Snapshot", CancellationToken ct = default)
     {
-        var header = MapHeader(game);
+        var header = await MapHeader(game, ct);
         var nextStatus = MapNextStatus(game.Id.Item);
         var (statusStr, preDraft, draft, mainComp, brk, ended) = await MapStatus(game, ct);
 
+        CompetitionRoundResultDto? lastCompetitionResultDto = null;
+        if (lastCompetitionJumperId is not null)
+        {
+            if (lastCompetitionState is null && !game.IsDuringCompetition)
+            {
+                throw new ArgumentNullException($"(Game {game.Id.Item
+                }) lastCompetitionState is null, but game is not during competition.");
+            }
+
+            var classification = game.IsDuringCompetition
+                ? game.CurrentCompetitionClassification
+                : lastCompetitionState!.Classification;
+            var lastClassificationResult =
+                classification.Single(result =>
+                    result.JumperId.Item == lastCompetitionJumperId!);
+            var lastJumpResult = lastClassificationResult.JumpResults.Last();
+            lastCompetitionResultDto = CreateCompetitionRoundResultDto(lastJumpResult);
+        }
+
         var nextStatusStr = nextStatus != null ? $"{nextStatus.Status} IN {nextStatus.In.TotalSeconds}" : null;
-        logger.Info($"(Game {game.Id.Item}) next status: {nextStatusStr}");
+        logger.Info($"(Game {game.Id.Item}) next status: {nextStatusStr ?? "NONE"}");
 
         return new GameUpdatedDto(
             Unwrap(game.Id_),
@@ -73,27 +96,50 @@ public class GameUpdatedDtoMapper(
             mainComp,
             brk,
             ended,
-            lastCompetitionState != null ? await MapCompetition(lastCompetitionState) : null
+            lastCompetitionState != null ? await MapCompetition(lastCompetitionState, game.Id.Item) : null,
+            lastCompetitionResultDto
         );
     }
 
     // ────────────────────────────── Header ──────────────────────────────
-    private GameHeaderDto MapHeader(App.Domain.Game.Game game)
+    private async Task<GameHeaderDto> MapHeader(App.Domain.Game.Game game, CancellationToken ct)
     {
-        var players = PlayersModule.toList(game.Players)
-            .Select(p => new PlayerDto(Unwrap(p.Id), PlayerModule.NickModule.value(p.Nick)))
+        var gameId = game.Id.Item;
+
+        var gamePlayers = PlayersModule.toList(game.Players)
+            .Select(player =>
+            {
+                var playerId = player.Id.Item;
+                var isBot = botRegistry.IsGameBot(gameId, playerId);
+                return new GamePlayerDto(Unwrap(player.Id), PlayerModule.NickModule.value(player.Nick), isBot);
+            })
             .ToList();
 
-        var jumpers = JumpersModule.toList(game.Jumpers)
-            .Select(j => new JumperDto(Unwrap(j.Id)))
-            .ToList();
+        var gameJumpers = JumpersModule.toList(game.Jumpers);
+        var gameWorldJumpersList = await gameJumpers.ToGameWorldJumpers(gameJumperAcl, gameWorldJumpers, ct);
 
-        var hillId = game.Hill.Match(
+        var gameJumperDtos = new List<GameJumperDto>();
+        var competitionJumperDtos = new List<CompetitionJumperDto>();
+        foreach (var gameWorldJumper in gameWorldJumpersList)
+        {
+            var gameJumperId = gameJumperAcl.GetGameJumper(gameWorldJumper.Id.Item).Id;
+            var competitionJumperId = competitionJumperAcl.GetCompetitionJumper(gameJumperId).Id;
+            var name = gameWorldJumper.Name.Item;
+            var surname = gameWorldJumper.Surname.Item;
+            var fisCountryCode = CountryFisCodeModule.value(gameWorldJumper.FisCountryCode);
+            gameJumperDtos.Add(new GameJumperDto(gameJumperId, gameWorldJumper.Id.Item, name,
+                surname,
+                fisCountryCode));
+            competitionJumperDtos.Add(new CompetitionJumperDto(gameJumperId, competitionJumperId, name, surname,
+                fisCountryCode));
+        }
+
+        var competitionHillId = game.Hill.Match(
             some: hill => Unwrap(hill.Id),
             none: () => (Guid?)null
         );
 
-        return new GameHeaderDto(hillId, players, jumpers);
+        return new GameHeaderDto(competitionHillId, gamePlayers, gameJumperDtos, competitionJumperDtos);
     }
 
     private NextStatusDto? MapNextStatus(Guid gameId)
@@ -101,7 +147,8 @@ public class GameUpdatedDtoMapper(
         var schedule = gameSchedule.GetGameSchedule(gameId);
         if (schedule is null) return null;
         if (schedule.BreakPassed(clock)) return null;
-        var nextStatusDto = new NextStatusDto(schedule.Phase.ToString(), schedule.In);
+        if (schedule.ScheduleTarget == GameScheduleTarget.CompetitionJump) return null;
+        var nextStatusDto = new NextStatusDto(schedule.ScheduleTarget.ToString(), schedule.In);
         return nextStatusDto;
     }
 
@@ -112,10 +159,12 @@ public class GameUpdatedDtoMapper(
 
         return caseName switch
         {
-            "PreDraft" => ("PreDraft", await MapPreDraft((App.Domain.Game.PreDraftStatus)fields[0]), null, null, null,
+            "PreDraft" => ("PreDraft", await MapPreDraft((App.Domain.Game.PreDraftStatus)fields[0], game.Id.Item), null,
+                null, null,
                 null),
             "Draft" => ("Draft", null, await MapDraft(game, (App.Domain.Game.Draft)fields[0], ct), null, null, null),
-            "MainCompetition" => ("MainCompetition", null, null, await MapCompetition((Competition)fields[0]), null,
+            "MainCompetition" => ("MainCompetition", null, null,
+                await MapCompetition((Competition)fields[0], game.Id.Item), null,
                 null),
             "Ended" => ("Ended", null, null, null, null, MapEnded(game)),
             "Break" => ($"Break {fields[0].ToString()!.Replace("Tag", "")}", null, null, null,
@@ -125,7 +174,7 @@ public class GameUpdatedDtoMapper(
     }
 
     // ---------- PreDraft ----------
-    private async Task<PreDraftDto> MapPreDraft(App.Domain.Game.PreDraftStatus pre)
+    private async Task<PreDraftDto> MapPreDraft(App.Domain.Game.PreDraftStatus pre, Guid gameId)
     {
         var (caseName, fields) = DeconstructUnion(pre);
 
@@ -134,7 +183,7 @@ public class GameUpdatedDtoMapper(
             "Running" => new PreDraftDto(
                 "Running",
                 PreDraftCompetitionIndexModule.value((App.Domain.Game.PreDraftCompetitionIndex)fields[0]),
-                await MapCompetition((Competition)fields[1])),
+                await MapCompetition((Competition)fields[1], gameId)),
             "Break" => new PreDraftDto(
                 "Break",
                 PreDraftCompetitionIndexModule.value((App.Domain.Game.PreDraftCompetitionIndex)fields[0]),
@@ -205,7 +254,7 @@ public class GameUpdatedDtoMapper(
     }
 
 
-    private async Task<CompetitionDto> MapCompetition(Competition comp)
+    private async Task<CompetitionDto> MapCompetition(Competition comp, Guid gameId)
     {
         var status = comp.GetStatusTag switch
         {
@@ -217,7 +266,7 @@ public class GameUpdatedDtoMapper(
             _ => "Unknown"
         };
 
-        Guid? nextJumperId =
+        var nextJumperId =
             comp.NextJumper.Match(
                 some: j => Unwrap(j.Id),
                 none: () => (Guid?)null
@@ -225,8 +274,25 @@ public class GameUpdatedDtoMapper(
 
         var gate = MapGate(comp.GateState);
         var results = await MapResults(comp.Jumpers_, comp.Classification, comp.Startlist_);
+        var schedule = gameSchedule.GetGameSchedule(gameId);
+        int? nextJumpIn = schedule switch
+        {
+            { ScheduleTarget: GameScheduleTarget.CompetitionJump } => (int)Math.Ceiling(schedule.In
+                .TotalSeconds),
+            _ => null
+        };
+        var endedEntries = comp.Startlist_.DoneEntries.Select(entry =>
+            new StartlistJumperDto(StartlistModule.BibModule.value(entry.Bib), true, entry.JumperId.Item));
+        var notEndedEntries = comp.Startlist_.RemainingEntries.Select(entry =>
+            new StartlistJumperDto(StartlistModule.BibModule.value(entry.Bib), false, entry.JumperId.Item));
 
-        return new CompetitionDto(status, nextJumperId, gate, results.ToImmutableList());
+        IReadOnlyList<StartlistJumperDto> startlist =
+        [
+            ..endedEntries, ..notEndedEntries
+        ];
+
+        return new CompetitionDto(status, startlist, gate,
+            results.ToImmutableList(), nextJumpIn);
     }
 
     private static GateDto MapGate(FSharpOption<GateState> gsOpt)
@@ -278,46 +344,47 @@ public class GameUpdatedDtoMapper(
             if (competitionJumper is null)
                 throw new InvalidOperationException($"Missing jumper {competitionJumperId} in competition.");
 
-            var gameWorldJumper = await gameWorldJumperByCompetitionJumperId(competitionJumper.Id, ct);
-
-            var competitionJumperDto = new CompetitionJumperDto(
-                competitionJumperId,
-                gameWorldJumper.Name.Item,
-                gameWorldJumper.Surname.Item,
-                CountryFisCodeModule.value(gameWorldJumper.FisCountryCode)
-            );
-
-            var jumpResultDtos = classificationResult.JumpResults.Select(jumpResult =>
-            {
-                double? judgePoints = jumpResult.JudgePoints.IsSome()
-                    ? JumpResultModule.JudgePointsModule.value(jumpResult.JudgePoints.Value)
-                    : null;
-                double? windPoints = jumpResult.WindPoints.IsSome()
-                    ? JumpResultModule.WindPointsModule.value(jumpResult.WindPoints.Value)
-                    : null;
-                var windAverage = jumpResult.Jump.Wind.ToDouble();
-                return new CompetitionRoundResultDto(
-                    JumpModule.DistanceModule.value(jumpResult.Jump.Distance),
-                    jumpResult.TotalPoints.Item,
-                    judgePoints,
-                    windPoints,
-                    windAverage
-                );
-            });
+            var jumpResultDtos = classificationResult.JumpResults.Select(CreateCompetitionRoundResultDto);
 
             return new CompetitionResultDto(
-                rank, bibValue, competitionJumperDto, totalPoints,
+                rank, bibValue, competitionJumperId, totalPoints,
                 jumpResultDtos.ToImmutableList()
             );
         });
 
         return
             await Task.WhenAll(
-                tasks); // <- zbiera wszystkie Task<CompetitionResultDto> w IEnumerable<CompetitionResultDto>
+                tasks);
+    }
+
+    private CompetitionRoundResultDto CreateCompetitionRoundResultDto(JumpResult jumpResult)
+    {
+        double? judgePoints = jumpResult.JudgePoints.IsSome()
+            ? JumpResultModule.JudgePointsModule.value(jumpResult.JudgePoints.Value)
+            : null;
+        double? windPoints = jumpResult.WindPoints.IsSome()
+            ? JumpResultModule.WindPointsModule.value(jumpResult.WindPoints.Value)
+            : null;
+        double? gatePoints = jumpResult.GatePoints.IsSome()
+            ? JumpResultModule.GatePointsModule.value(jumpResult.GatePoints.Value)
+            : null;
+        var totalCompetitionPoints = JumpResultModule.TotalCompensationModule.value(jumpResult.TotalCompensation);
+        var windAverage = jumpResult.Jump.Wind.ToDouble();
+        return new CompetitionRoundResultDto(
+            competitionJumperAcl.GetGameJumper(jumpResult.JumperId.Item).Id,
+            jumpResult.JumperId.Item,
+            JumpModule.DistanceModule.value(jumpResult.Jump.Distance),
+            jumpResult.TotalPoints.Item,
+            JumpModule.JudgesModule.value(jumpResult.Jump.JudgeNotes),
+            judgePoints,
+            windPoints,
+            windAverage,
+            gatePoints, totalCompetitionPoints
+        );
     }
 
 
-    // ---------- Break / Ended ----------
+// ---------- Break / Ended ----------
     private static BreakDto MapBreak(App.Domain.Game.StatusTag nextTag)
     {
         var next = nextTag switch

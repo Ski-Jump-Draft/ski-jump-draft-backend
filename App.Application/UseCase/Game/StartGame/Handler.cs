@@ -16,7 +16,11 @@ using App.Domain.GameWorld;
 using App.Domain.Matchmaking;
 using Microsoft.FSharp.Collections;
 using CompetitionJumperDto = App.Application.Acl.CompetitionJumperDto;
+using GameJumperDto = App.Application.Acl.GameJumperDto;
+using Hill = App.Domain.Competition.Hill;
+using HillId = App.Domain.Competition.HillId;
 using HillModule = App.Domain.Competition.HillModule;
+using Player = App.Domain.Matchmaking.Player;
 using PlayerId = App.Domain.Game.PlayerId;
 using PlayerModule = App.Domain.Game.PlayerModule;
 
@@ -75,41 +79,20 @@ public class Handler(
         Dictionary<Guid, Guid> gamePlayerByMatchmakingPlayer = new();
 
         var endedMatchmakingPlayers = matchmaking.Players_;
-        var gamePlayersEnumerable = endedMatchmakingPlayers.Select(matchmakingPlayer =>
-        {
-            var gamePlayerGuid = guid.NewGuid();
-            var gamePlayerId = PlayerId.NewPlayerId(gamePlayerGuid);
-            var matchmakingPlayerNickString =
-                Domain.Matchmaking.PlayerModule.NickModule.value(matchmakingPlayer.Nick)!;
-            var gamePlayerNick = PlayerModule.NickModule.createWithSuffix(matchmakingPlayerNickString).Value;
-            var gamePlayer = new Domain.Game.Player(gamePlayerId, gamePlayerNick);
-            gamePlayerByMatchmakingPlayer.Add(matchmakingPlayer.Id.Item, gamePlayerGuid);
-            botRegistry.RegisterGameBot(gameGuid, gamePlayerGuid);
-            return gamePlayer;
-        });
+        var gamePlayersEnumerable = CreateGamePlayers(command.MatchmakingId, gameGuid, endedMatchmakingPlayers,
+            gamePlayerByMatchmakingPlayer);
         var gamePlayers = Domain.Game.PlayersModule.create(ListModule.OfSeq(gamePlayersEnumerable)).ResultValue;
 
         var jumperGameFormsPrintString = "Forma zawodników:\n";
         var gameJumpersEnumerable = new List<Domain.Game.Jumper>();
 
-        // Musimy użyć foreach, żeby zbudować debugowy jumperGameFormsPrintString
         foreach (var selectedGameWorldJumperDto in selectedJumperDtos)
         {
             var gameJumperId = guid.NewGuid();
             var gameJumperDto = new GameJumperDto(gameJumperId);
-            var gameWorldJumperDto = new GameWorldJumperDto(selectedGameWorldJumperDto.Id);
-            gameJumperAcl.Map(gameWorldJumperDto, gameJumperDto);
-
-            var competitionJumperId = guid.NewGuid();
-            competitionJumperAcl.Map(gameJumperDto, new CompetitionJumperDto(competitionJumperId));
-
-            var liveForm = selectedGameWorldJumperDto.LiveForm;
-            var gameForm = jumperGameFormAlgorithm.CalculateFromLiveForm(liveForm);
-            jumperGameFormStorage.Add(gameJumperId, gameForm);
-
-            jumperGameFormsPrintString += $"{selectedGameWorldJumperDto.Name} {selectedGameWorldJumperDto.Surname
-            } --> GameForm {gameForm}\n";
-
+            SetupJumperAcl(selectedGameWorldJumperDto, gameJumperDto);
+            jumperGameFormsPrintString =
+                CalculateAndStoreJumperForm(gameJumperId, selectedGameWorldJumperDto, jumperGameFormsPrintString);
             gameJumpersEnumerable.Add(new Domain.Game.Jumper(Domain.Game.JumperId.NewJumperId(gameJumperId)));
         }
 
@@ -117,7 +100,33 @@ public class Handler(
         var gameJumpers = Domain.Game.JumpersModule.create(ListModule.OfSeq(gameJumpersEnumerable));
 
         var competitionHillId = Domain.Competition.HillId.NewHillId(guid.NewGuid());
-        var competitionHill = new Domain.Competition.Hill(competitionHillId,
+        var competitionHill = CreateCompetitionHill(competitionHillId, gameWorldHill);
+        SetupCompetitionHillAcl(competitionHillId, gameWorldHill);
+
+        var gameResult =
+            Domain.Game.Game.Create(gameId, globalGameSettings, gamePlayers, gameJumpers, competitionHill);
+        if (gameResult.IsOk)
+        {
+            var game = gameResult.ResultValue;
+            var timeToPreDraft = game.Settings.BreakSettings.BreakBeforePreDraft.Value;
+            await games.Add(game, ct);
+            await SchedulePreDraftPhase(gameGuid, timeToPreDraft, ct);
+            await NotifyGameStart(game, gameGuid, gamePlayerByMatchmakingPlayer, command.MatchmakingId, ct);
+            return new Result(gameGuid);
+        }
+
+        throw new GameInitializationException(gameGuid, gameResult.ErrorValue.ToString());
+    }
+
+    private void SetupCompetitionHillAcl(HillId competitionHillId, Domain.GameWorld.Hill gameWorldHill)
+    {
+        competitionHillAcl.Map(new CompetitionHillDto(competitionHillId.Item),
+            new GameWorldHillDto(gameWorldHill.Id.Item));
+    }
+
+    private Hill CreateCompetitionHill(HillId competitionHillId, Domain.GameWorld.Hill gameWorldHill)
+    {
+        return new Domain.Competition.Hill(competitionHillId,
             HillModule.KPointModule.tryCreate(Domain.GameWorld.HillModule.KPointModule.value(gameWorldHill.KPoint))
                 .Value,
             HillModule.HsPointModule
@@ -128,30 +137,79 @@ public class Handler(
                 .tryCreate(Domain.GameWorld.HillModule.WindPointsModule.value(gameWorldHill.HeadwindPoints)).Value,
             HillModule.WindPointsModule
                 .tryCreate(Domain.GameWorld.HillModule.WindPointsModule.value(gameWorldHill.TailwindPoints)).Value);
-        competitionHillAcl.Map(new CompetitionHillDto(competitionHillId.Item),
-            new GameWorldHillDto(gameWorldHill.Id.Item));
+    }
 
-        var gameResult =
-            Domain.Game.Game.Create(gameId, globalGameSettings, gamePlayers, gameJumpers, competitionHill);
-        if (gameResult.IsOk)
+    private string? CalculateAndStoreJumperForm(Guid gameJumperId,
+        SelectedGameWorldJumperDto selectedGameWorldJumperDto,
+        string? jumperGameFormsPrintString)
+    {
+        var liveForm = selectedGameWorldJumperDto.LiveForm;
+        var gameForm = jumperGameFormAlgorithm.CalculateFromLiveForm(liveForm);
+        jumperGameFormStorage.Add(gameJumperId, gameForm);
+
+        if (jumperGameFormsPrintString is null) return null;
+
+        jumperGameFormsPrintString += $"{selectedGameWorldJumperDto.Name} {selectedGameWorldJumperDto.Surname
+        } --> GameForm {gameForm}\n";
+        return jumperGameFormsPrintString;
+    }
+
+    private void SetupJumperAcl(SelectedGameWorldJumperDto selectedGameWorldJumperDto, GameJumperDto gameJumperDto)
+    {
+        var gameWorldJumperDto = new GameWorldJumperDto(selectedGameWorldJumperDto.Id);
+        gameJumperAcl.Map(gameWorldJumperDto, gameJumperDto);
+
+        var competitionJumperId = guid.NewGuid();
+        competitionJumperAcl.Map(gameJumperDto, new CompetitionJumperDto(competitionJumperId));
+    }
+
+
+    private IEnumerable<Domain.Game.Player> CreateGamePlayers(Guid matchmakingId, Guid gameGuid,
+        IReadOnlyCollection<Player> endedMatchmakingPlayers,
+        Dictionary<Guid, Guid> gamePlayerByMatchmakingPlayer)
+    {
+        Command command;
+        return endedMatchmakingPlayers.Select(matchmakingPlayer =>
         {
-            var game = gameResult.ResultValue;
-            var timeToPreDraft = game.Settings.BreakSettings.BreakBeforePreDraft.Value;
-            await games.Add(game, ct);
-            gameSchedule.SchedulePhase(gameGuid, GamePhase.PreDraft, timeToPreDraft);
-            await scheduler.ScheduleAsync(
-                jobType: "StartPreDraft",
-                payloadJson: json.Serialize(new { GameId = gameGuid }),
-                runAt: clock.Now().Add(timeToPreDraft),
-                uniqueKey: $"StartPreDraft:{gameGuid}", ct: ct
-            );
-            await gameNotifier.GameStartedAfterMatchmaking(command.MatchmakingId, gameGuid,
-                gamePlayerByMatchmakingPlayer);
-            await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(game, ct: ct));
-            return new Result(gameGuid);
-        }
+            var gamePlayerGuid = guid.NewGuid();
+            var gamePlayerId = PlayerId.NewPlayerId(gamePlayerGuid);
+            var matchmakingPlayerNickString =
+                Domain.Matchmaking.PlayerModule.NickModule.value(matchmakingPlayer.Nick)!;
+            var gamePlayerNick = PlayerModule.NickModule.createWithSuffix(matchmakingPlayerNickString).Value;
+            var gamePlayer = new Domain.Game.Player(gamePlayerId, gamePlayerNick);
+            gamePlayerByMatchmakingPlayer.Add(matchmakingPlayer.Id.Item, gamePlayerGuid);
+            RegisterGameBotIfNeeded(matchmakingId, matchmakingPlayer, gameGuid, gamePlayerGuid);
+            return gamePlayer;
+        });
+    }
 
-        throw new GameInitializationException(gameGuid, gameResult.ErrorValue.ToString());
+    private bool RegisterGameBotIfNeeded(Guid matchmakingId, Player matchmakingPlayer, Guid gameGuid,
+        Guid gamePlayerGuid)
+    {
+        if (!botRegistry.IsMatchmakingBot(matchmakingId, matchmakingPlayer.Id.Item)) return false;
+        botRegistry.RegisterGameBot(gameGuid, gamePlayerGuid);
+        return true;
+    }
+
+    private async Task SchedulePreDraftPhase(Guid gameGuid, TimeSpan timeToPreDraft, CancellationToken ct)
+    {
+        gameSchedule.ScheduleEvent(gameGuid, GameScheduleTarget.PreDraft, timeToPreDraft);
+        await scheduler.ScheduleAsync(
+            jobType: "StartPreDraft",
+            payloadJson: json.Serialize(new { GameId = gameGuid }),
+            runAt: clock.Now().Add(timeToPreDraft),
+            uniqueKey: $"StartPreDraft:{gameGuid}", ct: ct
+        );
+    }
+
+    private async Task NotifyGameStart(Domain.Game.Game game, Guid gameGuid,
+        Dictionary<Guid, Guid> gamePlayerByMatchmakingPlayer, Guid matchmakingId,
+        CancellationToken ct)
+    {
+        Command command;
+        await gameNotifier.GameStartedAfterMatchmaking(matchmakingId, gameGuid,
+            gamePlayerByMatchmakingPlayer);
+        await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(game, ct: ct));
     }
 }
 

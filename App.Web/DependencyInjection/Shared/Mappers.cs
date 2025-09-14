@@ -8,6 +8,8 @@ public static class Mappers
     {
         services
             .AddSingleton<GameUpdatedDtoMapper, GameUpdatedDtoMapper>();
+        services
+            .AddSingleton<MatchmakingUpdatedDtoMapper, MatchmakingUpdatedDtoMapper>();
         return services;
     }
 }

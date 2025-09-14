@@ -8,12 +8,12 @@ public sealed class InMemory(IClock clock) : IGameSchedule
 {
     private readonly ConcurrentDictionary<Guid, GameScheduleDto> _dtos = new();
 
-    public void SchedulePhase(Guid gameId, GamePhase phase, TimeSpan @in)
+    public void ScheduleEvent(Guid gameId, GameScheduleTarget scheduleTarget, TimeSpan @in)
     {
         var now = clock.Now();
         var scheduledAt = now + @in;
         if (!CanSchedulePhaseFor(gameId)) return;
-        var dto = new GameScheduleDto(gameId, phase, @in, scheduledAt);
+        var dto = new GameScheduleDto(gameId, scheduleTarget, @in, scheduledAt);
         if (!CanBeScheduled(dto)) return;
         _dtos[gameId] = dto;
     }

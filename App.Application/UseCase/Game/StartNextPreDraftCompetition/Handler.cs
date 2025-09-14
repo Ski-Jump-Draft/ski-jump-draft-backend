@@ -3,6 +3,7 @@ using App.Application.Acl;
 using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
+using App.Application.Game;
 using App.Application.Game.Gate;
 using App.Application.Mapping;
 using App.Application.Messaging.Notifiers;
@@ -33,7 +34,8 @@ public class Handler(
     ICompetitionJumperAcl competitionJumperAcl,
     ISelectGameStartingGateService selectGameStartingGateService,
     IMyLogger logger,
-    GameUpdatedDtoMapper gameUpdatedDtoMapper)
+    GameUpdatedDtoMapper gameUpdatedDtoMapper,
+    IGameSchedule gameSchedule)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -65,13 +67,15 @@ public class Handler(
         await games.Add(gameAfterStartNextPreDraftCompetition, ct);
         var timeToJump = game.Settings.CompetitionJumpInterval.Value;
         var now = clock.Now();
+        gameSchedule.ScheduleEvent(command.GameId, GameScheduleTarget.CompetitionJump, timeToJump);
         await scheduler.ScheduleAsync(
             jobType: "SimulateJumpInGame",
             payloadJson: json.Serialize(new { GameId = game.Id_.Item }),
             runAt: now.Add(timeToJump),
             uniqueKey: $"SimulateJumpInGame:{game.Id_.Item}_{now.ToUnixTimeSeconds()}",
             ct: ct);
-        await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterStartNextPreDraftCompetition, ct: ct));
+        await gameNotifier.GameUpdated(
+            await gameUpdatedDtoMapper.FromDomain(gameAfterStartNextPreDraftCompetition, ct: ct));
         return new Result(competitionGuid);
     }
 }

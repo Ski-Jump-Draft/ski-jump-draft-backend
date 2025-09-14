@@ -91,7 +91,7 @@ module JumpResultCreator =
                     match jump.Wind with
                     | WindAverage.Headwind headwind ->
                         let hillHeadwindPoints = Hill.WindPoints.value hill.HeadwindPoints
-                        headwind * hillHeadwindPoints
+                        -headwind * hillHeadwindPoints
                     | WindAverage.Tailwind tailwind ->
                         let hillTailwindPoints = Hill.WindPoints.value hill.TailwindPoints
                         tailwind * hillTailwindPoints

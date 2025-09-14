@@ -117,7 +117,7 @@ type Startlist =
             Ok
                 { this with
                     Remaining = tail
-                    Done = next :: this.Done }
+                    Done = this.Done @ [ next ] } // <-- tu zmiana
         | next :: _ -> Error(Startlist.Error.JumperNotNext(jumperId, next))
 
     member this.RoundIsFinished: bool = this.Remaining.IsEmpty

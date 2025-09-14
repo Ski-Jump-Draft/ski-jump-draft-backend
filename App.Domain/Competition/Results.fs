@@ -28,6 +28,11 @@ module JumpResult =
     module WindPoints =
         let value (WindPoints v) = v
 
+    type TotalCompensation = TotalCompensation of double
+
+    module TotalCompensation =
+        let value (TotalCompensation v) = v
+
 open JumpResult
 
 type JumpResult =
@@ -39,6 +44,14 @@ type JumpResult =
       GatePoints: GatePoints option
       WindPoints: WindPoints option
       TotalPoints: TotalPoints }
+
+    member this.TotalCompensation: TotalCompensation =
+        let gate = this.GatePoints |> Option.map GatePoints.value |> Option.defaultValue 0.0
+
+        let wind = this.WindPoints |> Option.map WindPoints.value |> Option.defaultValue 0.0
+
+        TotalCompensation(gate + wind)
+
 
 module Classification =
     type Position = private Position of int
@@ -99,7 +112,10 @@ type Results =
             |> List.groupBy _.Jump.JumperId
             |> List.map (fun (jumperId, jumpResults) ->
                 let sortedJumpResults = jumpResults |> List.sortBy _.RoundIndex
-                let totalPoints = jumpResults |> List.sumBy (fun j -> let (TotalPoints p) = j.TotalPoints in p)
+
+                let totalPoints =
+                    jumpResults |> List.sumBy (fun j -> let (TotalPoints p) = j.TotalPoints in p)
+
                 jumperId, totalPoints, sortedJumpResults)
             |> List.sortByDescending (fun (_, pts, _) -> pts)
 

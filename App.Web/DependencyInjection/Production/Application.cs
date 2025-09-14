@@ -15,7 +15,7 @@ public static class Application
     public static IServiceCollection AddProductionApplication(this IServiceCollection services)
     {
         services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.Fixed>(sp =>
-            new Fixed("Oslo HS134", sp.GetRequiredService<IHills>()));
+            new Fixed("Zakopane HS140", sp.GetRequiredService<IHills>()));
         services.AddSingleton<IGameJumpersSelector, App.Application.Policy.GameJumpersSelector.All>();
         services
             .AddSingleton<App.Application.Policy.DraftPassPicker.IDraftPassPicker, App.Application.Policy.DraftPassPicker.BestPicker>();
@@ -34,7 +34,7 @@ public static class Application
             .AddSingleton<App.Application.Game.Gate.IGameStartingGateSelectorFactory,
                 App.Application.Game.Gate.IterativeSimulatedFactory>(sp =>
             {
-                const JuryBravery juryBravery = JuryBravery.Medium;
+                const JuryBravery juryBravery = JuryBravery.Low;
                 return new IterativeSimulatedFactory(sp.GetRequiredService<IJumpSimulator>(),
                     sp.GetRequiredService<IWeatherEngine>(),
                     juryBravery, sp.GetRequiredService<ICompetitionJumperAcl>(),

@@ -321,6 +321,9 @@ type Game =
     member this.CurrentCompetitionClassificationResultOf(competitionJumperId: Competition.JumperId) =
         this.CurrentCompetition.Value.ClassificationResultOf competitionJumperId
 
+    member this.CurrentCompetitionBibOf(competitionJumperId: Competition.JumperId) =
+        this.CurrentCompetition.Value.Startlist_.BibOf competitionJumperId
+
     /// Ends the game based on a Ranking passed from Application Layer and drawn from some factory
     member this.EndGame(ranking: Ranking) =
         match this.Status with

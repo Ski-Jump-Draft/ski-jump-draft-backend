@@ -151,8 +151,8 @@ class Program
     }
 
     private static string UniqueKey(CompetitionResultDto r)
-        => r.Jumper.Id != Guid.Empty
-            ? r.Jumper.Id.ToString()
+        => r.Jumper.CompetitionJumperId != Guid.Empty
+            ? r.Jumper.CompetitionJumperId.ToString()
             : $"{r.Jumper.Name}|{r.Jumper.Surname}|{r.Jumper.CountryFisCode}";
 
     private static string Cell(string text, bool hl)

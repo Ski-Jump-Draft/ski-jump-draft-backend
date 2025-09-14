@@ -4,7 +4,7 @@ namespace App.Application.Game;
 
 public record GameScheduleDto(
     Guid GameId,
-    GamePhase Phase,
+    GameScheduleTarget ScheduleTarget,
     TimeSpan In,
     DateTimeOffset ScheduledAt)
 {
@@ -18,7 +18,7 @@ public record GameScheduleDto(
 
 public interface IGameSchedule
 {
-    void SchedulePhase(Guid gameId, GamePhase phase, TimeSpan @in);
+    void ScheduleEvent(Guid gameId, GameScheduleTarget scheduleTarget, TimeSpan @in);
     bool Remove(Guid gameId);
     GameScheduleDto? GetGameSchedule(Guid gameId);
 }

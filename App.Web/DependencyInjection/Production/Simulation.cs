@@ -14,7 +14,7 @@ public static class Simulation
                 FlightRatingPointsByForm: baseFormFactor * 1.1));
         services.AddSingleton<App.Domain.Simulation.IWeatherEngine, App.Simulator.Simple.WeatherEngine>(sp =>
             new WeatherEngine(sp.GetRequiredService<IRandom>(), sp.GetRequiredService<IMyLogger>(),
-                ConfigurationPresetFactory.StableHeadwind));
+                ConfigurationPresetFactory.TotalLottery));
         services.AddSingleton<App.Domain.Simulation.IJumpSimulator, App.Simulator.Simple.JumpSimulator>();
         services.AddSingleton<App.Domain.Simulation.IJudgesSimulator, App.Simulator.Simple.JudgesSimulator>();
         return services;

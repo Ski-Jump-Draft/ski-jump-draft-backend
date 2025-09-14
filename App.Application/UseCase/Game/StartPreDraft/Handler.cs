@@ -3,6 +3,7 @@ using App.Application.Acl;
 using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
+using App.Application.Game;
 using App.Application.Game.Gate;
 using App.Application.Mapping;
 using App.Application.Messaging.Notifiers;
@@ -29,7 +30,8 @@ public class Handler(
     IClock clock,
     IGuid guid,
     ISelectGameStartingGateService selectGameStartingGateService,
-    GameUpdatedDtoMapper gameUpdatedDtoMapper)
+    GameUpdatedDtoMapper gameUpdatedDtoMapper,
+    IGameSchedule gameSchedule)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -52,6 +54,7 @@ public class Handler(
             await games.Add(gameAfterPreDraftStart, ct);
             var timeToJump = game.Settings.CompetitionJumpInterval.Value;
             var now = clock.Now();
+            gameSchedule.ScheduleEvent(command.GameId, GameScheduleTarget.CompetitionJump, timeToJump);
             await scheduler.ScheduleAsync(
                 jobType: "SimulateJumpInGame",
                 payloadJson: json.Serialize(new { GameId = gameGuid }),

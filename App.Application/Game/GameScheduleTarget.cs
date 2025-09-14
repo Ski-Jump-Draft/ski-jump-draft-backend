@@ -1,10 +1,11 @@
 namespace App.Application.Game;
 
-public enum GamePhase
+public enum GameScheduleTarget
 {
     PreDraft,
     PreDraftNextCompetition,
     Draft,
     MainCompetition,
-    End
+    End,
+    CompetitionJump
 }

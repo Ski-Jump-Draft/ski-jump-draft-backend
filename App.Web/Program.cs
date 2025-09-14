@@ -45,7 +45,7 @@ app.MapPost("/matchmaking/join",
         [FromServices] App.Application.Utility.IMyLogger myLogger,
         CancellationToken ct) =>
     {
-        var command = new App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command(nick);
+        var command = new App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command(nick, IsBot: false);
         try
         {
             var (matchmakingId, correctedNick, playerId) = await commandBus
@@ -60,7 +60,8 @@ app.MapPost("/matchmaking/join",
             return Results.Conflict(new
             {
                 error = "MultipleGamesNotSupported",
-                message = "Nie udało się dołączyć do gry. Spróbuj ponownie za kilka minut. Pracujemy nad poprawą naszych serwerów, żeby utrzymywały wiele gier na raz."
+                message =
+                    "Nie udało się dołączyć do gry. Spróbuj ponownie za kilka minut. Pracujemy nad poprawą naszych serwerów, żeby utrzymywały wiele gier na raz."
             });
         }
         catch (App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.PlayerAlreadyJoinedException)

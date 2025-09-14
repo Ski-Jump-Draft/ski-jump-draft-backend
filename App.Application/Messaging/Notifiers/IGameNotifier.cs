@@ -26,20 +26,26 @@ public sealed record GameUpdatedDto(
     CompetitionDto? MainCompetition,
     BreakDto? Break,
     EndedDto? Ended,
-    CompetitionDto? LastCompetitionState
+    CompetitionDto? LastCompetitionState,
+    CompetitionRoundResultDto? LastCompetitionResultDto
 );
 
 // ───────── Header (stabilne słowniki referencyjne) ─────────
 
 public sealed record GameHeaderDto(
     Guid? HillId,
-    IReadOnlyList<PlayerDto> Players,
-    IReadOnlyList<JumperDto> Jumpers
-);
+    IReadOnlyList<GamePlayerDto> Players,
+    IReadOnlyList<GameJumperDto> Jumpers,
+    IReadOnlyList<CompetitionJumperDto> CompetitionJumpers);
 
-public sealed record PlayerDto(Guid PlayerId, string Nick);
+public sealed record GamePlayerDto(Guid PlayerId, string Nick, bool IsBot);
 
-public sealed record JumperDto(Guid JumperId);
+public sealed record GameJumperDto(
+    Guid GameJumperId,
+    Guid GameWorldJumperId,
+    string Name,
+    string Surname,
+    string CountryFisCode);
 
 // ───────── Next Status ─────────
 
@@ -77,29 +83,52 @@ public sealed record PlayerPicksDto(Guid PlayerId, IReadOnlyList<Guid> JumperIds
 
 public sealed record CompetitionDto(
     string Status, // "NotStarted" | "RoundInProgress" | "Suspended" | "Cancelled" | "Ended"
-    Guid? NextJumperId,
+    IReadOnlyList<StartlistJumperDto> Startlist,
     GateDto Gate,
-    IReadOnlyList<CompetitionResultDto> Results
+    IReadOnlyList<CompetitionResultDto> Results,
+    int? NextJumpInSeconds
+)
+{
+    public Guid? NextJumperId
+    {
+        get
+        {
+            var id = Startlist.FirstOrDefault(startlistJumper => !startlistJumper.Done)?.CompetitionJumperId;
+            return id;
+        }
+    }
+};
+
+public sealed record StartlistJumperDto(
+    int Bib,
+    bool Done,
+    Guid CompetitionJumperId
 );
 
 public sealed record CompetitionResultDto(
     double Rank,
     int Bib,
-    CompetitionJumperDto Jumper,
+    Guid CompetitionJumperId,
     double Total,
     IReadOnlyList<CompetitionRoundResultDto> Rounds
 );
 
 public sealed record CompetitionRoundResultDto(
+    Guid GameJumperId,
+    Guid CompetitionJumperId,
     double Distance,
     double Points,
+    IReadOnlyList<double>? Judges,
     double? JudgePoints,
-    double? WindPoints,
-    double? WindAverage
+    double? WindCompensation,
+    double WindAverage,
+    double? GateCompensation,
+    double? TotalCompensation
 );
 
 public sealed record CompetitionJumperDto(
-    Guid Id,
+    Guid GameJumperId,
+    Guid CompetitionJumperId,
     string Name,
     string Surname,
     string CountryFisCode

@@ -11,8 +11,8 @@ public class OnlineBotJoiner(IMatchmakings repo, ICommandBus bus, IMyLogger log)
     {
         while (!ct.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromSeconds(4), ct);
-            
+            await Task.Delay(TimeSpan.FromSeconds(5), ct);
+
             var all = await repo.GetInProgress(ct);
             var matchmaking = all.FirstOrDefault();
 
@@ -29,11 +29,11 @@ public class OnlineBotJoiner(IMatchmakings repo, ICommandBus bus, IMyLogger log)
             }
 
             const string nickBase = "Bot";
-            var cmd = new App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command(nickBase);
+            var cmd = new App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command(nickBase, IsBot: true);
 
             try
             {
-                var (matchmakingId, correctedNick, _) = await bus
+                var (matchmakingId, correctedNick, playerId) = await bus
                     .SendAsync<App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command,
                         App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Result>(cmd, ct);
 

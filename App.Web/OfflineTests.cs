@@ -15,7 +15,7 @@ public static class OfflineTests
         var joinResult = await commandBus
             .SendAsync<App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command,
                 App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Result>(
-                new App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command(myPlayer.GetNick()),
+                new App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command(myPlayer.GetNick(), IsBot: false),
                 CancellationToken.None);
 
         logger.Info($"Dołączyłeś do matchmakingu (ID = {joinResult.MatchmakingId})");

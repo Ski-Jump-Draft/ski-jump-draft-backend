@@ -4,6 +4,7 @@ using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Matchmaking;
 using App.Application.Messaging.Notifiers;
+using App.Application.Messaging.Notifiers.Mapper;
 using App.Application.Utility;
 using App.Domain.Matchmaking;
 
@@ -18,12 +19,13 @@ public record Result(bool HasSucceeded);
 public class Handler(
     IJson json,
     IMatchmakings matchmakings,
-    IMatchmakingNotifier notifier,
+    IMatchmakingNotifier matchmakingNotifier,
     IMatchmakingSchedule matchmakingSchedule,
     IScheduler scheduler,
     IClock clock,
     IMyLogger logger,
-    IBotRegistry botRegistry)
+    IBotRegistry botRegistry,
+    MatchmakingUpdatedDtoMapper matchmakingUpdatedDtoMapper)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -64,7 +66,7 @@ public class Handler(
             matchmakingSchedule.EndMatchmaking(command.MatchmakingId);
         }
 
-        await notifier.MatchmakingUpdated(MatchmakingNotifierMappers.MatchmakingUpdatedFromDomain(endedMatchmaking));
+        await matchmakingNotifier.MatchmakingUpdated(matchmakingUpdatedDtoMapper.FromDomain(endedMatchmaking));
 
         return new Result(hasSucceeded);
     }

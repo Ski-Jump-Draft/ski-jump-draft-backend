@@ -67,7 +67,7 @@ public class Handler(
                 draftPicksArchive.Archive(command.GameId, picksDictionary.ToEnumerableValues());
                 await LogDraftPicks(gameAfterPass, picksDictionary, ct);
                 var timeToMainCompetition = gameAfterPass.Settings.BreakSettings.BreakBeforeMainCompetition.Value;
-                gameSchedule.SchedulePhase(command.GameId, GamePhase.MainCompetition, timeToMainCompetition);
+                gameSchedule.ScheduleEvent(command.GameId, GameScheduleTarget.MainCompetition, timeToMainCompetition);
                 var now = clock.Now();
                 await scheduler.ScheduleAsync(
                     jobType: "StartMainCompetition",
