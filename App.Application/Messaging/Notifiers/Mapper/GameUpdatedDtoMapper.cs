@@ -378,7 +378,13 @@ public class GameUpdatedDtoMapper(
         logger.Info($"Startlist: {
             string.Join(", ", startlist.Select(startlistJumperDto => startlistJumperDto.ToString()))}");
 
-        return new CompetitionDto(status, startlist, gate,
+        int? roundIndex = null;
+        if (status == "RoundInProgress")
+        {
+            roundIndex = (int)RoundIndexModule.value(comp.CurrentRoundIndex.Value);
+        }
+
+        return new CompetitionDto(status, roundIndex, startlist, gate,
             results.ToImmutableList(), nextJumpIn);
     }
 

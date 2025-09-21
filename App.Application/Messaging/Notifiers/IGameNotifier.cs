@@ -99,6 +99,7 @@ public sealed record PlayerPicksDto(Guid PlayerId, IReadOnlyList<Guid> JumperIds
 
 public sealed record CompetitionDto(
     string Status, // "NotStarted" | "RoundInProgress" | "Suspended" | "Cancelled" | "Ended"
+    int? RoundIndex,
     IReadOnlyList<StartlistJumperDto> Startlist,
     GateStateDto GateState,
     IReadOnlyList<CompetitionResultDto> Results,

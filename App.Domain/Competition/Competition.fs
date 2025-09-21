@@ -55,6 +55,11 @@ type Competition =
         | Status.Cancelled -> StatusTag.CancelledTag
         | Status.Ended -> StatusTag.EndedTag
 
+    member this.CurrentRoundIndex: RoundIndex option =
+        match this.Status with
+        | Status.RoundInProgress(_, roundIndex) -> Some roundIndex
+        | _ -> None
+
     member this.GateState =
         match this.Status with
         | Status.NotStarted gs
@@ -256,7 +261,9 @@ type Competition =
                         this.BuildNextRoundStartlist(startlistAfter, nextRound, resultsAfter)
 
                     if nextStartlist.IsError then
-                        raise (Exception($"Next round startlist internal error: {nextStartlist |> Result.mapError string}"))
+                        raise (
+                            Exception($"Next round startlist internal error: {nextStartlist |> Result.mapError string}")
+                        )
 
                     let updated =
                         { this with
