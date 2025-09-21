@@ -52,14 +52,14 @@ type Hill =
     { Id: HillId
       Name: Name
       Location: Location
-      CountryId: CountryFisCode
+      CountryCode: CountryFisCode
       KPoint: KPoint
       HsPoint: HsPoint
       GatePoints: GatePoints
       HeadwindPoints: WindPoints
       TailwindPoints: WindPoints }
 
-    static member Create id name location countryId kPoint hsPoint gatePoints headwindPoints tailwindPoints =
+    static member Create id name location countryCode kPoint hsPoint gatePoints headwindPoints tailwindPoints =
         if (WindPoints.value headwindPoints > WindPoints.value tailwindPoints) then
             Error(HillError.HeadwindPointsGreaterThanTailwindPoints)
         elif (KPoint.value kPoint >= HsPoint.value hsPoint) then
@@ -69,7 +69,7 @@ type Hill =
                 { Id = id
                   Name = name
                   Location = location
-                  CountryId = countryId
+                  CountryCode = countryCode
                   KPoint = kPoint
                   HsPoint = hsPoint
                   GatePoints = gatePoints

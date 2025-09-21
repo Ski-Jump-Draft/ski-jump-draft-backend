@@ -12,13 +12,15 @@ namespace App.Simulator.Simple;
 /// <param name="FlightRatingPointsByForm">How many flight rating points by a one point of the form?</param>
 /// <param name="FlightToTakeoffRatio">E.g. 3.5 means that flight has 3.5 times more impact to distance than takeoff</param>
 /// <param name="RandomAdditionsRatio">Multiplies all random additions</param>
+/// <param name="DistanceSpreadByRatingFactor">Scales meters per rating point</param>
 public record SimulatorConfiguration(
     double SkillImpactFactor,
     double AverageBigSkill,
     double TakeoffRatingPointsByForm,
     double FlightRatingPointsByForm,
     double FlightToTakeoffRatio = 1,
-    double RandomAdditionsRatio = 1);
+    double RandomAdditionsRatio = 1,
+    double DistanceSpreadByRatingFactor = 1);
 
 public class JumpSimulator(SimulatorConfiguration configuration, IRandom random, IMyLogger logger) : IJumpSimulator
 {
@@ -133,7 +135,7 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
             {
                 < 0.0005 => Landing.Fall,
                 < 0.001 => Landing.TouchDown,
-                < 0.01 => Landing.Parallel,
+                < 0.009 => Landing.Parallel,
                 _ => Landing.Telemark,
             };
         }
@@ -181,7 +183,7 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
         var startingDistance = kPoint / 2.5;
 
         // ZMIANA: Upraszczamy bazowy przelicznik punktów ratingu na metry
-        var metersByRatingPoint = 0.2 * (kPoint / 100);
+        var metersByRatingPoint = 0.2 * (kPoint / 100) * configuration.DistanceSpreadByRatingFactor;
         logger.Debug($"KPoint: {kPoint}, startingDistance: {startingDistance}, metersByRatingPoint: {metersByRatingPoint
         }");
 
@@ -191,9 +193,15 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
         logger.Debug($"TakeoffRating: {takeoffRating}, FlightRating: {flightRating}, TakeoffAddition: {takeoffAddition
         }, FlightAddition: {flightAddition}");
 
-        var windAddition = averageWind * 4 * (kPoint / 50);
+        var windAddition = CalculateWindAddition(context, averageWind, kPoint);
         logger.Debug($"Wind: {averageWind}, WindAddition: {windAddition}");
 
         return startingDistance + gateAddition + takeoffAddition + flightAddition + windAddition;
+    }
+
+    private double CalculateWindAddition(SimulationContext context, double averageWind, double kPoint)
+    {
+        var windAddition = averageWind * 4 * (kPoint / 50);
+        return windAddition;
     }
 }

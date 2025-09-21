@@ -1,6 +1,7 @@
 using App.Application.Acl;
 using App.Application.Game.DraftPicks;
 using App.Application.Game.GameCompetitions;
+using App.Application.Utility;
 using App.Domain.Game;
 
 namespace App.Application.Game.Ranking;
@@ -8,7 +9,8 @@ namespace App.Application.Game.Ranking;
 public class DefaultSelector(
     IDraftPicksArchive draftPicksArchive,
     IGameCompetitionResultsArchive gameCompetitionResultsArchive,
-    ICompetitionJumperAcl competitionJumperAcl)
+    ICompetitionJumperAcl competitionJumperAcl,
+    IMyLogger logger)
     : IGameRankingFactorySelector
 {
     public IGameRankingFactory Select(RankingPolicy rankingPolicy)
@@ -16,7 +18,7 @@ public class DefaultSelector(
         return rankingPolicy switch
         {
             { IsClassic: true } => new ClassicGameRankingFactory(draftPicksArchive, gameCompetitionResultsArchive,
-                competitionJumperAcl),
+                competitionJumperAcl, logger),
             // { IsPodiumAtAllCosts: true } => new PodiumAtAllCosts(competitionJumperAcl), TODO
             _ => throw new UnsupportedPolicyException(rankingPolicy),
         };

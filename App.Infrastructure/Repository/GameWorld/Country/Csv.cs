@@ -44,7 +44,8 @@ public class Csv(
         {
             try
             {
-                if (csvCountry.Fis == CountryFisCodeModule.value(countryFisCode))
+                if (csvCountry.Fis.Equals(CountryFisCodeModule.value(countryFisCode),
+                        StringComparison.InvariantCultureIgnoreCase))
                     return FSharpOption<Domain.GameWorld.Country>.Some(Map(csvCountry));
             }
             catch (Exception ex)

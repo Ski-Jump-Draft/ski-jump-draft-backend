@@ -1,6 +1,7 @@
 using App.Application.Acl;
 using App.Application.Game.DraftPicks;
 using App.Application.Game.GameCompetitions;
+using App.Application.Utility;
 using App.Domain.Competition;
 using App.Domain.Game;
 using Microsoft.FSharp.Collections;
@@ -13,7 +14,8 @@ namespace App.Application.Game.Ranking;
 public class ClassicGameRankingFactory(
     IDraftPicksArchive draftPicksArchive,
     IGameCompetitionResultsArchive gameCompetitionResultsArchive,
-    ICompetitionJumperAcl competitionJumperAcl)
+    ICompetitionJumperAcl competitionJumperAcl,
+    IMyLogger logger)
     : IGameRankingFactory
 {
     public Task<Domain.Game.Ranking> Create(Domain.Game.Game game, CancellationToken ct)
@@ -34,13 +36,16 @@ public class ClassicGameRankingFactory(
         }
 
         var mainCompetitionPositionByJumper = new Dictionary<JumperId, int>();
-        foreach (var (competitionJumperId, position, _) in mainCompetitionClassification)
+        foreach (var (competitionJumperId, position, _, _, _) in mainCompetitionClassification)
         {
             var gameJumperDto = competitionJumperAcl.GetGameJumper(competitionJumperId);
             var gameJumperId = JumperId.NewJumperId(gameJumperDto.Id);
             mainCompetitionPositionByJumper.Add(gameJumperId,
                 position);
         }
+
+        logger.Info($"Main competition classification: {string.Join(",",
+            mainCompetitionPositionByJumper.Select(kvp => $"Jumper {kvp.Key.Item} ==> {kvp.Value} position"))}");
 
         var mainCompetitionPositionsByPlayer = new Dictionary<PlayerId, List<int>>();
         foreach (var playerId in playerIds)
@@ -59,6 +64,13 @@ public class ClassicGameRankingFactory(
 
             mainCompetitionPositionsByPlayer.Add(playerId, positions);
         }
+
+        logger.Info(
+            $"Main competition positions by player: {string.Join(", ",
+                mainCompetitionPositionsByPlayer.Select(kvp =>
+                    $"Player {kvp.Key.Item} ==> [{string.Join(",", kvp.Value)}]"))}"
+        );
+
 
         var pointsByPlayer = new Dictionary<PlayerId, int>();
         foreach (var playerId in playerIds)
@@ -87,7 +99,6 @@ public class ClassicGameRankingFactory(
                 return Tuple.Create(idAndPoints.Key, points);
             })
         );
-
         return Task.FromResult(Domain.Game.Ranking.Create(fSharpRankingMap));
     }
 }

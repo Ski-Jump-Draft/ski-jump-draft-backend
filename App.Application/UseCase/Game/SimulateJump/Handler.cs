@@ -17,6 +17,7 @@ using Gate = App.Domain.Simulation.Gate;
 using Hill = App.Domain.Simulation.Hill;
 using HillModule = App.Domain.Simulation.HillModule;
 using Jumper = App.Domain.Simulation.Jumper;
+using JumperId = App.Domain.Competition.JumperId;
 using JumperSkillsModule = App.Domain.Simulation.JumperSkillsModule;
 
 namespace App.Application.UseCase.Game.SimulateJump;
@@ -46,7 +47,8 @@ public class Handler(
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
     IJumperGameFormStorage jumperGameFormStorage,
     IGameCompetitionResultsArchive competitionResultsArchive,
-    IGameSchedule gameSchedule)
+    IGameSchedule gameSchedule,
+    IGameUpdatedDtoMapperCache gameUpdatedDtoMapperCache)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -126,7 +128,8 @@ public class Handler(
                     classificationResult.Points.Item
                 }pts)");
 
-            Competition? previousCompetition = null;
+            Competition? previousCompetition = addJumpOutcome.Competition; // TODO
+
 
             if (gameAfterAddingJump.IsDuringCompetition)
             {
@@ -188,9 +191,8 @@ public class Handler(
                 else if (gameAfterAddingJump.Status.IsBreak &&
                          ((Domain.Game.Status.Break)gameAfterAddingJump.Status).Next.IsEndedTag)
                 {
+                    ArchiveMainCompetitionResults(addJumpOutcome, command.GameId);
                     previousCompetition = addJumpOutcome.Competition;
-                    gameCompetitionResultsArchive.ArchiveMain(command.GameId,
-                        addJumpOutcome.Classification.ToGameCompetitionResultsArchiveDto());
                     var timeToEnd = gameAfterAddingJump.Settings.BreakSettings
                         .BreakBeforeEnd.Value;
                     gameSchedule.ScheduleEvent(command.GameId, GameScheduleTarget.End, timeToEnd);
@@ -211,9 +213,14 @@ public class Handler(
                 }
             }
 
-            await gameNotifier.GameUpdated(
-                await gameUpdatedDtoMapper.FromDomain(gameAfterAddingJump, previousCompetition,
-                    nextCompetitionJumper.Id.Item, ct: ct));
+            logger.Info("Previous competition: " + (previousCompetition is null
+                ? "null"
+                : $"not null, next jumper exists: {previousCompetition.NextJumper.IsSome()}"));
+
+            var gameUpdatedDto = await CreateGameUpdatedDtoAndCacheIfNeeded(gameAfterAddingJump, previousCompetition,
+                nextCompetitionJumper.Id, ct);
+            await gameNotifier.GameUpdated(gameUpdatedDto
+            );
 
             var jumperResultInClassifiation = addJumpOutcome.Competition
                 .ClassificationResultOf(nextCompetitionJumper.Id)
@@ -236,12 +243,49 @@ public class Handler(
 
     private void ArchivePreDraftCompetitionResults(AddJumpOutcome addJumpOutcome, Guid gameId)
     {
-        var competitionResultRecords = addJumpOutcome.Classification.Select(result =>
-            new ResultRecord(result.JumperId.Item,
-                Classification.PositionModule.value(result.Position),
-                TotalPointsModule.value(result.Points)));
+        var archiveDto = addJumpOutcome.Classification.ToGameCompetitionResultsArchiveDto(competitionJumperId =>
+            GetCompetitionJumperJumperBibOrThrow(addJumpOutcome, competitionJumperId));
         competitionResultsArchive.ArchivePreDraft(gameId,
-            new CompetitionResultsDto(competitionResultRecords.ToList()));
+            archiveDto);
+    }
+
+    private async Task<GameUpdatedDto> CreateGameUpdatedDtoAndCacheIfNeeded(App.Domain.Game.Game game,
+        App.Domain.Competition.Competition? lastCompetitionState,
+        App.Domain.Competition.JumperId lastCompetitionJumperId, CancellationToken ct)
+    {
+        var dto = await gameUpdatedDtoMapper.FromDomain(game, null,
+            lastCompetitionState: lastCompetitionState,
+            lastCompetitionJumperId.Item, ct: ct);
+
+        // if (game.StatusTag.IsPreDraftTag)
+        // {
+        //     if (dto.PreDraft is not null)
+        //     {
+        //         await gameUpdatedDtoMapperCache.SetEndedPreDraft(game.Id.Item, dto.PreDraft, ct);
+        //     }
+        // }
+
+        return dto;
+    }
+
+    private void ArchiveMainCompetitionResults(AddJumpOutcome addJumpOutcome, Guid gameId)
+    {
+        var archiveDto = addJumpOutcome.Classification.ToGameCompetitionResultsArchiveDto(competitionJumperId =>
+            GetCompetitionJumperJumperBibOrThrow(addJumpOutcome, competitionJumperId));
+        competitionResultsArchive.ArchiveMain(gameId,
+            archiveDto);
+    }
+
+    private static int GetCompetitionJumperJumperBibOrThrow(AddJumpOutcome addJumpOutcome, Guid competitionJumperId)
+    {
+        var bibOption =
+            addJumpOutcome.Competition.Startlist_.BibOf(JumperId.NewJumperId(competitionJumperId));
+        if (bibOption.IsNone())
+        {
+            throw new Exception($"Missing bib for jumper {competitionJumperId}.");
+        }
+
+        return StartlistModule.BibModule.value(bibOption.Value);
     }
 }
 

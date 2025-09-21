@@ -18,7 +18,7 @@ public static class Application
             new Fixed("Zakopane HS140", sp.GetRequiredService<IHills>()));
         services.AddSingleton<IGameJumpersSelector, App.Application.Policy.GameJumpersSelector.All>();
         services
-            .AddSingleton<App.Application.Policy.DraftPassPicker.IDraftPassPicker, App.Application.Policy.DraftPassPicker.BestPicker>();
+            .AddSingleton<App.Application.Policy.DraftPicker.IDraftPicker, App.Application.Policy.DraftPicker.BestPicker>();
         services
             .AddSingleton<App.Application.Game.Ranking.IGameRankingFactorySelector,
                 App.Application.Game.Ranking.DefaultSelector>();

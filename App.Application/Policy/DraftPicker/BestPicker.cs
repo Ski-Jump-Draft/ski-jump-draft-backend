@@ -7,7 +7,7 @@ using App.Application.Service;
 using App.Application.Utility;
 using App.Domain.GameWorld;
 
-namespace App.Application.Policy.DraftPassPicker;
+namespace App.Application.Policy.DraftPicker;
 
 public class BestPicker(
     IGameJumperAcl gameJumperAcl,
@@ -16,8 +16,9 @@ public class BestPicker(
     IGameCompetitionResultsArchive gameCompetitionResultsArchive,
     PreDraftPositionsService preDraftPositionsService,
     IRandom random,
-    IMyLogger logger)
-    : IDraftPassPicker
+    IMyLogger logger,
+    IJumpers jumpers)
+    : IDraftPicker, IDraftPassPicker
 {
     private Dictionary<Guid, List<int>> _preDraftPositionsByJumper = new();
 
@@ -31,11 +32,24 @@ public class BestPicker(
         UpdatePreDraftPositionsByJumper(game);
         var averagePositionByJumper = CreateAveragePositions(preDraftCompetitionResults);
         var ratingByGameJumper = CalculateGameJumperRatings(gameWorldJumpers, averagePositionByJumper, maxPosition);
-        logger.Info($"ratingByGameJumper = {
-            JsonSerializer.Serialize(ratingByGameJumper, new JsonSerializerOptions { WriteIndented = true })}");
+        await LogRatingsWithNames(ratingByGameJumper, ct);
         return DrawJumper(ratingByGameJumper);
     }
 
+    private async Task LogRatingsWithNames(Dictionary<Guid, double> ratingByGameJumper, CancellationToken ct)
+    {
+        var ratingsWithNames = new Dictionary<string, double>();
+        foreach (var kvp in ratingByGameJumper)
+        {
+            var gameWorldJumperId = gameJumperAcl.GetGameWorldJumper(kvp.Key).Id;
+            var gameWorldJumper = (await jumpers.GetById(JumperId.NewJumperId(gameWorldJumperId), ct)).Value;
+            var nameAndSurname = $"{gameWorldJumper.Name.Item} {gameWorldJumper.Surname.Item}";
+            ratingsWithNames[nameAndSurname] = kvp.Value;
+        }
+
+        logger.Info("ratingByGameJumper = " +
+                    JsonSerializer.Serialize(ratingsWithNames, new JsonSerializerOptions { WriteIndented = true }));
+    }
 
     private void ClearPreDraftPositions()
     {
@@ -133,19 +147,25 @@ public class BestPicker(
 
     private double CalculateRating(Jumper gameWorldJumper, int maxPosition, double averagePosition)
     {
-        const double rootN = 1.5;
-        const double positionImpactFactor = 4;
+        const double rootN = 1;
+        const double positionImpactFactor = 0.6;
         logger.Debug($"max position: {maxPosition}, average position: {averagePosition}, rootN: {rootN}");
+
         var rating = (maxPosition - averagePosition).NthRoot(rootN) * positionImpactFactor;
         logger.Debug($"rating: {rating}");
 
         var takeoff = JumperModule.BigSkillModule.value(gameWorldJumper.Takeoff);
         var flight = JumperModule.BigSkillModule.value(gameWorldJumper.Flight);
         var takeoffAndFlightAverage = (takeoff + flight) / 2;
-        const double alpha = 1.5; // alpha = 1 oznacza: różnica 1 w danym skillu odpowiada różnicy 1 średniej pozycji
+        const double alpha = 3; // alpha = X oznacza: różnica 1 w danym skillu odpowiada różnicy X średniej pozycji
         rating += takeoffAndFlightAverage * alpha;
         logger.Debug($"rating2: {rating}");
-        return rating;
+
+        const double beta = 15.5; // im większe, tym bardziej "winner-takes-all"
+        rating = Math.Pow(rating, beta);
+        logger.Debug($"rating3: {rating}");
+        const decimal divider = 1e23m;
+        return rating / (double)divider;
     }
 
     private Guid DrawJumper(Dictionary<Guid, double> ratingByGameJumper)

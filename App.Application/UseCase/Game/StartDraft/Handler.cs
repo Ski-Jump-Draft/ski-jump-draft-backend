@@ -3,6 +3,7 @@ using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
+using App.Application.Service;
 using App.Application.Utility;
 using App.Domain.Game;
 using Microsoft.FSharp.Collections;
@@ -24,7 +25,8 @@ public class Handler(
     IRandom random,
     IClock clock,
     IScheduler scheduler,
-    GameUpdatedDtoMapper gameUpdatedDtoMapper)
+    GameUpdatedDtoMapper gameUpdatedDtoMapper,
+    DraftSystemSchedulerService draftSystemSchedulerService)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -53,9 +55,11 @@ available picks: {gameAfterStartDraft.AvailableDraftPicks}
 picks: {gameAfterStartDraft.DraftPicks}
 ");
 
-        await DraftPassHelper.MaybeScheduleDraftPass(gameAfterStartDraft, scheduler, json, clock, ct);
+        await draftSystemSchedulerService.ScheduleSystemDraftEvents(gameAfterStartDraft, ct);
 
-        await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterStartDraft));
+        // await DraftPassHelper.MaybeScheduleDraftPass(gameAfterStartDraft, scheduler, json, clock, ct);
+
+        await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterStartDraft, ct: ct));
 
 
         return new Result();

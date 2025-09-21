@@ -1,6 +1,6 @@
 using App.Application.Utility;
 
-namespace App.Infrastructure.Utility.Guid;
+namespace App.Infrastructure.Utility.GuidUtilities;
 
 public class SystemGuid : IGuid
 {

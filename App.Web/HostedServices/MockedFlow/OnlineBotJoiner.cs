@@ -11,7 +11,7 @@ public class OnlineBotJoiner(IMatchmakings repo, ICommandBus bus, IMyLogger log)
     {
         while (!ct.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromSeconds(5), ct);
+            await Task.Delay(TimeSpan.FromMilliseconds(300), ct);
 
             var all = await repo.GetInProgress(ct);
             var matchmaking = all.FirstOrDefault();
@@ -23,7 +23,7 @@ public class OnlineBotJoiner(IMatchmakings repo, ICommandBus bus, IMyLogger log)
 
             var oneSlotRemained = matchmaking.RemainingSlots == 1;
 
-            if (matchmaking.IsFull || oneSlotRemained)
+            if (matchmaking.IsFull/* || oneSlotRemained*/)
             {
                 continue;
             }

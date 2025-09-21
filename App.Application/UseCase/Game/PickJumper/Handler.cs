@@ -5,6 +5,7 @@ using App.Application.Game;
 using App.Application.Game.DraftPicks;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
+using App.Application.Service;
 using App.Application.Utility;
 using App.Domain.Game;
 
@@ -27,7 +28,7 @@ public class Handler(
     IScheduler scheduler,
     IDraftPicksArchive draftPicksArchive,
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
-    IGameSchedule gameSchedule)
+    IGameSchedule gameSchedule, DraftSystemSchedulerService draftSystemSchedulerService)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -50,7 +51,7 @@ public class Handler(
 
             await games.Add(gameAfterPick, ct);
 
-            await DraftPassHelper.MaybeScheduleDraftPass(gameAfterPick, scheduler, json, clock, ct);
+            await draftSystemSchedulerService.ScheduleSystemDraftEvents(gameAfterPick, ct);
 
             if (phaseChangedTo.IsSome() && phaseChangedTo.Value.IsBreak)
             {
@@ -67,7 +68,7 @@ public class Handler(
                     ct: ct);
             }
 
-            await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterPick, ct: ct));
+            await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterPick, lastDraftState: pickOutcome.Draft, ct: ct));
 
             return new Result();
         }

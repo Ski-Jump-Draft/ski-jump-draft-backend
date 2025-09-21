@@ -10,7 +10,7 @@ public static class DraftPassHelper
         IJson json, IClock clock,
         CancellationToken ct = default)
     {
-        if (!game.StatusTag.IsDraftTag)
+        if (game.StatusTag.IsDraftTag == false)
         {
             return false;
         }

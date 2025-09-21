@@ -22,6 +22,7 @@ public sealed record GameUpdatedDto(
     int PreDraftsCount,
     GameHeaderDto Header,
     PreDraftDto? PreDraft,
+    EndedPreDraftDto? EndedPreDraft,
     DraftDto? Draft,
     CompetitionDto? MainCompetition,
     BreakDto? Break,
@@ -33,7 +34,9 @@ public sealed record GameUpdatedDto(
 // ───────── Header (stabilne słowniki referencyjne) ─────────
 
 public sealed record GameHeaderDto(
-    Guid? HillId,
+    string DraftOrderPolicy,
+    int? DraftTimeoutInSeconds,
+    GameHillDto Hill,
     IReadOnlyList<GamePlayerDto> Players,
     IReadOnlyList<GameJumperDto> Jumpers,
     IReadOnlyList<CompetitionJumperDto> CompetitionJumpers);
@@ -47,15 +50,28 @@ public sealed record GameJumperDto(
     string Surname,
     string CountryFisCode);
 
+public sealed record GameHillDto(
+    Guid GameHillId,
+    Guid GameWorldHillId,
+    string Name,
+    string Location,
+    double K,
+    double Hs,
+    string CountryFisCode,
+    string Alpha2Code
+);
+
 // ───────── Next Status ─────────
 
 public sealed record NextStatusDto(string Status, TimeSpan In);
 
 // ───────── PreDraft ─────────
+public sealed record EndedPreDraftDto(
+    List<EndedCompetitionResults> EndedCompetitions);
 
 public sealed record PreDraftDto(
-    string Mode, // "Running" | "Break"
-    int Index, // 0-based index aktualnego/polskiego konkursu pre-draft
+    string Status, // "Running" | "Break"
+    int? Index, // 0-based index aktualnego/polskiego konkursu pre-draft
     CompetitionDto? Competition // null, jeśli Break
 );
 
@@ -84,9 +100,9 @@ public sealed record PlayerPicksDto(Guid PlayerId, IReadOnlyList<Guid> JumperIds
 public sealed record CompetitionDto(
     string Status, // "NotStarted" | "RoundInProgress" | "Suspended" | "Cancelled" | "Ended"
     IReadOnlyList<StartlistJumperDto> Startlist,
-    GateDto Gate,
+    GateStateDto GateState,
     IReadOnlyList<CompetitionResultDto> Results,
-    int? NextJumpInSeconds
+    int? NextJumpInMilliseconds
 )
 {
     public Guid? NextJumperId
@@ -98,6 +114,9 @@ public sealed record CompetitionDto(
         }
     }
 };
+
+public sealed record EndedCompetitionResults(
+    IReadOnlyList<CompetitionResultDto> Results);
 
 public sealed record StartlistJumperDto(
     int Bib,
@@ -134,7 +153,7 @@ public sealed record CompetitionJumperDto(
     string CountryFisCode
 );
 
-public sealed record GateDto(
+public sealed record GateStateDto(
     int Starting,
     int CurrentJury,
     int? CoachReduction
@@ -146,5 +165,7 @@ public sealed record BreakDto(string Next); // "PreDraft" | "Draft" | "MainCompe
 
 public sealed record EndedDto(
     string Policy, // Classic | PodiumAtAllCosts
-    Dictionary<Guid, (int, int)> Ranking // position, points
+    Dictionary<Guid, PositionAndPoints> Ranking // position, points
 );
+
+public sealed record PositionAndPoints(int Position, int Points);

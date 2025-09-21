@@ -2,9 +2,9 @@ using App.Application.Extensions;
 using App.Application.Utility;
 using App.Domain.Game;
 
-namespace App.Application.Policy.DraftPassPicker;
+namespace App.Application.Policy.DraftPicker;
 
-public class RandomPicker(IRandom random) : IDraftPassPicker
+public class RandomPicker(IRandom random) : IDraftPicker, IDraftPassPicker
 {
     public Task<Guid> Pick(Domain.Game.Game game, CancellationToken ct)
     {

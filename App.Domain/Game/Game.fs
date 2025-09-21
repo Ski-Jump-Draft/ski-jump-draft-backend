@@ -220,6 +220,7 @@ type Game =
 
                     Ok
                         { Game = newGame
+                          Draft = newDraft
                           Picks = newDraft.Picks
                           PhaseChangedTo = Some newStatus }
                 else
@@ -229,6 +230,7 @@ type Game =
 
                     Ok
                         { Game = newGame
+                          Draft = newDraft
                           Picks = newDraft.Picks
                           PhaseChangedTo = None }
         | _ -> Error GameError.InvalidPhase
@@ -357,6 +359,7 @@ type Game =
 
 and PickOutcome =
     { Game: Game
+      Draft: Draft
       Picks: Draft.Picks
       PhaseChangedTo: Status option }
 

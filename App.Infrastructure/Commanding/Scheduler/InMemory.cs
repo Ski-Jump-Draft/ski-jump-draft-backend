@@ -63,6 +63,9 @@ public class InMemory(ICommandBus commandBus, IJson json, IMyLogger logger) : IS
                     case "PassPick":
                         await HandlePassPick(payloadJson, CancellationToken.None);
                         break;
+                    case "PickByBot":
+                        await HandlePickByBot(payloadJson, CancellationToken.None);
+                        break;
                     case "EndGame":
                         await HandleEndGame(payloadJson, CancellationToken.None);
                         break;
@@ -74,6 +77,9 @@ public class InMemory(ICommandBus commandBus, IJson json, IMyLogger logger) : IS
             catch (TaskCanceledException)
             {
                 // OK, to można zignorować
+            }
+            catch (Application.UseCase.Game.PassPick.PassPickingLockedException)
+            {
             }
             catch (Exception ex)
             {
@@ -172,6 +178,15 @@ public class InMemory(ICommandBus commandBus, IJson json, IMyLogger logger) : IS
         await commandBus
             .SendAsync<Application.UseCase.Game.PassPick.Command,
                 Application.UseCase.Game.PassPick.Result>(command, ct);
+    }
+
+    private async Task HandlePickByBot(string payloadJson, CancellationToken ct)
+    {
+        var payload = json.Deserialize<PickByBot>(payloadJson);
+        var command = new Application.UseCase.Game.PickByBot.Command(payload.GameId, payload.PlayerId);
+        await commandBus
+            .SendAsync<Application.UseCase.Game.PickByBot.Command,
+                Application.UseCase.Game.PickByBot.Result>(command, ct);
     }
 
     private async Task HandleEndGame(string payloadJson, CancellationToken ct)

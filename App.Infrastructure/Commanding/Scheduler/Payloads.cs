@@ -9,4 +9,5 @@ public record StartDraftPayload(Guid GameId);
 public record StartMainCompetitionPayload(Guid GameId);
 public record PickJumperPayload(Guid GameId, Guid PlayerId, Guid JumperId);
 public record PassPickPayload(Guid GameId, Guid PlayerId);
+public record PickByBot(Guid GameId, Guid PlayerId);
 public record EndGamePayload(Guid GameId);

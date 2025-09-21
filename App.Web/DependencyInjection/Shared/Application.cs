@@ -59,6 +59,11 @@ public static class Application
                 App.Application.UseCase.Game.PassPick.Handler>();
         services
             .AddSingleton<
+                ICommandHandler<App.Application.UseCase.Game.PickByBot.Command,
+                    App.Application.UseCase.Game.PickByBot.Result>,
+                App.Application.UseCase.Game.PickByBot.Handler>();
+        services
+            .AddSingleton<
                 ICommandHandler<App.Application.UseCase.Game.SimulateJump.Command,
                     App.Application.UseCase.Game.SimulateJump.Result>,
                 App.Application.UseCase.Game.SimulateJump.Handler>();
@@ -73,7 +78,13 @@ public static class Application
                     App.Application.UseCase.Game.EndGame.Result>,
                 App.Application.UseCase.Game.EndGame.Handler>();
 
-        services.AddSingleton<App.Application.Service.PreDraftPositionsService, App.Application.Service.PreDraftPositionsService>();
+        services
+            .AddSingleton<App.Application.Service.PreDraftPositionsService,
+                App.Application.Service.PreDraftPositionsService>();
+        services
+            .AddSingleton<App.Application.Service.DraftSystemSchedulerService,
+                App.Application.Service.DraftSystemSchedulerService>();
+
         services.AddSingleton<IMatchmakingSchedule, Infrastructure.Schedule.Matchmaking.InMemory>();
         services.AddSingleton<IGameSchedule, Infrastructure.Schedule.Game.InMemory>();
         return services;

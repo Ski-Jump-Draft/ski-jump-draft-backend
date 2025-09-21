@@ -20,7 +20,7 @@ public class PreDraftPositionsService(
 
         foreach (var preDraftCompetitionResults in preDraftResults)
         {
-            foreach (var (competitionJumperId, gameJumperPosition, _) in preDraftCompetitionResults.Results)
+            foreach (var (competitionJumperId, gameJumperPosition, _, _, _) in preDraftCompetitionResults.Results)
             {
                 var gameJumperId = competitionJumperAcl.GetGameJumper(competitionJumperId).Id;
                 if (!positionsByGameJumper.TryGetValue(gameJumperId, out var positionsList))

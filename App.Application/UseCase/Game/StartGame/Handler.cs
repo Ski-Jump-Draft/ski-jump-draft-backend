@@ -168,7 +168,6 @@ public class Handler(
         IReadOnlyCollection<Player> endedMatchmakingPlayers,
         Dictionary<Guid, Guid> gamePlayerByMatchmakingPlayer)
     {
-        Command command;
         return endedMatchmakingPlayers.Select(matchmakingPlayer =>
         {
             var gamePlayerGuid = guid.NewGuid();

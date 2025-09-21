@@ -104,6 +104,6 @@ public class Csv(
     public async Task<IEnumerable<Domain.GameWorld.Hill>> GetByCountryFisCode(CountryFisCode countryFisCode, CancellationToken ct)
     {
         var all = await LoadAllAsync(ct);
-        return all.Where(j => j.CountryId.Equals(countryFisCode)).ToList();
+        return all.Where(j => j.CountryCode.Equals(countryFisCode)).ToList();
     }
 }

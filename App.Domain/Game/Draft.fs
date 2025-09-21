@@ -14,9 +14,9 @@ type DraftError =
     | Other of string
 
 module Draft =
-    type Picks = Map<PlayerId, Set<JumperId>>
+    type Picks = Map<PlayerId, JumperId list>
 
-    module Settings =
+    module SettingsModule =
         type TargetPicks = private TargetPicks of int
 
         module TargetPicks =
@@ -56,11 +56,11 @@ module Draft =
             | TimeoutAfter of Time: TimeSpan
 
     type Settings =
-        { TargetPicks: Settings.TargetPicks
-          MaxPicks: Settings.MaxPicks
-          UniqueJumpersPolicy: Settings.UniqueJumpersPolicy
-          Order: Settings.Order
-          TimeoutPolicy: Settings.TimeoutPolicy }
+        { TargetPicks: SettingsModule.TargetPicks
+          MaxPicks: SettingsModule.MaxPicks
+          UniqueJumpersPolicy: SettingsModule.UniqueJumpersPolicy
+          Order: SettingsModule.Order
+          TimeoutPolicy: SettingsModule.TimeoutPolicy }
 
     type TurnIndex = private TurnIndex of int
 
@@ -77,7 +77,7 @@ module Draft =
 
 
 open Draft
-open Draft.Settings
+open Draft.SettingsModule
 
 type Draft =
     private
@@ -115,7 +115,7 @@ type Draft =
         if playerCount = 0 then
             Error(Other "No players provided")
         else
-            let target = Settings.TargetPicks.value settings.TargetPicks
+            let target = SettingsModule.TargetPicks.value settings.TargetPicks
 
             let picksPerPlayer =
                 let byDivision = jumperCount / playerCount
@@ -165,12 +165,10 @@ type Draft =
     member this.Ended: bool =
         let i = TurnIndex.value this.CurrentTurnIndex
         let finishedByTurnOrder = i >= this.TurnOrder.Length
-
-        let everyoneDone =
-            not this.Picks.IsEmpty
-            && this.Picks |> Map.forall (fun _ picks -> picks.Count >= this.PicksPerPlayer)
-
+        let picksMade = this.Picks |> Seq.sumBy (fun kv -> kv.Value.Length)
+        let everyoneDone = picksMade >= this.TotalPicks
         finishedByTurnOrder || everyoneDone
+
 
     member this.CurrentTurn: Turn option =
         if this.Ended then
@@ -182,8 +180,7 @@ type Draft =
                 { Index = this.CurrentTurnIndex
                   PlayerId = pid })
 
-    member this.PicksOf(playerId: PlayerId) : JumperId list option =
-        this.Picks |> Map.tryFind playerId |> Option.map Set.toList
+    member this.PicksOf(playerId: PlayerId) : JumperId list option = this.Picks |> Map.tryFind playerId
 
     member this.AllPicks: Picks = this.Picks
 
@@ -192,7 +189,7 @@ type Draft =
             false
         else
             match this.Settings.UniqueJumpersPolicy with
-            | Unique -> not (this.Picks |> Map.exists (fun _ picks -> picks.Contains jumperId))
+            | Unique -> not (this.Picks |> Map.exists (fun _ picks -> picks |> List.contains jumperId))
             | NotUnique -> true
 
     member this.Pick (playerId: PlayerId) (jumperId: JumperId) : Result<Draft, DraftError> =
@@ -205,18 +202,47 @@ type Draft =
             | Some _ when not (this.AllJumpers.Contains jumperId) -> Error JumperNotFound
             | Some _ when not (this.CanBePicked jumperId) -> Error JumperNotAllowed
             | Some _ ->
-                let playerPicks =
-                    this.Picks |> Map.tryFind playerId |> Option.defaultValue Set.empty
+                let playerPicks = this.Picks |> Map.tryFind playerId |> Option.defaultValue []
 
-                if playerPicks.Count >= this.PicksPerPlayer then
-                    Error MaxPicksReached
+                if playerPicks |> List.contains jumperId then
+                    Error(JumperNotAllowed)
                 else
-                    let updated = this.Picks |> Map.add playerId (playerPicks.Add jumperId)
+                    // POPRAWKA: Sprawdź zarówno PicksPerPlayer jak i MaxPicks
+                    let maxAllowed =
+                        min this.PicksPerPlayer (SettingsModule.MaxPicks.value this.Settings.MaxPicks)
 
-                    Ok
-                        { this with
-                            Picks = updated
-                            CurrentTurnIndex = TurnIndex.next this.CurrentTurnIndex }
+                    if playerPicks.Length >= maxAllowed then
+                        Error MaxPicksReached
+                    else
+                        let updated = this.Picks |> Map.add playerId (playerPicks @ [ jumperId ])
+
+                        Ok
+                            { this with
+                                Picks = updated
+                                CurrentTurnIndex = TurnIndex.next this.CurrentTurnIndex }
+
+    // member this.Pick (playerId: PlayerId) (jumperId: JumperId) : Result<Draft, DraftError> =
+    //     if this.Ended then
+    //         Error DraftAlreadyEnded
+    //     else
+    //         match this.CurrentTurn with
+    //         | None -> Error DraftAlreadyEnded
+    //         | Some t when t.PlayerId <> playerId -> Error InvalidPlayer
+    //         | Some _ when not (this.AllJumpers.Contains jumperId) -> Error JumperNotFound
+    //         | Some _ when not (this.CanBePicked jumperId) -> Error JumperNotAllowed
+    //         | Some _ ->
+    //             let playerPicks =
+    //                 this.Picks |> Map.tryFind playerId |> Option.defaultValue Set.empty
+    //
+    //             if playerPicks.Count >= this.PicksPerPlayer then
+    //                 Error MaxPicksReached
+    //             else
+    //                 let updated = this.Picks |> Map.add playerId (playerPicks.Add jumperId)
+    //
+    //                 Ok
+    //                     { this with
+    //                         Picks = updated
+    //                         CurrentTurnIndex = TurnIndex.next this.CurrentTurnIndex }
 
     member this.AvailablePicks: Set<JumperId> =
         match this.Settings.UniqueJumpersPolicy with
@@ -232,16 +258,24 @@ type Draft =
             let i = TurnIndex.value this.CurrentTurnIndex
             this.TurnOrder |> List.skip i
 
+    // member this.PicksUntil(pid: PlayerId) : int option =
+    //     if this.Ended then
+    //         None
+    //     else
+    //         let i = TurnIndex.value this.CurrentTurnIndex
+    //
+    //         match
+    //             this.TurnOrder
+    //             |> List.tryFindIndex (fun p -> p = pid)
+    //             |> Option.map (fun j -> j - i)
+    //         with
+    //         | Some d when d >= 0 -> Some d
+    //         | _ -> None
+
     member this.PicksUntil(pid: PlayerId) : int option =
         if this.Ended then
             None
         else
             let i = TurnIndex.value this.CurrentTurnIndex
-
-            match
-                this.TurnOrder
-                |> List.tryFindIndex (fun p -> p = pid)
-                |> Option.map (fun j -> j - i)
-            with
-            | Some d when d >= 0 -> Some d
-            | _ -> None
+            let remainingOrder = this.TurnOrder |> List.skip i
+            remainingOrder |> List.tryFindIndex (fun p -> p = pid)

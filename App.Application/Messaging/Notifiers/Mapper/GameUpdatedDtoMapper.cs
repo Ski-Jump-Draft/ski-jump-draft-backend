@@ -5,12 +5,14 @@ using App.Application.Bot;
 using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Game;
+using App.Application.Game.GameCompetitions;
 using App.Application.Mapping;
 using App.Application.Service;
 using App.Application.Utility;
 using App.Domain.Competition;
 using App.Domain.Game;
 using App.Domain.GameWorld;
+using HillModule = App.Domain.GameWorld.HillModule;
 using Jumper = App.Domain.Competition.Jumper;
 using JumperId = App.Domain.Game.JumperId;
 
@@ -25,13 +27,18 @@ public class GameUpdatedDtoMapper(
     Func<Domain.Competition.JumperId, CancellationToken, Task<Domain.GameWorld.Jumper>>
         gameWorldJumperByCompetitionJumperId,
     PreDraftPositionsService preDraftPositionsService,
+    IGameCompetitionResultsArchive gameCompetitionResultsArchive,
     IGameSchedule gameSchedule,
     IMyLogger logger,
     IClock clock,
     IBotRegistry botRegistry,
     IGameJumperAcl gameJumperAcl,
     IJumpers gameWorldJumpers,
-    ICompetitionJumperAcl competitionJumperAcl)
+    ICompetitionJumperAcl competitionJumperAcl,
+    IGameUpdatedDtoMapperCache cache,
+    IHills gameWorldHills,
+    ICompetitionHillAcl competitionHillAcl,
+    ICountries countries)
 {
     private const int SchemaVersion = 1;
 
@@ -54,12 +61,17 @@ public class GameUpdatedDtoMapper(
 
 
     public async Task<GameUpdatedDto> FromDomain(App.Domain.Game.Game game,
+        App.Domain.Game.Draft? lastDraftState = null,
         App.Domain.Competition.Competition? lastCompetitionState = null, Guid? lastCompetitionJumperId = null,
         string changeType = "Snapshot", CancellationToken ct = default)
     {
         var header = await MapHeader(game, ct);
         var nextStatus = MapNextStatus(game.Id.Item);
         var (statusStr, preDraft, draft, mainComp, brk, ended) = await MapStatus(game, ct);
+        if (draft is null && lastDraftState is not null)
+        {
+            draft = await MapDraft(game, lastDraftState, ct);
+        }
 
         CompetitionRoundResultDto? lastCompetitionResultDto = null;
         if (lastCompetitionJumperId is not null)
@@ -82,6 +94,18 @@ public class GameUpdatedDtoMapper(
 
         var nextStatusStr = nextStatus != null ? $"{nextStatus.Status} IN {nextStatus.In.TotalSeconds}" : null;
         logger.Info($"(Game {game.Id.Item}) next status: {nextStatusStr ?? "NONE"}");
+        //
+        // var shouldGetEndedPreDraft = statusStr != "PreDraft" && preDraft is null;
+        // logger.Info($"Should get cached PreDraft: {shouldGetEndedPreDraft} (statusStr: {statusStr
+        // }, pre draft is null: {preDraft is null}, preDraft competition results count: {
+        //     preDraft?.Competition?.Results.Count})");
+
+        EndedPreDraftDto? endedPreDraft = null;
+        if (statusStr != "PreDraft" && preDraft is null)
+        {
+            endedPreDraft =
+                await MapEndedPreDraft(game, game.Id.Item, ct); // await cache.GetEndedPreDraft(game.Id.Item, ct);
+        }
 
         return new GameUpdatedDto(
             Unwrap(game.Id_),
@@ -92,6 +116,7 @@ public class GameUpdatedDtoMapper(
             game.Settings.PreDraftSettings.CompetitionsCount,
             header,
             preDraft,
+            endedPreDraft,
             draft,
             mainComp,
             brk,
@@ -139,7 +164,24 @@ public class GameUpdatedDtoMapper(
             none: () => (Guid?)null
         );
 
-        return new GameHeaderDto(competitionHillId, gamePlayers, gameJumperDtos, competitionJumperDtos);
+        var draftOrderPolicy = GetDraftOrderPolicyString(game.Settings.DraftSettings.Order);
+        var draftTimeoutInSeconds = GetDraftTimeoutInSeconds(game.Settings.DraftSettings.TimeoutPolicy);
+
+        var hill = game.Hill.Value;
+        var gameWorldHill = await hill.ToGameWorldHill(gameWorldHills, competitionHillAcl, ct: ct);
+        var countryFisCode = gameWorldHill.CountryCode;
+        var countryFisCodeString = CountryFisCodeModule.value(countryFisCode);
+        var gameWorldCountry = await countries.GetByFisCode(countryFisCode, ct)
+            .AwaitOrWrap(_ => new KeyNotFoundException(countryFisCodeString));
+        var hillDto = new GameHillDto(hill.Id.Item, gameWorldHill.Id.Item, gameWorldHill.Name.Item,
+            gameWorldHill.Location.Item, HillModule.KPointModule.value(gameWorldHill.KPoint),
+            HillModule.HsPointModule.value(gameWorldHill.HsPoint),
+            countryFisCodeString,
+            Alpha2CodeModule.value(gameWorldCountry.Alpha2));
+
+        return new GameHeaderDto(draftOrderPolicy, draftTimeoutInSeconds, hillDto, gamePlayers,
+            gameJumperDtos,
+            competitionJumperDtos);
     }
 
     private NextStatusDto? MapNextStatus(Guid gameId)
@@ -174,22 +216,50 @@ public class GameUpdatedDtoMapper(
     }
 
     // ---------- PreDraft ----------
-    private async Task<PreDraftDto> MapPreDraft(App.Domain.Game.PreDraftStatus pre, Guid gameId)
+    private async Task<PreDraftDto> MapPreDraft(App.Domain.Game.PreDraftStatus preDraftStatus, Guid gameId)
     {
-        var (caseName, fields) = DeconstructUnion(pre);
+        var (caseName, fields) = DeconstructUnion(preDraftStatus);
 
         return caseName switch
         {
             "Running" => new PreDraftDto(
                 "Running",
                 PreDraftCompetitionIndexModule.value((App.Domain.Game.PreDraftCompetitionIndex)fields[0]),
+                // endedCompetitionResultsList.ToList(),
                 await MapCompetition((Competition)fields[1], gameId)),
             "Break" => new PreDraftDto(
                 "Break",
                 PreDraftCompetitionIndexModule.value((App.Domain.Game.PreDraftCompetitionIndex)fields[0]),
+                // endedCompetitionResultsList.ToList(),
                 null),
             _ => throw new InvalidOperationException($"Unknown PreDraftStatus case '{caseName}'.")
         };
+    }
+
+    private async Task<EndedPreDraftDto> MapEndedPreDraft(App.Domain.Game.Game game, Guid gameId, CancellationToken ct)
+    {
+        var archiveCompetitionResultsDtosList =
+            gameCompetitionResultsArchive.GetPreDraftResults(gameId)?.ToImmutableList() ?? [];
+
+        var endedCompetitionResultsList = archiveCompetitionResultsDtosList.Select(archiveCompetitionResultsDto =>
+            new EndedCompetitionResults(archiveCompetitionResultsDto.Results.Select(MapArchiveResultRecord)
+                .ToImmutableList()));
+
+        return new EndedPreDraftDto(endedCompetitionResultsList.ToList());
+
+        CompetitionResultDto MapArchiveResultRecord(ResultRecord resultRecord)
+        {
+            var jumpRecords = resultRecord.Jumps.Select(jumpRecord =>
+            {
+                var competitionJumperId = resultRecord.CompetitionJumperId;
+                var gameJumperId = competitionJumperAcl.GetGameJumper(competitionJumperId).Id;
+                return new CompetitionRoundResultDto(gameJumperId, competitionJumperId, jumpRecord.Distance,
+                    jumpRecord.Points, jumpRecord.Judges, jumpRecord.JudgePoints, jumpRecord.WindCompensation,
+                    jumpRecord.WindAverage, jumpRecord.GateCompensation, jumpRecord.TotalCompensation);
+            });
+            return new CompetitionResultDto(resultRecord.Rank, resultRecord.Bib, resultRecord.CompetitionJumperId,
+                resultRecord.Points, jumpRecords.ToList().AsReadOnly());
+        }
     }
 
     // ---------- Draft ----------
@@ -233,24 +303,34 @@ public class GameUpdatedDtoMapper(
 
         var availableJumpers = await Task.WhenAll(tasks);
 
-        int? timeoutInSeconds = game.Settings.DraftSettings.TimeoutPolicy switch
-        {
-            DraftModule.SettingsModule.TimeoutPolicy.TimeoutAfter timeoutAfter => timeoutAfter.Time.Seconds,
-            var timeoutPolicy when timeoutPolicy.IsNoTimeout => null,
-            _ => throw new InvalidOperationException($"Unknown DraftSettings.TimeoutPolicy: {
-                game.Settings.DraftSettings.TimeoutPolicy}")
-        };
+        var timeoutInSeconds = GetDraftTimeoutInSeconds(game.Settings.DraftSettings.TimeoutPolicy);
         var nextPlayers = draft.TurnQueueRemaining.Select(id => id.Item);
-        var orderPolicyString = game.Settings.DraftSettings.Order switch
-        {
-            var v when v.IsClassic => "Classic",
-            var v when v.IsSnake => "Snake",
-            var v when v.IsRandom => "Random",
-            _ => throw new InvalidOperationException(
-                $"Unknown DraftSettings.Order: {game.Settings.DraftSettings.Order}")
-        };
+        var orderPolicyString = GetDraftOrderPolicyString(game.Settings.DraftSettings.Order);
         return new DraftDto(currentPlayerId, timeoutInSeconds, draft.Ended, orderPolicyString, picks,
             availableJumpers.ToList().AsReadOnly(), nextPlayers.ToList());
+    }
+
+    private static int? GetDraftTimeoutInSeconds(Domain.Game.DraftModule.SettingsModule.TimeoutPolicy timeoutPolicy)
+    {
+        return timeoutPolicy switch
+        {
+            Domain.Game.DraftModule.SettingsModule.TimeoutPolicy.TimeoutAfter timeoutAfter => timeoutAfter.Time.Seconds,
+            { IsNoTimeout: true } => null,
+            _ => throw new InvalidOperationException($"Unknown DraftSettings.TimeoutPolicy: {
+                timeoutPolicy}")
+        };
+    }
+
+    private static string GetDraftOrderPolicyString(Domain.Game.DraftModule.SettingsModule.Order orderPolicy)
+    {
+        return orderPolicy switch
+        {
+            { IsClassic: true } => "Classic",
+            { IsSnake: true } => "Snake",
+            { IsRandom: true } => "Random",
+            _ => throw new InvalidOperationException(
+                $"Unknown DraftSettings.Order: {orderPolicy}")
+        };
     }
 
 
@@ -278,7 +358,7 @@ public class GameUpdatedDtoMapper(
         int? nextJumpIn = schedule switch
         {
             { ScheduleTarget: GameScheduleTarget.CompetitionJump } => (int)Math.Ceiling(schedule.In
-                .TotalSeconds),
+                .TotalMilliseconds),
             _ => null
         };
         var endedEntries = comp.Startlist_.DoneEntries.Select(entry =>
@@ -291,14 +371,17 @@ public class GameUpdatedDtoMapper(
             ..endedEntries, ..notEndedEntries
         ];
 
+        logger.Info($"Startlist: {
+            string.Join(", ", startlist.Select(startlistJumperDto => startlistJumperDto.ToString()))}");
+
         return new CompetitionDto(status, startlist, gate,
             results.ToImmutableList(), nextJumpIn);
     }
 
-    private static GateDto MapGate(FSharpOption<GateState> gsOpt)
+    private static GateStateDto MapGate(FSharpOption<GateState> gsOpt)
     {
         if (!FSharpOption<GateState>.get_IsSome(gsOpt))
-            return new GateDto(0, 0, null);
+            return new GateStateDto(0, 0, null);
 
         var gs = gsOpt.Value;
 
@@ -318,7 +401,7 @@ public class GameUpdatedDtoMapper(
             none: () => (int?)null
         );
 
-        return new GateDto(starting, current, coachReduction);
+        return new GateStateDto(starting, current, coachReduction);
     }
 
     private async Task<IEnumerable<CompetitionResultDto>> MapResults(
@@ -399,7 +482,7 @@ public class GameUpdatedDtoMapper(
         return new BreakDto(next);
     }
 
-    private static EndedDto MapEnded(App.Domain.Game.Game game)
+    private EndedDto MapEnded(App.Domain.Game.Game game)
     {
         var policy = game.Settings.RankingPolicy switch
         {
@@ -414,11 +497,15 @@ public class GameUpdatedDtoMapper(
         var positionAndPointsMap = positionAndPoints
             .ToDictionary(
                 kvp => kvp.Key.Item,
-                kvp => (RankingModule.PositionModule.value(kvp.Value.Item1),
+                kvp => new PositionAndPoints(
+                    RankingModule.PositionModule.value(kvp.Value.Item1),
                     RankingModule.PointsModule.value(kvp.Value.Item2))
             );
 
-        return new EndedDto(policy, positionAndPointsMap);
+        var endedDto = new EndedDto(policy, positionAndPointsMap);
+        logger.Info($"Ended DTO: {JsonSerializer.Serialize(endedDto, new JsonSerializerOptions { WriteIndented = true })
+        }");
+        return endedDto;
     }
 }
 
