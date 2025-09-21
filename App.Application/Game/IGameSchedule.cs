@@ -8,11 +8,11 @@ public record GameScheduleDto(
     TimeSpan In,
     DateTimeOffset ScheduledAt)
 {
-    public TimeSpan BreakRemaining(IClock clock) => In - (clock.Now() - ScheduledAt);
-    
-    public bool BreakPassed(IClock clock)
+    public TimeSpan BreakRemaining(DateTimeOffset now) => In - (now - ScheduledAt);
+
+    public bool BreakPassed(DateTimeOffset now)
     {
-        return BreakRemaining(clock) <= TimeSpan.Zero;
+        return BreakRemaining(now) <= TimeSpan.Zero;
     }
 };
 

@@ -4,32 +4,35 @@ using App.Application.Utility;
 
 namespace App.Infrastructure.Schedule.Game;
 
-public sealed class InMemory(IClock clock) : IGameSchedule
+public sealed class InMemory(IClock clock, IMyLogger logger) : IGameSchedule
 {
     private readonly ConcurrentDictionary<Guid, GameScheduleDto> _dtos = new();
 
     public void ScheduleEvent(Guid gameId, GameScheduleTarget scheduleTarget, TimeSpan @in)
     {
         var now = clock.Now();
-        var scheduledAt = now + @in;
-        if (!CanSchedulePhaseFor(gameId)) return;
-        var dto = new GameScheduleDto(gameId, scheduleTarget, @in, scheduledAt);
-        if (!CanBeScheduled(dto)) return;
+        logger.Info($"now: {now}, scheduledAt: {now}, @in: {@in}, scheduleTarget: {scheduleTarget}, gameId: {
+            gameId}");
+        if (!CanSchedulePhaseFor(gameId, now)) return;
+        var dto = new GameScheduleDto(gameId, scheduleTarget, @in, ScheduledAt: now);
+        if (!CanBeScheduled(dto, now)) return;
         _dtos[gameId] = dto;
     }
 
 
     public bool Remove(Guid gameId) => _dtos.Remove(gameId, out _);
 
-    private bool CanBeScheduled(GameScheduleDto dto)
+    private bool CanBeScheduled(GameScheduleDto dto, DateTimeOffset now)
     {
-        return !dto.BreakPassed(clock);
+        return !dto.BreakPassed(now);
     }
 
-    private bool CanSchedulePhaseFor(Guid gameId)
+    private bool CanSchedulePhaseFor(Guid gameId, DateTimeOffset now)
     {
         var existingDto = _dtos.GetValueOrDefault(gameId);
-        return existingDto is null || !existingDto.BreakPassed(clock);
+        var breakPassed = existingDto?.BreakPassed(now) ?? false;
+        logger.Info($"existingDto: {existingDto}, breakPassed: {breakPassed}");
+        return existingDto is null || breakPassed;
     }
 
     public GameScheduleDto? GetGameSchedule(Guid gameId)

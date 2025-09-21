@@ -15,7 +15,7 @@ public static class Game
                 .ResultValue;
             var preDraftSettings = App.Domain.Game.PreDraftSettings.Create(ListModule.OfSeq(
                     new List<App.Domain.Competition.Settings>
-                        { preDraftCompetitionSettings /*, preDraftCompetitionSettings*/ }))
+                        { preDraftCompetitionSettings /*, preDraftCompetitionSettings */ }))
                 .Value;
             var mainCompetitionSettings = App.Domain.Competition.Settings.Create(ListModule.OfSeq([
                 new App.Domain.Competition.RoundSettings(
@@ -31,9 +31,9 @@ public static class Game
                 App.Domain.Game.DraftModule.SettingsModule.TargetPicksModule.create(4).Value,
                 App.Domain.Game.DraftModule.SettingsModule.MaxPicksModule.create(4).Value,
                 App.Domain.Game.DraftModule.SettingsModule.UniqueJumpersPolicy.Unique,
-                App.Domain.Game.DraftModule.SettingsModule.Order.Snake,
+                App.Domain.Game.DraftModule.SettingsModule.Order.Random,
                 App.Domain.Game.DraftModule.SettingsModule.TimeoutPolicy.NewTimeoutAfter(
-                    TimeSpan.FromSeconds(15)));
+                    TimeSpan.FromSeconds(3)));
             var breakSettings =
                 new App.Domain.Game.BreakSettings(App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(5)).Value,
                     App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(15)).Value,
@@ -43,7 +43,7 @@ public static class Game
             var jumpInterval = App.Domain.Game.PhaseDuration.Create(TimeSpan.FromMilliseconds(1000)).Value;
             return new App.Domain.Game.Settings(breakSettings, preDraftSettings, draftSettings, mainCompetitionSettings,
                 jumpInterval,
-                App.Domain.Game.RankingPolicy.Classic);
+                App.Domain.Game.RankingPolicy.PodiumAtAllCosts);
         });
 
         return services;

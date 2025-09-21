@@ -161,10 +161,10 @@ public class BestPicker(
         rating += takeoffAndFlightAverage * alpha;
         logger.Debug($"rating2: {rating}");
 
-        const double beta = 15.5; // im większe, tym bardziej "winner-takes-all"
+        const double beta = 17.5; // im większe, tym bardziej "winner-takes-all"
         rating = Math.Pow(rating, beta);
         logger.Debug($"rating3: {rating}");
-        const decimal divider = 1e23m;
+        const decimal divider = 1e28m;
         return rating / (double)divider;
     }
 

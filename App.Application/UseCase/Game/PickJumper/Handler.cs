@@ -59,6 +59,7 @@ public class Handler(
                     pickOutcome.Picks.ToDictionary().ToEnumerableValues());
                 var timeToMainCompetition = gameAfterPick.Settings.BreakSettings.BreakBeforeMainCompetition.Value;
                 gameSchedule.ScheduleEvent(command.GameId, GameScheduleTarget.MainCompetition, timeToMainCompetition);
+                logger.Info($"Scheduled Main Competition in {timeToMainCompetition}");
                 var now = clock.Now();
                 await scheduler.ScheduleAsync(
                     jobType: "StartMainCompetition",

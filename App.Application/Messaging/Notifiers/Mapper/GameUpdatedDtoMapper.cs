@@ -187,8 +187,12 @@ public class GameUpdatedDtoMapper(
     private NextStatusDto? MapNextStatus(Guid gameId)
     {
         var schedule = gameSchedule.GetGameSchedule(gameId);
+        var now = clock.Now();
+        logger.Info("Schedule of game " + gameId + ": " + schedule);
+        logger.Info("Break remaining in seconds: " + (schedule?.BreakRemaining(now).TotalSeconds));
+
         if (schedule is null) return null;
-        if (schedule.BreakPassed(clock)) return null;
+        if (schedule.BreakPassed(now)) return null;
         if (schedule.ScheduleTarget == GameScheduleTarget.CompetitionJump) return null;
         var nextStatusDto = new NextStatusDto(schedule.ScheduleTarget.ToString(), schedule.In);
         return nextStatusDto;

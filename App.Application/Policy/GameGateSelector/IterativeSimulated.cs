@@ -28,9 +28,11 @@ public class IterativeSimulated(
 
         var allowedOvershootsPercent = juryBravery switch
         {
-            JuryBravery.High => Math.Round((decimal)4 / 50, 2),
-            JuryBravery.Medium => Math.Round((decimal)2 / 50, 2),
+            JuryBravery.VeryHigh => Math.Round((decimal)6 / 50, 2),
+            JuryBravery.High => Math.Round((decimal)3 / 50, 2),
+            JuryBravery.Medium => Math.Round((decimal)0 / 50, 2),
             JuryBravery.Low => Math.Round((decimal)0 / 50, 2),
+            JuryBravery.VeryLow => Math.Round((decimal)0 / 50, 2),
             _ => throw new ArgumentOutOfRangeException(nameof(juryBravery), juryBravery, null)
         };
         var allowedOvershoots = (int)Math.Floor(simulationJumpers.Length * allowedOvershootsPercent);
@@ -63,13 +65,12 @@ public class IterativeSimulated(
         if (tries >= maxTries)
             throw new MaxTriesExceededException(maxTries, $"Could not find suitable gate after {maxTries} tries");
 
-        // currentGate += juryBravery switch
-        // {
-        //     JuryBravery.High => +1,
-        //     JuryBravery.Low => -1,
-        //     JuryBravery.Medium => 0,
-        //     _ => throw new ArgumentOutOfRangeException(nameof(juryBravery), juryBravery, null)
-        // };
+        currentGate += juryBravery switch
+        {
+            JuryBravery.VeryLow => -2,
+            JuryBravery.Low => -1,
+            _ => 0
+        };
 
         return currentGate;
 
@@ -106,9 +107,11 @@ public class IterativeSimulated(
 
 public enum JuryBravery
 {
+    VeryHigh,
     High,
     Medium,
-    Low
+    Low,
+    VeryLow
 }
 
 public class MaxTriesExceededException(int maxTries, string? message = null) : Exception(message);
