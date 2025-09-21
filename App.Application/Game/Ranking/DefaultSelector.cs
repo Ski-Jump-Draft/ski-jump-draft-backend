@@ -19,7 +19,8 @@ public class DefaultSelector(
         {
             { IsClassic: true } => new ClassicGameRankingFactory(draftPicksArchive, gameCompetitionResultsArchive,
                 competitionJumperAcl, logger),
-            // { IsPodiumAtAllCosts: true } => new PodiumAtAllCosts(competitionJumperAcl), TODO
+            { IsPodiumAtAllCosts: true } => new PodiumAtAllCostFactory(draftPicksArchive,
+                gameCompetitionResultsArchive, competitionJumperAcl, logger),
             _ => throw new UnsupportedPolicyException(rankingPolicy),
         };
     }
