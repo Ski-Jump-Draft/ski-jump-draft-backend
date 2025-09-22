@@ -8,6 +8,7 @@ riderModule.iml
 .env.local
 .env.staging
 /App.Infrastructure/data/
+/App.Infrastructure/data/jumpers.csv
 /.idea/.idea.App/.idea/.name
 /App.sln.DotSettings.user
 /.idea/.idea.App/.idea/aws.xml
@@ -16,4 +17,4 @@ riderModule.iml
 /.idea/.idea.App/.idea/indexLayout.xml
 /.idea/.idea.App/.idea/inspectionProfiles/Project_Default.xml
 /.idea/.idea.App/.idea/vcs.xml
-/.idea/.idea.Game/.idea/workspace.xml
+/.idea/.idea.Game/.idea/workspace.xmlApp.Infrastructure/data/
