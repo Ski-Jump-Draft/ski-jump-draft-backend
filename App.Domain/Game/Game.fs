@@ -96,6 +96,11 @@ type Game =
         match this.Status with
         | PreDraft(PreDraftStatus.Break _) -> true
         | _ -> false
+        
+    member this.NextPreDraftCompetitionIndex =
+        match this.Status with
+        | PreDraft(PreDraftStatus.Break index) -> Some index
+        | _ -> None
 
     member this.WaitsForNextMainCompetition =
         match this.Status with

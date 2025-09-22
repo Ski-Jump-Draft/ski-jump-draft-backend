@@ -18,13 +18,10 @@ public record Command(
 public record Result();
 
 public class Handler(
-    IJson json,
     IGames games,
     IGameNotifier gameNotifier,
     IMyLogger logger,
     IRandom random,
-    IClock clock,
-    IScheduler scheduler,
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
     DraftSystemSchedulerService draftSystemSchedulerService)
     : ICommandHandler<Command, Result>

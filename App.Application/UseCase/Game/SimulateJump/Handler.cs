@@ -39,16 +39,13 @@ public class Handler(
     IGuid guid,
     Acl.ICompetitionJumperAcl competitionJumperAcl,
     IGameJumperAcl gameJumperAcl,
-    App.Domain.GameWorld.ICountries gameWorldCountries,
     App.Domain.GameWorld.IJumpers gameWorldJumpers,
     IMyLogger logger,
     IJudgesSimulator judgesSimulator,
-    IGameCompetitionResultsArchive gameCompetitionResultsArchive,
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
     IJumperGameFormStorage jumperGameFormStorage,
     IGameCompetitionResultsArchive competitionResultsArchive,
-    IGameSchedule gameSchedule,
-    IGameUpdatedDtoMapperCache gameUpdatedDtoMapperCache)
+    IGameSchedule gameSchedule)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -155,7 +152,7 @@ public class Handler(
                 if (gameAfterAddingJump.Status.IsPreDraft &&
                     ((Domain.Game.Status.PreDraft)gameAfterAddingJump.Status).Item.IsBreak)
                 {
-                    ArchivePreDraftCompetitionResults(addJumpOutcome, command.GameId);
+                    await ArchivePreDraftCompetitionResults(addJumpOutcome, command.GameId, ct);
                     var preDraftStatus = (Domain.Game.Status.PreDraft)gameAfterAddingJump.Status;
                     var preDraftBreak = (Domain.Game.PreDraftStatus.Break)preDraftStatus.Item;
                     var nextPreDraftCompetitionIndex = PreDraftCompetitionIndexModule.value(preDraftBreak.NextIndex);
@@ -174,7 +171,7 @@ public class Handler(
                 else if (gameAfterAddingJump.Status.IsBreak &&
                          ((Domain.Game.Status.Break)gameAfterAddingJump.Status).Next.IsDraftTag)
                 {
-                    ArchivePreDraftCompetitionResults(addJumpOutcome, command.GameId);
+                    await ArchivePreDraftCompetitionResults(addJumpOutcome, command.GameId, ct);
                     previousCompetition = addJumpOutcome.Competition;
                     var timeToDraft = gameAfterAddingJump.Settings.BreakSettings
                         .BreakBeforeDraft.Value;
@@ -191,7 +188,7 @@ public class Handler(
                 else if (gameAfterAddingJump.Status.IsBreak &&
                          ((Domain.Game.Status.Break)gameAfterAddingJump.Status).Next.IsEndedTag)
                 {
-                    ArchiveMainCompetitionResults(addJumpOutcome, command.GameId);
+                    await ArchiveMainCompetitionResults(addJumpOutcome, command.GameId, ct);
                     previousCompetition = addJumpOutcome.Competition;
                     var timeToEnd = gameAfterAddingJump.Settings.BreakSettings
                         .BreakBeforeEnd.Value;
@@ -241,12 +238,15 @@ public class Handler(
         throw new Exception("Error adding a jump to game.");
     }
 
-    private void ArchivePreDraftCompetitionResults(AddJumpOutcome addJumpOutcome, Guid gameId)
+
+    private async Task ArchivePreDraftCompetitionResults(AddJumpOutcome addJumpOutcome, Guid gameId,
+        CancellationToken ct)
     {
-        var archiveDto = addJumpOutcome.Classification.ToGameCompetitionResultsArchiveDto(competitionJumperId =>
-            GetCompetitionJumperJumperBibOrThrow(addJumpOutcome, competitionJumperId));
-        competitionResultsArchive.ArchivePreDraft(gameId,
-            archiveDto);
+        var archiveDto = addJumpOutcome.Classification.ToGameCompetitionResultsArchiveDto(gameJumperAcl,
+            competitionJumperAcl, competitionJumperId =>
+                GetCompetitionJumperJumperBibOrThrow(addJumpOutcome, competitionJumperId));
+        await competitionResultsArchive.ArchivePreDraftAsync(gameId,
+            archiveDto, ct);
     }
 
     private async Task<GameUpdatedDto> CreateGameUpdatedDtoAndCacheIfNeeded(App.Domain.Game.Game game,
@@ -268,12 +268,13 @@ public class Handler(
         return dto;
     }
 
-    private void ArchiveMainCompetitionResults(AddJumpOutcome addJumpOutcome, Guid gameId)
+    private async Task ArchiveMainCompetitionResults(AddJumpOutcome addJumpOutcome, Guid gameId, CancellationToken ct)
     {
-        var archiveDto = addJumpOutcome.Classification.ToGameCompetitionResultsArchiveDto(competitionJumperId =>
-            GetCompetitionJumperJumperBibOrThrow(addJumpOutcome, competitionJumperId));
-        competitionResultsArchive.ArchiveMain(gameId,
-            archiveDto);
+        var archiveDto = addJumpOutcome.Classification.ToGameCompetitionResultsArchiveDto(gameJumperAcl,
+            competitionJumperAcl, competitionJumperId =>
+                GetCompetitionJumperJumperBibOrThrow(addJumpOutcome, competitionJumperId));
+        await competitionResultsArchive.ArchiveMainAsync(gameId,
+            archiveDto, ct);
     }
 
     private static int GetCompetitionJumperJumperBibOrThrow(AddJumpOutcome addJumpOutcome, Guid competitionJumperId)

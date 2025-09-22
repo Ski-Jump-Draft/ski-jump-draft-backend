@@ -26,10 +26,10 @@ public class BestPicker(
     {
         ClearPreDraftPositions();
         var gameWorldJumpers = await RetrieveGameWorldJumpersFromDraftPicks(game, ct);
-        var preDraftCompetitionResults = RetrievePreDraftCompetitionResultsOrThrow(game);
+        var preDraftCompetitionResults = await RetrievePreDraftCompetitionResultsOrThrow(game, ct);
         var maxPosition = CalculateMaxPositionFromResults(preDraftCompetitionResults);
         logger.Debug("Max position: " + maxPosition);
-        UpdatePreDraftPositionsByJumper(game);
+        await UpdatePreDraftPositionsByJumper(game);
         var averagePositionByJumper = CreateAveragePositions(preDraftCompetitionResults);
         var ratingByGameJumper = CalculateGameJumperRatings(gameWorldJumpers, averagePositionByJumper, maxPosition);
         await LogRatingsWithNames(ratingByGameJumper, ct);
@@ -65,10 +65,11 @@ public class BestPicker(
         return gameWorldJumpers;
     }
 
-    private ImmutableList<CompetitionResultsDto> RetrievePreDraftCompetitionResultsOrThrow(Domain.Game.Game game)
+    private async Task<ImmutableList<CompetitionResultsDto>> RetrievePreDraftCompetitionResultsOrThrow(
+        Domain.Game.Game game, CancellationToken ct)
     {
         var preDraftCompetitionResults =
-            gameCompetitionResultsArchive.GetPreDraftResults(game.Id.Item)?.ToImmutableList();
+            (await gameCompetitionResultsArchive.GetPreDraftResultsAsync(game.Id.Item, ct))?.ToImmutableList();
         if (preDraftCompetitionResults is null)
         {
             throw new Exception($"Game {game.Id} does not have pre-draft results in archive.");
@@ -83,9 +84,10 @@ public class BestPicker(
         return maxPosition;
     }
 
-    private void UpdatePreDraftPositionsByJumper(Domain.Game.Game game)
+    private async Task UpdatePreDraftPositionsByJumper(Domain.Game.Game game)
     {
-        _preDraftPositionsByJumper = preDraftPositionsService.GetPreDraftPositions(game.Id.Item).PositionsByGameJumper;
+        _preDraftPositionsByJumper =
+            (await preDraftPositionsService.GetPreDraftPositions(game.Id.Item)).PositionsByGameJumper;
     }
 
     private Dictionary<Guid, double> CalculateGameJumperRatings(IEnumerable<Jumper> gameWorldJumpers,

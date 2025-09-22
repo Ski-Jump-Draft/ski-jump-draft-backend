@@ -1,3 +1,4 @@
+using App.Application.Acl;
 using App.Application.Extensions;
 using App.Application.Game.GameCompetitions;
 using App.Domain.Competition;
@@ -8,6 +9,8 @@ public static class CompetitionClassificationMappers
 {
     public static CompetitionResultsDto ToGameCompetitionResultsArchiveDto(
         this IEnumerable<Classification.JumperClassificationResult> jumperClassificationResults,
+        // Func<Guid, Guid> gameJumperByCompetitionJumper, Func<Guid, Guid> gameWorldJumperByGameJumper,
+        IGameJumperAcl gameJumperAcl, ICompetitionJumperAcl competitionJumperAcl,
         Func<Guid, int> getBibByCompetitionJumperId)
     {
         return new CompetitionResultsDto(jumperClassificationResults.Select(jumperClassificationResult =>
@@ -33,7 +36,14 @@ public static class CompetitionClassificationMappers
                     gatePoints,
                     JumpResultModule.TotalCompensationModule.value(jumpResult.TotalCompensation));
             });
-            return new ResultRecord(jumperClassificationResult.JumperId.Item,
+            var competitionJumperGuid = jumperClassificationResult.JumperId.Item;
+            var gameJumperGuid = competitionJumperAcl.GetGameJumper(competitionJumperGuid).Id;
+            var gameWorldJumperGuid = gameJumperAcl.GetGameWorldJumper(gameJumperGuid).Id;
+            // var gameJumperGuid = gameJumperByCompetitionJumper.Invoke(competitionJumperGuid);
+            // var gameWorldJumperGuid = gameWorldJumperByGameJumper.Invoke(gameJumperGuid);
+
+            return new ResultRecord(gameWorldJumperGuid, gameJumperGuid,
+                competitionJumperGuid,
                 Classification.PositionModule.value(jumperClassificationResult.Position),
                 getBibByCompetitionJumperId(jumperClassificationResult.JumperId.Item),
                 jumperClassificationResult.Points.Item, jumpRecords.ToList());

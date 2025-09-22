@@ -6,5 +6,14 @@ riderModule.iml
 .env
 .env.development
 .env.local
-.env
 .env.staging
+/App.Infrastructure/data/
+/.idea/.idea.App/.idea/.name
+/App.sln.DotSettings.user
+/.idea/.idea.App/.idea/aws.xml
+/.idea/.idea.App/.idea/encodings.xml
+/Game.sln.DotSettings.user
+/.idea/.idea.App/.idea/indexLayout.xml
+/.idea/.idea.App/.idea/inspectionProfiles/Project_Default.xml
+/.idea/.idea.App/.idea/vcs.xml
+/.idea/.idea.Game/.idea/workspace.xml

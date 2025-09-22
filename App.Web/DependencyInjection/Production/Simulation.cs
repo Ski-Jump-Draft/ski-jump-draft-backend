@@ -14,8 +14,8 @@ public static class Simulation
                 FlightRatingPointsByForm: baseFormFactor * 1.1, DistanceSpreadByRatingFactor: 1.2));
         services.AddSingleton<App.Domain.Simulation.IWeatherEngine, App.Simulator.Simple.WeatherEngine>(sp =>
             new WeatherEngine(sp.GetRequiredService<IRandom>(), sp.GetRequiredService<IMyLogger>(),
-                new Configuration(-1.4, 0.04, 0.25)
-                /*,ConfigurationPresetFactory.TypicalEngelberg)*/));
+                new Configuration(-0.7, 0.05, 0.25)
+                /*,ConfigurationPresetFactory.TypicalEngelberg)*/)); 
         services.AddSingleton<App.Domain.Simulation.IJumpSimulator, App.Simulator.Simple.JumpSimulator>();
         services.AddSingleton<App.Domain.Simulation.IJudgesSimulator, App.Simulator.Simple.JudgesSimulator>();
         return services;

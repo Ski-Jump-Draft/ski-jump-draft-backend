@@ -52,7 +52,8 @@ public class Handler(
     IJumperGameFormAlgorithm jumperGameFormAlgorithm,
     IJumperGameFormStorage jumperGameFormStorage,
     IGameSchedule gameSchedule,
-    IBotRegistry botRegistry)
+    IBotRegistry botRegistry,
+    IRandom random)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -67,8 +68,7 @@ public class Handler(
 
         logger.Info($"Starting game for a succeeded matchmaking {command.MatchmakingId}");
 
-        var selectedJumperDtos = (await jumpersSelector.Select(ct)).ToImmutableList();
-
+        var selectedGameWorldJumperDtos = await SelectAndShuffleGameJumpers(ct);
         var selectedHillGuid = await hillSelector.Select(ct);
         var gameWorldHill = await gameWorldHills.GetById(Domain.GameWorld.HillId.NewHillId(selectedHillGuid), ct)
             .AwaitOrWrap(_ => new IdNotFoundException(selectedHillGuid));
@@ -78,11 +78,41 @@ public class Handler(
 
         Dictionary<Guid, Guid> gamePlayerByMatchmakingPlayer = new();
 
-        var endedMatchmakingPlayers = matchmaking.Players_;
-        var gamePlayersEnumerable = CreateGamePlayers(command.MatchmakingId, gameGuid, endedMatchmakingPlayers,
-            gamePlayerByMatchmakingPlayer);
-        var gamePlayers = Domain.Game.PlayersModule.create(ListModule.OfSeq(gamePlayersEnumerable)).ResultValue;
+        var gamePlayers = BuildGamePlayersFromMatchmaking(matchmaking, gameGuid, gamePlayerByMatchmakingPlayer);
+        var gameJumpers = SetupGameJumpers(selectedGameWorldJumperDtos);
+        var competitionHill = SetupCompetitionHill(gameWorldHill);
 
+        var gameResult =
+            Domain.Game.Game.Create(gameId, globalGameSettings, gamePlayers, gameJumpers, competitionHill);
+
+        if (gameResult.IsOk)
+        {
+            var game = gameResult.ResultValue;
+            var timeToPreDraft = game.Settings.BreakSettings.BreakBeforePreDraft.Value;
+            await games.Add(game, ct);
+            await SchedulePreDraftPhase(gameGuid, timeToPreDraft, ct);
+            await NotifyGameStart(game, gameGuid, gamePlayerByMatchmakingPlayer, command.MatchmakingId, ct);
+            return new Result(gameGuid);
+        }
+
+        throw new GameInitializationException(gameGuid, gameResult.ErrorValue.ToString());
+    }
+
+    private async Task<ImmutableList<SelectedGameWorldJumperDto>> SelectAndShuffleGameJumpers(CancellationToken ct)
+    {
+        return (await jumpersSelector.Select(ct)).ToList().Shuffle(random).ToImmutableList();
+    }
+
+    private Hill SetupCompetitionHill(Domain.GameWorld.Hill gameWorldHill)
+    {
+        var competitionHillId = Domain.Competition.HillId.NewHillId(guid.NewGuid());
+        var competitionHill = CreateCompetitionHill(competitionHillId, gameWorldHill);
+        SetupCompetitionHillAcl(competitionHillId, gameWorldHill);
+        return competitionHill;
+    }
+
+    private Jumpers SetupGameJumpers(ImmutableList<SelectedGameWorldJumperDto> selectedJumperDtos)
+    {
         var jumperGameFormsPrintString = "Forma zawodników:\n";
         var gameJumpersEnumerable = new List<Domain.Game.Jumper>();
 
@@ -98,24 +128,25 @@ public class Handler(
 
         logger.Info(jumperGameFormsPrintString + "\n\n");
         var gameJumpers = Domain.Game.JumpersModule.create(ListModule.OfSeq(gameJumpersEnumerable));
+        return gameJumpers;
+    }
 
-        var competitionHillId = Domain.Competition.HillId.NewHillId(guid.NewGuid());
-        var competitionHill = CreateCompetitionHill(competitionHillId, gameWorldHill);
-        SetupCompetitionHillAcl(competitionHillId, gameWorldHill);
+    private Players BuildGamePlayersFromMatchmaking(Domain.Matchmaking.Matchmaking matchmaking, Guid gameGuid,
+        Dictionary<Guid, Guid> gamePlayerByMatchmakingPlayer)
+    {
+        var matchmakingId = matchmaking.Id_.Item;
+        var endedMatchmakingPlayers = matchmaking.Players_;
+        var gamePlayersList = CreateGamePlayersFromMatchmakingPlayers(matchmakingId, gameGuid, endedMatchmakingPlayers,
+            gamePlayerByMatchmakingPlayer);
+        var sortedGamePlayers = OrderGamePlayersByNick(gamePlayersList);
+        var gamePlayers = Domain.Game.PlayersModule.create(ListModule.OfSeq(sortedGamePlayers)).ResultValue;
+        return gamePlayers;
+    }
 
-        var gameResult =
-            Domain.Game.Game.Create(gameId, globalGameSettings, gamePlayers, gameJumpers, competitionHill);
-        if (gameResult.IsOk)
-        {
-            var game = gameResult.ResultValue;
-            var timeToPreDraft = game.Settings.BreakSettings.BreakBeforePreDraft.Value;
-            await games.Add(game, ct);
-            await SchedulePreDraftPhase(gameGuid, timeToPreDraft, ct);
-            await NotifyGameStart(game, gameGuid, gamePlayerByMatchmakingPlayer, command.MatchmakingId, ct);
-            return new Result(gameGuid);
-        }
-
-        throw new GameInitializationException(gameGuid, gameResult.ErrorValue.ToString());
+    private static IOrderedEnumerable<Domain.Game.Player> OrderGamePlayersByNick(
+        List<Domain.Game.Player> gamePlayersList)
+    {
+        return gamePlayersList.OrderBy(player => PlayerModule.NickModule.value(player.Nick));
     }
 
     private void SetupCompetitionHillAcl(HillId competitionHillId, Domain.GameWorld.Hill gameWorldHill)
@@ -164,7 +195,7 @@ public class Handler(
     }
 
 
-    private IEnumerable<Domain.Game.Player> CreateGamePlayers(Guid matchmakingId, Guid gameGuid,
+    private List<Domain.Game.Player> CreateGamePlayersFromMatchmakingPlayers(Guid matchmakingId, Guid gameGuid,
         IReadOnlyCollection<Player> endedMatchmakingPlayers,
         Dictionary<Guid, Guid> gamePlayerByMatchmakingPlayer)
     {
@@ -179,7 +210,7 @@ public class Handler(
             gamePlayerByMatchmakingPlayer.Add(matchmakingPlayer.Id.Item, gamePlayerGuid);
             RegisterGameBotIfNeeded(matchmakingId, matchmakingPlayer, gameGuid, gamePlayerGuid);
             return gamePlayer;
-        });
+        }).ToList();
     }
 
     private bool RegisterGameBotIfNeeded(Guid matchmakingId, Player matchmakingPlayer, Guid gameGuid,

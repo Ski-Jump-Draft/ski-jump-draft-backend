@@ -8,13 +8,12 @@ using App.Application.Game.Gate;
 using App.Application.Mapping;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
-using App.Application.Policy.GameHillSelector;
-using App.Application.Policy.GameJumpersSelector;
+using App.Application.Policy.GameCompetitionStartlist;
 using App.Application.Utility;
 using App.Domain.Competition;
 using App.Domain.Game;
-using App.Domain.GameWorld;
 using Microsoft.FSharp.Collections;
+using Jumper = App.Domain.Competition.Jumper;
 
 namespace App.Application.UseCase.Game.StartNextPreDraftCompetition;
 
@@ -35,7 +34,8 @@ public class Handler(
     ISelectGameStartingGateService selectGameStartingGateService,
     IMyLogger logger,
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
-    IGameSchedule gameSchedule)
+    IGameSchedule gameSchedule,
+    IGameCompetitionStartlist gameCompetitionStartlist)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -48,34 +48,56 @@ public class Handler(
             throw new Exception("Game is not waiting for next pre draft competition");
         }
 
+        var nextPreDraftCompetitionIndex =
+            PreDraftCompetitionIndexModule.value(game.NextPreDraftCompetitionIndex.Value);
+
         logger.Info($"Starting next pre draft competition for game {game.Id_.Item}");
 
         var competitionGuid = guid.NewGuid();
         var competitionId = CompetitionId.NewCompetitionId(competitionGuid);
 
-        var competitionJumpers = game.Jumpers.ToCompetitionJumpers(competitionJumperAcl).ToImmutableList();
-        var startingGateInt = await selectGameStartingGateService.Select(competitionJumpers, game.Hill.Value, ct);
+        var competitionJumpersStartlist =
+            await GenerateCompetitionJumpersStartlist(command.GameId, nextPreDraftCompetitionIndex, ct);
+
+        var startingGateInt =
+            await selectGameStartingGateService.Select(competitionJumpersStartlist, game.Hill.Value, ct);
         var startingGate = Domain.Competition.Gate.NewGate(startingGateInt);
 
         var gameAfterStartNextPreDraftCompetitionResult =
-            game.ContinuePreDraft(competitionId, ListModule.OfSeq(competitionJumpers), startingGate);
+            game.ContinuePreDraft(competitionId, ListModule.OfSeq(competitionJumpersStartlist), startingGate);
         if (!gameAfterStartNextPreDraftCompetitionResult.IsOk)
             throw new Exception("Game start next pre draft competition failed",
                 new Exception(gameAfterStartNextPreDraftCompetitionResult.ErrorValue.ToString()));
 
         var gameAfterStartNextPreDraftCompetition = gameAfterStartNextPreDraftCompetitionResult.ResultValue;
         await games.Add(gameAfterStartNextPreDraftCompetition, ct);
+        await ScheduleFirstCompetitionJump(game, ct);
+        await gameNotifier.GameUpdated(
+            await gameUpdatedDtoMapper.FromDomain(gameAfterStartNextPreDraftCompetition, ct: ct));
+        return new Result(competitionGuid);
+    }
+
+    private async Task ScheduleFirstCompetitionJump(Domain.Game.Game game, CancellationToken ct)
+    {
+        var gameId = game.Id.Item;
         var timeToJump = game.Settings.CompetitionJumpInterval.Value;
         var now = clock.Now();
-        gameSchedule.ScheduleEvent(command.GameId, GameScheduleTarget.CompetitionJump, timeToJump);
+        gameSchedule.ScheduleEvent(gameId, GameScheduleTarget.CompetitionJump, timeToJump);
         await scheduler.ScheduleAsync(
             jobType: "SimulateJumpInGame",
             payloadJson: json.Serialize(new { GameId = game.Id_.Item }),
             runAt: now.Add(timeToJump),
             uniqueKey: $"SimulateJumpInGame:{game.Id_.Item}_{now.ToUnixTimeSeconds()}",
             ct: ct);
-        await gameNotifier.GameUpdated(
-            await gameUpdatedDtoMapper.FromDomain(gameAfterStartNextPreDraftCompetition, ct: ct));
-        return new Result(competitionGuid);
+    }
+
+    private async Task<ImmutableList<Jumper>> GenerateCompetitionJumpersStartlist(Guid gameId,
+        int preDraftCompetitionIndex, CancellationToken ct)
+    {
+        var gameJumpersStartlist = await gameCompetitionStartlist.Get(gameId,
+            new Policy.GameCompetitionStartlist.PreDraftDto(preDraftCompetitionIndex), ct);
+        var competitionJumpersStartlist =
+            gameJumpersStartlist.ToCompetitionJumpers(competitionJumperAcl).ToImmutableList();
+        return competitionJumpersStartlist;
     }
 }

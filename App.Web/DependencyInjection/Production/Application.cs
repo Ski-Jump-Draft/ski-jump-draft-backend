@@ -15,7 +15,7 @@ public static class Application
     public static IServiceCollection AddProductionApplication(this IServiceCollection services)
     {
         services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.Fixed>(sp =>
-            new Fixed("Oslo HS134", sp.GetRequiredService<IHills>()));
+            new Fixed("Zakopane HS140", sp.GetRequiredService<IHills>()));
         services.AddSingleton<IGameJumpersSelector, App.Application.Policy.GameJumpersSelector.All>();
         services
             .AddSingleton<App.Application.Policy.DraftPicker.IDraftPicker,
@@ -26,6 +26,9 @@ public static class Application
         services
             .AddSingleton<App.Application.Policy.DraftBotPickTime.IDraftBotPickTime,
                 App.Application.Policy.DraftBotPickTime.GaussianDistribution>();
+        services
+            .AddSingleton<App.Application.Policy.GameCompetitionStartlist.IGameCompetitionStartlist,
+                App.Application.Policy.GameCompetitionStartlist.Classic>();
         services
             .AddSingleton<App.Application.Game.Ranking.IGameRankingFactorySelector,
                 App.Application.Game.Ranking.DefaultSelector>();

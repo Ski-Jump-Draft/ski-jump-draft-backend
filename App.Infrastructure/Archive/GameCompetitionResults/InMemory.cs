@@ -7,7 +7,10 @@ public class InMemory : IGameCompetitionResultsArchive
     private readonly Dictionary<Guid, List<CompetitionResultsDto>> _preDraft = new();
     private readonly Dictionary<Guid, CompetitionResultsDto> _main = new();
 
-    public void ArchivePreDraft(Guid gameId, CompetitionResultsDto competitionResults)
+    public Task ArchivePreDraftAsync(
+        Guid gameId,
+        CompetitionResultsDto competitionResults,
+        CancellationToken ct = default)
     {
         if (!_preDraft.TryGetValue(gameId, out var competitionResultsDtos))
         {
@@ -16,20 +19,29 @@ public class InMemory : IGameCompetitionResultsArchive
         }
 
         competitionResultsDtos.Add(competitionResults);
+        return Task.CompletedTask;
     }
 
-    public List<CompetitionResultsDto>? GetPreDraftResults(Guid gameId)
+    public Task<List<CompetitionResultsDto>?> GetPreDraftResultsAsync(
+        Guid gameId,
+        CancellationToken ct = default)
     {
-        return _preDraft.GetValueOrDefault(gameId);
+        return Task.FromResult(_preDraft.GetValueOrDefault(gameId));
     }
 
-    public void ArchiveMain(Guid gameId, CompetitionResultsDto competitionResults)
+    public Task ArchiveMainAsync(
+        Guid gameId,
+        CompetitionResultsDto competitionResults,
+        CancellationToken ct = default)
     {
         _main[gameId] = competitionResults;
+        return Task.CompletedTask;
     }
 
-    public CompetitionResultsDto? GetMainResults(Guid gameId)
+    public Task<CompetitionResultsDto?> GetMainResultsAsync(
+        Guid gameId,
+        CancellationToken ct = default)
     {
-        return _main.GetValueOrDefault(gameId);
+        return Task.FromResult(_main.GetValueOrDefault(gameId));
     }
 }

@@ -10,15 +10,14 @@ using RankingModule = App.Domain.Game.RankingModule;
 
 namespace App.Application.Game.Ranking;
 
-// TODO: Zrobić refactor i reuse. + PodiumAtAllCosts
+// TODO: Zrobić refactor i reuse.
 public class ClassicGameRankingFactory(
     IDraftPicksArchive draftPicksArchive,
     IGameCompetitionResultsArchive gameCompetitionResultsArchive,
-    ICompetitionJumperAcl competitionJumperAcl,
     IMyLogger logger)
     : IGameRankingFactory
 {
-    public Task<Domain.Game.Ranking> Create(Domain.Game.Game game, CancellationToken ct)
+    public async Task<Domain.Game.Ranking> Create(Domain.Game.Game game, CancellationToken ct)
     {
         if (!game.WaitsForEnd)
         {
@@ -28,7 +27,8 @@ public class ClassicGameRankingFactory(
         var playerIds = PlayersModule.toIdsList(game.Players).ToList();
         var picks = draftPicksArchive.GetPicks(game.Id_.Item);
 
-        var mainCompetitionClassification = gameCompetitionResultsArchive.GetMainResults(game.Id.Item)?.Results;
+        var mainCompetitionClassification =
+            (await gameCompetitionResultsArchive.GetMainResultsAsync(game.Id.Item, ct))?.Results;
         if (mainCompetitionClassification is null)
         {
             throw new Exception($"Game {game.Id
@@ -36,10 +36,9 @@ public class ClassicGameRankingFactory(
         }
 
         var mainCompetitionPositionByJumper = new Dictionary<JumperId, int>();
-        foreach (var (competitionJumperId, position, _, _, _) in mainCompetitionClassification)
+        foreach (var (_, gameJumperGuid, _, position, _, _, _) in mainCompetitionClassification)
         {
-            var gameJumperDto = competitionJumperAcl.GetGameJumper(competitionJumperId);
-            var gameJumperId = JumperId.NewJumperId(gameJumperDto.Id);
+            var gameJumperId = JumperId.NewJumperId(gameJumperGuid);
             mainCompetitionPositionByJumper.Add(gameJumperId,
                 position);
         }
@@ -99,6 +98,6 @@ public class ClassicGameRankingFactory(
                 return Tuple.Create(idAndPoints.Key, points);
             })
         );
-        return Task.FromResult(Domain.Game.Ranking.Create(fSharpRankingMap));
+        return Domain.Game.Ranking.Create(fSharpRankingMap);
     }
 }

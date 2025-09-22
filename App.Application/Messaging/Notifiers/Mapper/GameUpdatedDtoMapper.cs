@@ -24,8 +24,6 @@ using Microsoft.FSharp.Core;
 using Microsoft.FSharp.Reflection;
 
 public class GameUpdatedDtoMapper(
-    Func<Domain.Competition.JumperId, CancellationToken, Task<Domain.GameWorld.Jumper>>
-        gameWorldJumperByCompetitionJumperId,
     PreDraftPositionsService preDraftPositionsService,
     IGameCompetitionResultsArchive gameCompetitionResultsArchive,
     IGameSchedule gameSchedule,
@@ -35,7 +33,6 @@ public class GameUpdatedDtoMapper(
     IGameJumperAcl gameJumperAcl,
     IJumpers gameWorldJumpers,
     ICompetitionJumperAcl competitionJumperAcl,
-    IGameUpdatedDtoMapperCache cache,
     IHills gameWorldHills,
     ICompetitionHillAcl competitionHillAcl,
     ICountries countries)
@@ -243,7 +240,7 @@ public class GameUpdatedDtoMapper(
     private async Task<EndedPreDraftDto> MapEndedPreDraft(App.Domain.Game.Game game, Guid gameId, CancellationToken ct)
     {
         var archiveCompetitionResultsDtosList =
-            gameCompetitionResultsArchive.GetPreDraftResults(gameId)?.ToImmutableList() ?? [];
+            (await gameCompetitionResultsArchive.GetPreDraftResultsAsync(gameId, ct))?.ToImmutableList() ?? [];
 
         var endedCompetitionResultsList = archiveCompetitionResultsDtosList.Select(archiveCompetitionResultsDto =>
             new EndedCompetitionResults(archiveCompetitionResultsDto.Results.Select(MapArchiveResultRecord)
@@ -287,7 +284,8 @@ public class GameUpdatedDtoMapper(
             .ToList()
             .AsReadOnly();
 
-        var positionsByGameJumper = preDraftPositionsService.GetPreDraftPositions(game.Id.Item).PositionsByGameJumper;
+        var positionsByGameJumper = (await preDraftPositionsService.GetPreDraftPositions(game.Id.Item, ct))
+            .PositionsByGameJumper;
 
         var tasks = draft.AvailablePicks.Select(async gameJumperId =>
         {

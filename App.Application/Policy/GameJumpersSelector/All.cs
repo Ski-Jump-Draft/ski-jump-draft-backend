@@ -3,7 +3,7 @@ using App.Domain.GameWorld;
 
 namespace App.Application.Policy.GameJumpersSelector;
 
-public class All(IJumpers jumpers, ICountries countries) : IGameJumpersSelector
+public class All(IJumpers jumpers) : IGameJumpersSelector
 {
     public async Task<IEnumerable<SelectedGameWorldJumperDto>> Select(CancellationToken ct)
     {

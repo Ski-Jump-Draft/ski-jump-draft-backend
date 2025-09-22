@@ -8,6 +8,7 @@ using App.Application.Game.Gate;
 using App.Application.Mapping;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
+using App.Application.Policy.GameCompetitionStartlist;
 using App.Application.Policy.GameHillSelector;
 using App.Application.Policy.GameJumpersSelector;
 using App.Application.Utility;
@@ -16,7 +17,9 @@ using App.Domain.Game;
 using App.Domain.GameWorld;
 using Microsoft.FSharp.Collections;
 using HillId = App.Domain.GameWorld.HillId;
+using Jumper = App.Domain.Competition.Jumper;
 using JumperId = App.Domain.GameWorld.JumperId;
+using PreDraftDto = App.Application.Messaging.Notifiers.PreDraftDto;
 
 namespace App.Application.UseCase.Game.StartMainCompetition;
 
@@ -37,7 +40,8 @@ public class Handler(
     ISelectGameStartingGateService selectGameStartingGateService,
     IMyLogger logger,
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
-    IGameSchedule gameSchedule)
+    IGameSchedule gameSchedule,
+    IGameCompetitionStartlist gameCompetitionStartlist)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -54,12 +58,14 @@ public class Handler(
 
         var competitionGuid = guid.NewGuid();
         var competitionId = CompetitionId.NewCompetitionId(competitionGuid);
-        var competitionJumpers = game.Jumpers.ToCompetitionJumpers(competitionJumperAcl).ToImmutableList();
-        var startingGateInt = await selectGameStartingGateService.Select(competitionJumpers, game.Hill.Value, ct);
+
+        var competitionJumpersStartlist = await GenerateCompetitionJumpersStartlist(command.GameId, ct);
+        var startingGateInt =
+            await selectGameStartingGateService.Select(competitionJumpersStartlist, game.Hill.Value, ct);
         var startingGate = Domain.Competition.Gate.NewGate(startingGateInt);
 
         var gameAfterMainCompetitionStartResult =
-            game.StartMainCompetition(competitionId, ListModule.OfSeq(competitionJumpers), startingGate);
+            game.StartMainCompetition(competitionId, ListModule.OfSeq(competitionJumpersStartlist), startingGate);
         if (!gameAfterMainCompetitionStartResult.IsOk)
             throw new Exception("Game start next pre draft competition failed",
                 new Exception(gameAfterMainCompetitionStartResult.ErrorValue.ToString()));
@@ -77,5 +83,14 @@ public class Handler(
             ct: ct);
         await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterMainCompetitionStart, ct: ct));
         return new Result(competitionGuid);
+    }
+
+
+    private async Task<ImmutableList<Jumper>> GenerateCompetitionJumpersStartlist(Guid gameId, CancellationToken ct)
+    {
+        var gameJumpersStartlist = await gameCompetitionStartlist.Get(gameId, new MainCompetitionDto(), ct);
+        var competitionJumpersStartlist =
+            gameJumpersStartlist.ToCompetitionJumpers(competitionJumperAcl).ToImmutableList();
+        return competitionJumpersStartlist;
     }
 }
