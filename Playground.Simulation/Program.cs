@@ -114,7 +114,7 @@ public static class Program
             {
                 var wind = weatherEngine.GetWind();
                 weatherEngine.SimulateTime(TimeSpan.FromMinutes(1));
-                var windDouble = WindModule.averaged(wind);
+                var windDouble = WindModule.average(wind);
                 var ctx = new SimulationContext(Gate.NewGate(gate), jumper, hill, wind);
                 var jump = jumpSimulator.Simulate(ctx);
 

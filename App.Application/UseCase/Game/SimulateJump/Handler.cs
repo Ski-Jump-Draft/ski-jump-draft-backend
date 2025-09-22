@@ -88,7 +88,7 @@ public class Handler(
 
         logger.Info($"{gameWorldJumper.Name.Item} {gameWorldJumper.Surname.Item} jumped: {
             DistanceModule.value(simulatedJump.Distance)}m + {simulatedJump.Landing} ({
-                WindModule.averaged(simulationWind):F2}m/s)");
+                WindModule.average(simulationWind):F2}m/s)");
 
         var judgesSimulationContext =
             new JudgesSimulationContext(simulatedJump, Gate.NewGate(App.Domain.Competition.GateModule.value(gate)),
@@ -100,7 +100,7 @@ public class Handler(
             .OrThrow("Invalid judge notes");
 
         var competitionJumpWind =
-            App.Domain.Competition.JumpModule.WindAverage.FromDouble(WindModule.averaged(simulationWind));
+            App.Domain.Competition.JumpModule.WindAverage.FromDouble(WindModule.average(simulationWind));
         var competitionJump = new App.Domain.Competition.Jump(nextCompetitionJumper.Id,
             JumpModule.DistanceModule.tryCreate(DistanceModule.value(simulatedJump.Distance))
                 .OrThrow("Invalid distance"),
@@ -228,7 +228,7 @@ public class Handler(
                 Domain.GameWorld.CountryFisCodeModule.value(gameWorldJumper.FisCountryCode),
                 DistanceModule.value(simulatedJump.Distance),
                 JumpModule.JudgesModule.value(competitionJudges).ToArray(),
-                WindModule.averaged(simulationWind),
+                WindModule.average(simulationWind),
                 Domain.Competition.TotalPointsModule.value(jumperResultInClassifiation.Points),
                 Domain.Competition.Classification.PositionModule.value(jumperResultInClassifiation.Position));
 

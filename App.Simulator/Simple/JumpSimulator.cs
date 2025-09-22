@@ -10,7 +10,7 @@ namespace App.Simulator.Simple;
 /// <param name="AverageBigSkill">Multiplies all random additions</param>
 /// <param name="TakeoffRatingPointsByForm">How many takeoff rating points by a one point of the form?</param>
 /// <param name="FlightRatingPointsByForm">How many flight rating points by a one point of the form?</param>
-/// <param name="FlightToTakeoffRatio">E.g. 3.5 means that flight has 3.5 times more impact to distance than takeoff</param>
+/// <param name="FlightToTakeoffRatio">E.g., 3.5 means that the flight has 3.5 times more impact to distance than takeoff</param>
 /// <param name="RandomAdditionsRatio">Multiplies all random additions</param>
 /// <param name="DistanceSpreadByRatingFactor">Scales meters per rating point</param>
 public record SimulatorConfiguration(
@@ -28,8 +28,9 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
     {
         var takeoffRating = CalculateTakeoffRating(context);
         var flightRating = CalculateFlightRating(context);
-        var averageWind = WindModule.averaged(context.Wind);
-        var distance = CalculateDistance(context, takeoffRating, flightRating, averageWind);
+        var averageWind = WindModule.average(context.Wind);
+        var windInstability = WindModule.instability(context.Wind);
+        var distance = CalculateDistance(context, takeoffRating, flightRating, averageWind, windInstability);
         var landing = GenerateLanding(context, distance);
         logger.Debug($"Distance: {distance}, AverageWind: {averageWind}, Landing: {landing}");
         return new Jump(DistanceModule.tryCreate(distance).Value, landing);
@@ -124,6 +125,19 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
         return random.Gaussian(0, 8);
     }
 
+    private static double DynamicFlightToTakeoffRatio(double k)
+    {
+        return k switch
+        {
+            <= 90 => 1.0,
+            < 125 => Lerp(1.0, 1.6, SmoothStep(90, 125, k)),
+            < 200 => Lerp(1.6, 4.5, SmoothStep(125, 200, k)),
+            _ => 4.5
+        };
+    }
+
+    private static double Lerp(double a, double b, double t) => a + (b - a) * t;
+
     private Landing GenerateLanding(SimulationContext context, double distance)
     {
         var realHs = HillModule.HsPointModule.value(context.Hill.SimulationData.RealHs);
@@ -170,7 +184,7 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
     }
 
     private double CalculateDistance(SimulationContext context, double takeoffRating, double flightRating,
-        double averageWind)
+        double averageWind, double windInstability)
     {
         var metersByGate = HillModule.MetersByGateModule.value(context.Hill.SimulationData.MetersByGate);
         var gate = context.Gate.Item;
@@ -188,20 +202,89 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
         }");
 
         var takeoffAddition = metersByRatingPoint * takeoffRating;
-        var flightAddition = metersByRatingPoint * flightRating * configuration.FlightToTakeoffRatio;
+
+        var flightToTakeoffRatio = DynamicFlightToTakeoffRatio(kPoint);
+        var flightToTakeoffRatioAfterIncludingConfiguration =
+            configuration.FlightToTakeoffRatio *
+            flightToTakeoffRatio; // globalny mnożnik dalej działa (ustaw 1, by mieć dokładnie kotwice)
+        var flightAddition = metersByRatingPoint * flightRating * flightToTakeoffRatioAfterIncludingConfiguration;
+
+        logger.Debug($"FlightToTakeoffRatio(Dyn/Eff): {flightToTakeoffRatio}/{
+            flightToTakeoffRatioAfterIncludingConfiguration}");
 
         logger.Debug($"TakeoffRating: {takeoffRating}, FlightRating: {flightRating}, TakeoffAddition: {takeoffAddition
         }, FlightAddition: {flightAddition}");
 
-        var windAddition = CalculateWindAddition(context, averageWind, kPoint);
+        var windAddition = CalculateWindAddition(context, averageWind, windInstability, kPoint);
         logger.Debug($"Wind: {averageWind}, WindAddition: {windAddition}");
 
         return startingDistance + gateAddition + takeoffAddition + flightAddition + windAddition;
     }
 
-    private double CalculateWindAddition(SimulationContext context, double averageWind, double kPoint)
+    private double CalculateWindAddition(SimulationContext context, double averageWind, double windInstability,
+        double kPoint)
     {
-        var windAddition = averageWind * 4 * (kPoint / 50);
-        return windAddition;
+        if (averageWind == 0) return 0;
+
+        var perMsHeadwind = CalculatePerMsHeadwind(kPoint);
+        perMsHeadwind *= SkiFlyingBoost(kPoint);
+
+        var windAbs = Math.Abs(averageWind);
+
+        var sigma = CalculateInstabilitySigma(windInstability, windAbs);
+        var randomizedFactor = RandomizedFactor(random, sigma, windInstability);
+
+        var metersLinear = windAbs * perMsHeadwind;
+        var asym = averageWind < 0 ? -TailMultiplier(windAbs, windInstability) : 1.0;
+
+        return metersLinear * asym * randomizedFactor;
+    }
+
+    /// <summary>
+    /// Calculates meters per headwind m/s using some fancy AI's algorithm
+    /// </summary>
+    /// <param name="k"></param>
+    /// <returns></returns>
+    private static double CalculatePerMsHeadwind(double k)
+    {
+        const double a = 0.0078019484919;
+        const double b = 1.38264025417;
+        return a * Math.Pow(k, b);
+    }
+
+    /// <summary>
+    /// Returns value from 0 to 1. K pertains to (185,inf). 250 or more is 1.
+    /// </summary>
+    /// <param name="k"></param>
+    /// <returns></returns>
+    private static double SkiFlyingBoost(double k)
+    {
+        return 1.0 + 0.08 * SmoothStep(185, 240, k);
+    }
+
+    private static double TailMultiplier(double wAbs, double instability)
+    {
+        var baseTail = 1.5 + 0.22 * SmoothStep(1.5, 3.5, wAbs);
+        var strongWindAtt = 1.0 - 0.5 * SmoothStep(4, 10, wAbs);
+        var stabilityAtt = 1.0 - 0.5 * Math.Clamp(instability, 0, 1);
+        return 1.0 + (baseTail - 1.0) * strongWindAtt * stabilityAtt;
+    }
+
+    private static double CalculateInstabilitySigma(double instability, double wAbs)
+    {
+        return Math.Max(1e-6, (instability * 0.5) * (1.0 + 0.3 * SmoothStep(0, 6, wAbs)));
+    }
+
+    private static double RandomizedFactor(IRandom random, double sigma, double instability)
+    {
+        var rndVal = random.Gaussian(0, sigma);
+        return Math.Clamp(1.0 + rndVal, 1.0 - instability, 1.0 + instability);
+    }
+
+    private static double SmoothStep(double edge0, double edge1, double x)
+    {
+        if (edge1 <= edge0) return x < edge0 ? 0 : 1;
+        var t = Math.Clamp((x - edge0) / (edge1 - edge0), 0, 1);
+        return t * t * (3 - 2 * t);
     }
 }

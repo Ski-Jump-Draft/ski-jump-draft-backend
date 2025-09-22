@@ -17,38 +17,28 @@ public static class ConfigurationPresetFactory
     public static Configuration StableNeutral => new(-0.03, 0.005, 0.02);
 }
 
-
 /// <summary>
 /// A simple weather engine using minutes. Not recommended to use longer than ~200 minutes
 /// </summary>
-public class WeatherEngine : IWeatherEngine
+public class WeatherEngine(IRandom random, IMyLogger logger, Configuration configuration)
+    : IWeatherEngine
 {
-    private double _currentBaseWindDouble;
+    private double _currentBaseWindDouble = configuration.StartingWind;
     private int _minutes;
-    private readonly Configuration _configuration;
-    private readonly IRandom _random;
-    private readonly IMyLogger _logger;
-
-    public WeatherEngine(IRandom random, IMyLogger logger, Configuration configuration)
-    {
-        _random = random;
-        _logger = logger;
-        _configuration = configuration;
-        _currentBaseWindDouble = configuration.StartingWind;
-    }
 
     public Wind GetWind()
     {
         var windDouble = _currentBaseWindDouble + GenerateWindAddition();
-        var wind = WindModule.create(windDouble);
-        _logger.Debug($"Generated wind ({_minutes} minutes): " +
-                      (WindModule.averaged(wind).ToString(CultureInfo.InvariantCulture)) + "");
+        var windInstability = WindInstabilityModule.create(1);
+        var wind = WindModule.create(windDouble, windInstability);
+        logger.Debug($"Generated wind ({_minutes} minutes): " +
+                     (WindModule.average(wind).ToString(CultureInfo.InvariantCulture)) + "");
         return wind;
     }
 
     private double GenerateWindAddition()
     {
-        return _random.Gaussian(0, _configuration.WindAdditionStdDev);
+        return random.Gaussian(0, configuration.WindAdditionStdDev);
     }
 
     public int Minutes => _minutes;
@@ -56,10 +46,10 @@ public class WeatherEngine : IWeatherEngine
     public void SimulateTime(TimeSpan time)
     {
         var minutes = (int)Math.Floor(time.TotalMinutes);
-        _logger.Debug($"Simulating {minutes} minutes");
+        logger.Debug($"Simulating {minutes} minutes");
         for (var i = 0; i < minutes; i++)
         {
-            var change = _random.Gaussian(0, _configuration.StableWindChangeStdDev);
+            var change = random.Gaussian(0, configuration.StableWindChangeStdDev);
             _currentBaseWindDouble += change;
         }
 
