@@ -159,6 +159,8 @@ app.MapPost("/game/{gameId:guid}/pick",
 
 app.MapHub<GameHub>("/game/hub");
 
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+
 app.UseRouting();
 
 if (mode == Mode.Offline)
