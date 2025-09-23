@@ -10,6 +10,11 @@ using Results = Microsoft.AspNetCore.Http.Results;
 
 var builder = WebApplication.CreateBuilder(args);
 
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddUserSecrets<Program>();
+}
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend",
@@ -105,28 +110,6 @@ app.MapGet("/matchmaking",
             return Results.Problem("Could not join");
         }
     });
-
-// app.MapGet("/game/{gameId:guid}/leave",
-//     async (Guid gameId, Guid playerId, [FromServices] ICommandBus commandBus,
-//         [FromServices] App.Domain.Game.IGames repo, [FromServices] App.Application.Utility.IMyLogger myLogger,
-//         CancellationToken ct) =>
-//     {
-//         var command = new App.Application.UseCase.Game.LeaveGame.Command(gameId, playerId);
-//         try
-//         {
-//             var result = await commandBus
-//                 .SendAsync<App.Application.UseCase.Game.LeaveGame.Command,
-//                     App.Application.UseCase.Game.LeaveGame.Result>(command, ct);
-//             var hasLeft = result.HasLeft;
-//             return !hasLeft ? Results.NotFound() : Results.Ok(result);
-//         }
-//         catch (Exception e)
-//         {
-//             myLogger.Error($"Error during leaving a game: {e.Message} (gameId: {gameId}, playerId: {playerId})");
-//             return Results.InternalServerError();
-//         }
-//     });
-
 
 app.MapPost("/game/{gameId:guid}/pick",
     async (Guid gameId, Guid playerId, Guid jumperId, [FromServices] ICommandBus commandBus,

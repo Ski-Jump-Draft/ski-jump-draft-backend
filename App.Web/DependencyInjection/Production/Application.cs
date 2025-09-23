@@ -5,6 +5,7 @@ using App.Application.Matchmaking;
 using App.Application.Policy.GameGateSelector;
 using App.Application.Policy.GameHillSelector;
 using App.Application.Policy.GameJumpersSelector;
+using App.Application.Utility;
 using App.Domain.GameWorld;
 using App.Domain.Simulation;
 
@@ -16,7 +17,12 @@ public static class Application
     {
         // services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.Fixed>(sp =>
         //     new Fixed("Zakopane HS140", sp.GetRequiredService<IHills>()));
-        services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.RandomHill>();
+        services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.RandomHill>(sp =>
+            new RandomHill(sp.GetRequiredService<IRandom>(), sp.GetRequiredService<IHills>(),
+            [
+                "Zakopane HS140",
+                "Oslo HS134"
+            ], sp.GetRequiredService<IMyLogger>()));
         services.AddSingleton<IGameJumpersSelector, App.Application.Policy.GameJumpersSelector.All>();
         services
             .AddSingleton<App.Application.Policy.DraftPicker.IDraftPicker,
