@@ -215,13 +215,13 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
         logger.Debug($"TakeoffRating: {takeoffRating}, FlightRating: {flightRating}, TakeoffAddition: {takeoffAddition
         }, FlightAddition: {flightAddition}");
 
-        var windAddition = CalculateWindAddition(context, averageWind, windInstability, kPoint);
+        var windAddition = CalculateWindAddition(averageWind, windInstability, kPoint);
         logger.Debug($"Wind: {averageWind}, WindAddition: {windAddition}");
 
         return startingDistance + gateAddition + takeoffAddition + flightAddition + windAddition;
     }
 
-    private double CalculateWindAddition(SimulationContext context, double averageWind, double windInstability,
+    private double CalculateWindAddition(double averageWind, double windInstability,
         double kPoint)
     {
         if (averageWind == 0) return 0;
