@@ -12,7 +12,8 @@ public enum Mode
 
 public static class DependencyInjection
 {
-    public static IServiceCollection InjectDependencies(this IServiceCollection services, Mode mode)
+    public static IServiceCollection InjectDependencies(this IServiceCollection services, IConfiguration config,
+        Mode mode)
     {
         services.AddAcl().AddApplication().AddArchives().AddCommanding().AddMappers().AddRepositories().AddStorages()
             .AddUtilities().AddBot().AddJson();
@@ -25,7 +26,7 @@ public static class DependencyInjection
             case Mode.Online:
                 services.AddProductionApplication().AddProductionGame().AddProductionHostedServices()
                     .AddProductionMatchmaking()
-                    .AddProductionNotifiers().AddProductionSimulation();
+                    .AddProductionNotifiers().AddProductionSimulation().AddGameWorld(config);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(mode), mode, null);

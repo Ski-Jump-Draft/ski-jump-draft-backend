@@ -27,7 +27,7 @@ DotNetEnv.Env.Load(".env");
 builder.Services.AddSignalR();
 
 const Mode mode = Mode.Online;
-builder.Services.InjectDependencies(mode);
+builder.Services.InjectDependencies(builder.Configuration, mode);
 
 var app = builder.Build();
 app.UseCors("AllowFrontend");
