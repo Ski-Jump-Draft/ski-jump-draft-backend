@@ -17,6 +17,7 @@ public static class DependencyInjection
     {
         services.AddAcl().AddApplication().AddArchives().AddCommanding().AddMappers().AddRepositories().AddStorages()
             .AddUtilities().AddBot().AddJson();
+        services.AddMemoryCache();
 
         switch (mode)
         {
