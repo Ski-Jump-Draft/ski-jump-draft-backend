@@ -13,16 +13,60 @@ namespace App.Web.DependencyInjection.Production;
 
 public static class Application
 {
-    public static IServiceCollection AddProductionApplication(this IServiceCollection services)
+    public static IServiceCollection AddProductionApplication(this IServiceCollection services, bool isMocked)
     {
         // services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.Fixed>(sp =>
         //     new Fixed("Zakopane HS140", sp.GetRequiredService<IHills>()));
-        services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.RandomHill>(sp =>
-            new RandomHill(sp.GetRequiredService<IRandom>(), sp.GetRequiredService<IHills>(),
-            [
-                "Zakopane HS140",
-                "Oslo HS134"
-            ], sp.GetRequiredService<IMyLogger>()));
+
+        if (isMocked)
+        {
+            services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.RandomHill>(sp =>
+                new RandomHill(sp.GetRequiredService<IRandom>(), sp.GetRequiredService<IHills>(),
+                [
+                    "Zakopane HS140",
+                    "Oslo HS134"
+                ], sp.GetRequiredService<IMyLogger>()));
+            services
+                .AddSingleton<App.Application.Matchmaking.IMatchmakingDurationCalculator,
+                    App.Application.Matchmaking.FixedMatchmakingDurationCalculator>(sp =>
+                    new FixedMatchmakingDurationCalculator(TimeSpan.FromSeconds(3)));
+            services
+                .AddSingleton<App.Application.Game.Gate.IGameStartingGateSelectorFactory,
+                    App.Application.Game.Gate.IterativeSimulatedFactory>(sp =>
+                {
+                    const JuryBravery juryBravery = JuryBravery.High;
+                    return new IterativeSimulatedFactory(sp.GetRequiredService<IJumpSimulator>(),
+                        sp.GetRequiredService<IWeatherEngine>(),
+                        juryBravery, sp.GetRequiredService<ICompetitionJumperAcl>(),
+                        sp.GetRequiredService<IGameJumperAcl>(),
+                        sp.GetRequiredService<ICompetitionHillAcl>(), sp.GetRequiredService<IJumpers>(),
+                        sp.GetRequiredService<IJumperGameFormStorage>());
+                });
+        }
+        else
+        {
+            services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.RandomHill>(sp =>
+                new RandomHill(sp.GetRequiredService<IRandom>(), sp.GetRequiredService<IHills>(),
+                [
+                ], sp.GetRequiredService<IMyLogger>()));
+            services
+                .AddSingleton<App.Application.Matchmaking.IMatchmakingDurationCalculator,
+                    App.Application.Matchmaking.FixedMatchmakingDurationCalculator>(sp =>
+                    new FixedMatchmakingDurationCalculator(TimeSpan.FromSeconds(60)));
+            services
+                .AddSingleton<App.Application.Game.Gate.IGameStartingGateSelectorFactory,
+                    App.Application.Game.Gate.IterativeSimulatedFactory>(sp =>
+                {
+                    const JuryBravery juryBravery = JuryBravery.High;
+                    return new IterativeSimulatedFactory(sp.GetRequiredService<IJumpSimulator>(),
+                        sp.GetRequiredService<IWeatherEngine>(),
+                        juryBravery, sp.GetRequiredService<ICompetitionJumperAcl>(),
+                        sp.GetRequiredService<IGameJumperAcl>(),
+                        sp.GetRequiredService<ICompetitionHillAcl>(), sp.GetRequiredService<IJumpers>(),
+                        sp.GetRequiredService<IJumperGameFormStorage>());
+                });
+        }
+
         services.AddSingleton<IGameJumpersSelector, App.Application.Policy.GameJumpersSelector.All>();
         services
             .AddSingleton<App.Application.Policy.DraftPicker.IDraftPicker,
@@ -43,22 +87,7 @@ public static class Application
             .AddSingleton<App.Application.Game.Gate.ISelectGameStartingGateService,
                 App.Application.Game.Gate.SelectCompetitionStartingGateService>();
 
-        services
-            .AddSingleton<App.Application.Matchmaking.IMatchmakingDurationCalculator,
-                App.Application.Matchmaking.FixedMatchmakingDurationCalculator>(sp =>
-                new FixedMatchmakingDurationCalculator(TimeSpan.FromSeconds(3)));
-        services
-            .AddSingleton<App.Application.Game.Gate.IGameStartingGateSelectorFactory,
-                App.Application.Game.Gate.IterativeSimulatedFactory>(sp =>
-            {
-                const JuryBravery juryBravery = JuryBravery.Medium;
-                return new IterativeSimulatedFactory(sp.GetRequiredService<IJumpSimulator>(),
-                    sp.GetRequiredService<IWeatherEngine>(),
-                    juryBravery, sp.GetRequiredService<ICompetitionJumperAcl>(),
-                    sp.GetRequiredService<IGameJumperAcl>(),
-                    sp.GetRequiredService<ICompetitionHillAcl>(), sp.GetRequiredService<IJumpers>(),
-                    sp.GetRequiredService<IJumperGameFormStorage>());
-            });
+
         services
             .AddSingleton<App.Application.JumpersForm.IJumperGameFormAlgorithm,
                 App.Application.Policy.GameFormAlgorithm.FullyRandom>();

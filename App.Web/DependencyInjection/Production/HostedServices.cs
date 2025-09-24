@@ -1,13 +1,21 @@
 using App.Web.HostedServices.MockedFlow;
+using App.Web.HostedServices.RealFlow;
 
 namespace App.Web.DependencyInjection.Production;
 
 public static class HostedServices
 {
-    public static IServiceCollection AddProductionHostedServices(this IServiceCollection services)
+    public static IServiceCollection AddProductionHostedServices(this IServiceCollection services, bool isMocked)
     {
-        services.AddHostedService<OnlineBotJoiner>();
+        if (isMocked)
+        {
+            services.AddHostedService<MockedOnlineBotJoiner>();
+        }
+        else
+        {
+            services.AddHostedService<OnlineBotJoiner>();
+        }
+        
         return services;
     }
 }
-

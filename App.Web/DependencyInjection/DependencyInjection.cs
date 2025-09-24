@@ -25,9 +25,12 @@ public static class DependencyInjection
                 services.AddLocalApplication().AddLocalGame().AddLocalHostedServices().AddLocalMatchmaking()
                     .AddLocalNotifiers().AddLocalSimulation().AddLocalMyPlayer(); break;
             case Mode.Online:
-                services.AddProductionApplication().AddProductionGame().AddProductionHostedServices()
-                    .AddProductionMatchmaking()
-                    .AddProductionNotifiers().AddProductionSimulation().AddGameWorld(config);
+                const bool isMocked = false;
+                services.AddProductionApplication(isMocked: isMocked).AddProductionGame()
+                    .AddProductionHostedServices(isMocked: isMocked)
+                    .AddProductionMatchmaking(isMocked: isMocked)
+                    .AddProductionNotifiers().AddProductionSimulation(isMocked: isMocked)
+                    .AddGameWorld(config, isMocked: isMocked);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(mode), mode, null);

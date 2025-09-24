@@ -4,7 +4,7 @@ using App.Domain.Matchmaking;
 
 namespace App.Web.HostedServices.MockedFlow;
 
-public class OnlineBotJoiner(IMatchmakings repo, ICommandBus bus, IMyLogger log)
+public class MockedOnlineBotJoiner(IMatchmakings repo, ICommandBus bus, IMyLogger log)
     : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken ct)

@@ -127,11 +127,12 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
 
     private static double DynamicFlightToTakeoffRatio(double k)
     {
+        const double flightRatioWhenK200 = 4.0;
         return k switch
         {
             <= 90 => 1.0,
             < 125 => Lerp(1.0, 1.6, SmoothStep(90, 125, k)),
-            < 200 => Lerp(1.6, 4.5, SmoothStep(125, 200, k)),
+            < 200 => Lerp(1.6, flightRatioWhenK200, SmoothStep(125, 200, k)),
             _ => 4.5
         };
     }

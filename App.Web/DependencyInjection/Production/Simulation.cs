@@ -5,7 +5,7 @@ namespace App.Web.DependencyInjection.Production;
 
 public static class Simulation
 {
-    public static IServiceCollection AddProductionSimulation(this IServiceCollection services)
+    public static IServiceCollection AddProductionSimulation(this IServiceCollection services, bool isMocked)
     {
         const double baseFormFactor = 2.5;
         services.AddSingleton<App.Simulator.Simple.SimulatorConfiguration>(sp =>
