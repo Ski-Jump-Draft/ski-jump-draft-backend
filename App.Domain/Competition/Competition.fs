@@ -5,9 +5,9 @@ open FsToolkit.ErrorHandling
 
 module Competition =
     type Status =
-        | NotStarted of GateState
-        | RoundInProgress of GateState * RoundIndex
-        | Suspended of GateState * RoundIndex
+        | NotStarted of GateState: GateState
+        | RoundInProgress of GateState: GateState * RoundIndex: RoundIndex
+        | Suspended of GateState: GateState * RoundIndex: RoundIndex
         | Cancelled
         | Ended
 
@@ -54,6 +54,8 @@ type Competition =
         | Status.Suspended _ -> StatusTag.SuspendedTag
         | Status.Cancelled -> StatusTag.CancelledTag
         | Status.Ended -> StatusTag.EndedTag
+        
+    member this.Status_ = this.Status
 
     member this.CurrentRoundIndex: RoundIndex option =
         match this.Status with

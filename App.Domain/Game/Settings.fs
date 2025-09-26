@@ -18,6 +18,7 @@ type PreDraftSettings =
             None
 
     member this.CompetitionsCount = this.Competitions.Length
+    member this.Competitions_: Competition.Settings list = this.Competitions
 
 
 type PhaseDuration =

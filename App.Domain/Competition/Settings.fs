@@ -11,6 +11,8 @@ module RoundLimitValue =
         else
             Ok(RoundLimitValue v)
 
+    let value (RoundLimitValue v) = v
+
 type RoundLimit =
     | NoneLimit
     | Soft of Value: RoundLimitValue
@@ -19,7 +21,7 @@ type RoundLimit =
 type RoundSettings =
     { RoundLimit: RoundLimit
       SortStartlist: bool
-      ResetPoints: bool}
+      ResetPoints: bool }
 
 module Settings =
     type Error = | RoundSettingsEmpty
@@ -33,8 +35,10 @@ type Settings =
             Error(Settings.Error.RoundSettingsEmpty)
         else
             Ok { RoundSettings = roundSettings }
-    
-    member this.PointsResets : RoundIndex list =
-            this.RoundSettings
-            |> List.mapi (fun i rs -> if rs.ResetPoints then Some (RoundIndex(uint i)) else None)
-            |> List.choose id
+
+    member this.PointsResets: RoundIndex list =
+        this.RoundSettings
+        |> List.mapi (fun i rs -> if rs.ResetPoints then Some(RoundIndex(uint i)) else None)
+        |> List.choose id
+
+    member this.Rounds: RoundSettings list = this.RoundSettings

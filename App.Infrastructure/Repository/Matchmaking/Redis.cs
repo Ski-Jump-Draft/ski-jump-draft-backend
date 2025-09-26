@@ -55,14 +55,21 @@ public class Redis(IConnectionMultiplexer redis) : IMatchmakings
     private static string LiveSetKey => "matchmaking:live:ids";
     private static string ArchiveSetKey => "matchmaking:archive:ids";
 
-
     public async Task Add(Domain.Matchmaking.Matchmaking matchmaking, CancellationToken ct)
     {
         var matchmakingId = matchmaking.Id_.Item;
         var dto = MatchmakingDtoMapper.Create(matchmaking);
         var serializedMatchmaking = JsonSerializer.Serialize(dto);
-        await _db.StringSetAsync(LiveKey(matchmakingId), serializedMatchmaking);
-        await _db.SetAddAsync(LiveSetKey, dto.Id.ToString());
+        if (matchmaking.Status_.IsRunning)
+        {
+            await _db.StringSetAsync(LiveKey(matchmakingId), serializedMatchmaking);
+            await _db.SetAddAsync(LiveSetKey, dto.Id.ToString());
+        }
+        else
+        {
+            await _db.StringSetAsync(ArchiveKey(matchmakingId), serializedMatchmaking);
+            await _db.SetAddAsync(ArchiveSetKey, dto.Id.ToString());
+        }
     }
 
     public async Task<FSharpOption<Domain.Matchmaking.Matchmaking>> GetById(MatchmakingId matchmakingId,

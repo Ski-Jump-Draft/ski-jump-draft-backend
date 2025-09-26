@@ -2,6 +2,7 @@ namespace App.Domain.Game
 
 open System.Collections.Generic
 open App.Domain
+open App.Domain.Game.Draft.TurnIndex
 
 type GameId = GameId of System.Guid
 
@@ -31,8 +32,8 @@ type PreDraftStatus =
 type Status =
     | PreDraft of PreDraftStatus
     | Draft of Draft
-    | MainCompetition of Competition.Competition
-    | Ended of Ranking
+    | MainCompetition of Competition: Competition.Competition
+    | Ended of Ranking: Ranking
     | Break of Next: StatusTag
 
 type GameError =
@@ -90,13 +91,49 @@ type Game =
         | Ended _ -> EndedTag
         | Break next -> BreakTag next
 
+    member this.IsBreakBefore(phase: StatusTag) =
+        match this.Status with
+        | Break nextPhase -> phase = nextPhase
+        | _ -> false
+
+    member this.PhaseHasStarted(phase: StatusTag) : bool =
+        // zamiana StatusTag na liczbowy porządek
+        let rec order =
+            function
+            | StatusTag.PreDraftTag -> 0
+            | StatusTag.DraftTag -> 1
+            | StatusTag.MainCompetitionTag -> 2
+            | StatusTag.EndedTag -> 3
+            | StatusTag.BreakTag next ->
+                // Break jest "tuż przed" następną fazą
+                (order next) - 1
+
+        let current = order this.StatusTag
+        let target = order phase
+        current >= target
+
+    member this.PhaseHasEnded(phase: StatusTag) : bool =
+        let rec order =
+            function
+            | StatusTag.PreDraftTag -> 0
+            | StatusTag.DraftTag -> 1
+            | StatusTag.MainCompetitionTag -> 2
+            | StatusTag.EndedTag -> 3
+            | StatusTag.BreakTag next -> (order next) - 1
+
+        // zakończenie fazy = mamy już przynajmniej następną
+        let current = order this.StatusTag
+        let targetEnded = order phase + 1
+        current >= targetEnded
+
+
     member this.IsDuringCompetition = this.CurrentCompetition.IsSome
 
     member this.WaitsForNextPreDraftCompetition =
         match this.Status with
         | PreDraft(PreDraftStatus.Break _) -> true
         | _ -> false
-        
+
     member this.NextPreDraftCompetitionIndex =
         match this.Status with
         | PreDraft(PreDraftStatus.Break index) -> Some index
