@@ -77,8 +77,9 @@ app.MapPost("/matchmaking/join",
         {
             return Results.Conflict(new { error = "RoomIsFull", message = "Pokój jest pełny." });
         }
-        catch (Exception)
+        catch (Exception error)
         {
+            myLogger.Error($"Error during joining a matchmaking: {nick}. Error: {error.Message}, StackTrace: {error.StackTrace}");
             return Results.InternalServerError();
         }
     });

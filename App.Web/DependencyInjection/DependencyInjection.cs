@@ -15,7 +15,7 @@ public static class DependencyInjection
     public static IServiceCollection InjectDependencies(this IServiceCollection services, IConfiguration config,
         Mode mode)
     {
-        services.AddAcl().AddApplication().AddArchives().AddCommanding().AddMappers().AddRepositories().AddStorages()
+        services.AddAcl().AddApplication().AddArchives().AddCommanding().AddMappers().AddStorages()
             .AddUtilities().AddBot().AddJson();
         services.AddMemoryCache();
 
@@ -23,14 +23,15 @@ public static class DependencyInjection
         {
             case Mode.Offline:
                 services.AddLocalApplication().AddLocalGame().AddLocalHostedServices().AddLocalMatchmaking()
-                    .AddLocalNotifiers().AddLocalSimulation().AddLocalMyPlayer(); break;
+                    .AddLocalNotifiers().AddLocalSimulation().AddLocalMyPlayer().AddLocalRepositories(); break;
             case Mode.Online:
                 const bool isMocked = false;
                 services.AddProductionApplication(isMocked: isMocked).AddProductionGame()
                     .AddProductionHostedServices(isMocked: isMocked)
                     .AddProductionMatchmaking(isMocked: isMocked)
                     .AddProductionNotifiers().AddProductionSimulation(isMocked: isMocked)
-                    .AddGameWorld(config, isMocked: isMocked);
+                    .AddGameWorld(config, isMocked: isMocked)
+                    .AddProductionRepositories(config, isMocked: isMocked);
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(mode), mode, null);

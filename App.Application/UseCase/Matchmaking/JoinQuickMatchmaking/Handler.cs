@@ -61,12 +61,13 @@ public class Handler(
             case (_, >= 1):
                 throw new MultipleGamesNotSupportedException();
             case (1, 0):
+                var matchmaking = matchmmakingsInProgress.Single();
                 return new MatchmakingDto(matchmmakingsInProgress.Single(), JustCreated: false);
             // 0 matchmakings, 0 games
             default:
             {
                 var newMatchmaking =
-                    Domain.Matchmaking.Matchmaking.Create(MatchmakingId.NewMatchmakingId(guid.NewGuid()),
+                    Domain.Matchmaking.Matchmaking.CreateNew(MatchmakingId.NewMatchmakingId(guid.NewGuid()),
                         globalMatchmakingSettings);
                 return new MatchmakingDto(newMatchmaking, JustCreated: true);
             }

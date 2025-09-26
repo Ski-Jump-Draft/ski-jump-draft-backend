@@ -27,11 +27,17 @@ type Matchmaking =
           Status: Status
           Players: Set<Player> }
 
-    static member Create id settings =
+    static member CreateNew id settings =
         { Id = id
           Settings = settings
           Status = Running
           Players = Set.empty }
+
+    static member CreateFromState id settings status players =
+        { Id = id
+          Settings = settings
+          Status = status
+          Players = players }
 
 
     member this.Id_: MatchmakingId = this.Id
@@ -89,7 +95,13 @@ type Matchmaking =
         | _ -> Error(InvalidStatus this.Status)
 
     member this.CanJoin: bool =
-        not (this.Players.Count >= Settings.MaxPlayers.value this.Settings.MaxPlayers)
+        match this.Status with
+        | Ended _ ->
+            false
+        | Failed _ ->
+            false
+        | Running ->
+            not (this.Players.Count >= Settings.MaxPlayers.value this.Settings.MaxPlayers)
 
     member this.IsFull: bool =
         this.Players.Count >= Settings.MaxPlayers.value this.Settings.MaxPlayers

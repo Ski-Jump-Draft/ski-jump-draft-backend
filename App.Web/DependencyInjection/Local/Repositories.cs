@@ -1,11 +1,8 @@
-using System.Globalization;
-using CsvHelper.Configuration;
-
-namespace App.Web.DependencyInjection.Shared;
+namespace App.Web.DependencyInjection.Local;
 
 public static class Repositories
 {
-    public static IServiceCollection AddRepositories(this IServiceCollection services)
+    public static IServiceCollection AddLocalRepositories(this IServiceCollection services)
     {
         services
             .AddSingleton<App.Domain.Matchmaking.IMatchmakings,

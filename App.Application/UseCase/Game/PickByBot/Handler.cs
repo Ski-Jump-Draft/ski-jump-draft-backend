@@ -28,7 +28,7 @@ public class Handler(
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
     {
-        // botPassPickLock.Lock(command.GameId, command.PlayerId); TODO: Uncomment
+        // botPassPickLock.Lock(command.GameId, command.PlayerId); TODO: Uncomment!!!
         var game = await games.GetById(GameId.NewGameId(command.GameId), ct)
             .AwaitOrWrap(_ => new IdNotFoundException(command.GameId));
 

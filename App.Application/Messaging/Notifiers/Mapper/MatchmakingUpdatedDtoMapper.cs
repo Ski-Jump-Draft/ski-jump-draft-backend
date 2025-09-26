@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using App.Application.Bot;
+using App.Application.Extensions;
 using App.Domain.Matchmaking;
 using Microsoft.FSharp.Core;
 
@@ -11,18 +12,7 @@ public class MatchmakingUpdatedDtoMapper(
 {
     public MatchmakingUpdatedDto FromDomain(Domain.Matchmaking.Matchmaking matchmaking)
     {
-        var statusString = matchmaking.Status_ switch
-        {
-            Status.Ended endedStatus => endedStatus.Result switch
-            {
-                { IsSucceeded: true } => "Ended Succeeded",
-                { IsNotEnoughPlayers: true } => "Ended NotEnoughPlayers",
-                _ => throw new ArgumentOutOfRangeException()
-            },
-            Status.Failed failedStatus => "Failed " + failedStatus,
-            var s when s.IsRunning => "Running",
-            _ => throw new ArgumentOutOfRangeException()
-        };
+        var statusString = matchmaking.Status_.FormattedStatus();
 
         return new MatchmakingUpdatedDto(
             matchmaking.Id_.Item,
