@@ -243,23 +243,23 @@ public class GameUpdatedDtoMapper(
             (await gameCompetitionResultsArchive.GetPreDraftResultsAsync(gameId, ct))?.ToImmutableList() ?? [];
 
         var endedCompetitionResultsList = archiveCompetitionResultsDtosList.Select(archiveCompetitionResultsDto =>
-            new EndedCompetitionResults(archiveCompetitionResultsDto.Results.Select(MapArchiveResultRecord)
+            new EndedCompetitionResults(archiveCompetitionResultsDto.JumperResults.Select(MapArchiveResultRecord)
                 .ToImmutableList()));
 
         return new EndedPreDraftDto(endedCompetitionResultsList.ToList());
 
-        CompetitionResultDto MapArchiveResultRecord(ResultRecord resultRecord)
+        CompetitionResultDto MapArchiveResultRecord(ArchiveJumperResult archiveJumperResult)
         {
-            var jumpRecords = resultRecord.Jumps.Select(jumpRecord =>
+            var jumpRecords = archiveJumperResult.Jumps.Select(jumpRecord =>
             {
-                var competitionJumperId = resultRecord.CompetitionJumperId;
+                var competitionJumperId = archiveJumperResult.CompetitionJumperId;
                 var gameJumperId = competitionJumperAcl.GetGameJumper(competitionJumperId).Id;
                 return new CompetitionRoundResultDto(gameJumperId, competitionJumperId, jumpRecord.Distance,
                     jumpRecord.Points, jumpRecord.Judges, jumpRecord.JudgePoints, jumpRecord.WindCompensation,
                     jumpRecord.WindAverage, jumpRecord.GateCompensation, jumpRecord.TotalCompensation);
             });
-            return new CompetitionResultDto(resultRecord.Rank, resultRecord.Bib, resultRecord.CompetitionJumperId,
-                resultRecord.Points, jumpRecords.ToList().AsReadOnly());
+            return new CompetitionResultDto(archiveJumperResult.Rank, archiveJumperResult.Bib, archiveJumperResult.CompetitionJumperId,
+                archiveJumperResult.Points, jumpRecords.ToList().AsReadOnly());
         }
     }
 
@@ -499,7 +499,7 @@ public class GameUpdatedDtoMapper(
             _ => "Classic"
         };
 
-        var ranking = ((Domain.Game.Status.Ended)game.Status).Item;
+        var ranking = ((Domain.Game.Status.Ended)game.Status).Ranking;
         var positionAndPoints = ranking.PositionsAndPoints;
 
         var positionAndPointsMap = positionAndPoints

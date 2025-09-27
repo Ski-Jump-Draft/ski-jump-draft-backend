@@ -47,16 +47,16 @@ public class Classic(IGames games, IGameCompetitionResultsArchive gameCompetitio
         }
     }
 
-    private static List<ResultRecord> ExtractLastPreDraftCompetitionResults(List<CompetitionResultsDto> preDraftResults)
+    private static List<ArchiveJumperResult> ExtractLastPreDraftCompetitionResults(List<CompetitionResultsDto> preDraftResults)
     {
         return ExtractPreDraftCompetitionResults(preDraftResults, preDraftResults.Count - 1);
     }
 
-    private static List<ResultRecord> ExtractPreDraftCompetitionResults(List<CompetitionResultsDto> preDraftResults,
+    private static List<ArchiveJumperResult> ExtractPreDraftCompetitionResults(List<CompetitionResultsDto> preDraftResults,
         int competitionIndex)
     {
         var preDraftCompetitionResults = preDraftResults[competitionIndex];
-        return preDraftCompetitionResults.Results;
+        return preDraftCompetitionResults.JumperResults;
     }
 
     private static FSharpList<JumperId> ExtractJumpersIdsFromGame(Domain.Game.Game game)
@@ -64,7 +64,7 @@ public class Classic(IGames games, IGameCompetitionResultsArchive gameCompetitio
         return JumpersModule.toIdsList(game.Jumpers);
     }
 
-    private static IReadOnlyList<JumperId> GetStartlistByResultRecordsList(List<ResultRecord> archiveResultRecords)
+    private static IReadOnlyList<JumperId> GetStartlistByResultRecordsList(List<ArchiveJumperResult> archiveResultRecords)
     {
         var descendingResultRecords =
             archiveResultRecords.OrderByDescending(resultRecord => resultRecord.Rank);
@@ -73,8 +73,8 @@ public class Classic(IGames games, IGameCompetitionResultsArchive gameCompetitio
         return sortedStartlist;
     }
 
-    private static JumperId ResultRecordToGameJumperId(ResultRecord resultRecord)
+    private static JumperId ResultRecordToGameJumperId(ArchiveJumperResult archiveJumperResult)
     {
-        return JumperId.NewJumperId(resultRecord.GameJumperId);
+        return JumperId.NewJumperId(archiveJumperResult.GameJumperId);
     }
 }

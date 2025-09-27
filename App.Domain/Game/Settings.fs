@@ -27,9 +27,9 @@ type PhaseDuration =
 
     static member Create(v: TimeSpan) =
         if v.TotalSeconds > 0 then
-            Some({ PhaseDuration = v })
+             { PhaseDuration = v }
         else
-            None
+            invalidOp "Invalid PhaseDuration"
 
     member this.Value = this.PhaseDuration
 

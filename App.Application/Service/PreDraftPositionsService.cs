@@ -18,7 +18,7 @@ public class PreDraftPositionsService(
 
         foreach (var preDraftCompetitionResults in preDraftResults)
         {
-            foreach (var (_, gameJumperGuid, _, gameJumperPosition, _, _, _) in preDraftCompetitionResults.Results)
+            foreach (var (_, gameJumperGuid, _, gameJumperPosition, _, _, _) in preDraftCompetitionResults.JumperResults)
             {
                 if (!positionsByGameJumper.TryGetValue(gameJumperGuid, out var positionsList))
                     positionsByGameJumper.Add(gameJumperGuid, [gameJumperPosition]);

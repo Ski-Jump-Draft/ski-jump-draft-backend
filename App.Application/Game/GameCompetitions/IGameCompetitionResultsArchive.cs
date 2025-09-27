@@ -1,17 +1,19 @@
 namespace App.Application.Game.GameCompetitions;
 
-public record CompetitionResultsDto(List<ResultRecord> Results);
+public record CompetitionResultsDto(List<ArchiveJumperResult> JumperResults);
 
-public record ResultRecord(
+public record ArchiveJumperResult(
     Guid GameWorldJumperId,
     Guid GameJumperId,
     Guid CompetitionJumperId,
     int Rank,
     int Bib,
     double Points,
-    List<ResultJumpRecord> Jumps);
+    List<ArchiveJumpResult> Jumps);
 
-public record ResultJumpRecord(
+public record ArchiveJumpResult(
+    Guid Id,
+    Guid CompetitionJumperId,
     double Distance,
     double Points,
     IReadOnlyList<double>? Judges,

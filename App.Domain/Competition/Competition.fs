@@ -33,6 +33,39 @@ open Competition
 
 type CompetitionId = CompetitionId of System.Guid
 
+[<RequireQualifiedAccess>]
+type CompetitionResume =
+    {
+        Id: CompetitionId
+        Settings: Settings
+        Hill: Hill
+        Jumpers: Jumper list
+        /// Stabilna mapa BIBów (całej konkurencji), zwykle z DB.
+        Bibs: (JumperId * Startlist.Bib) list
+        /// Uporządkowanie w AKTUALNEJ rundzie: zrobione w tej rundzie (w kolejności wykonania).
+        DoneOrder: JumperId list
+        /// Uporządkowanie w AKTUALNEJ rundzie: oczekujący (w kolejności startu).
+        RemainingOrder: JumperId list
+        /// Wszystkie dotychczasowe wyniki skoków (dowolnie ułożone).
+        JumpResults: JumpResult list
+        /// Jaki status ma być przywrócony.
+        StatusTag: Competition.StatusTag
+        /// Wymagane dla: NotStarted, RoundInProgress, Suspended
+        GateState: GateState option
+        /// Wymagane dla: RoundInProgress, Suspended
+        RoundIndex: RoundIndex option
+    }
+
+module private CompetitionRestoreHelpers =
+    let inline mapStartlistErr e = Competition.Error.StartlistError e
+    let inline internalErr msg = Competition.Error.Internal msg
+
+    let markManyDone (ids: JumperId list) (sl: Startlist) =
+        (Ok sl, ids)
+        ||> List.fold (fun acc jid ->
+            acc
+            |> Result.bind (fun s -> s.MarkJumpDone jid |> Result.mapError mapStartlistErr))
+
 type Competition =
     private
         { Id: CompetitionId
@@ -43,6 +76,8 @@ type Competition =
           Hill: Hill
           Jumpers: Jumper list }
 
+    member this.Id_ = this.Id
+    
     member this.Jumpers_ = this.Jumpers
 
     member this.Startlist_ = this.Startlist
@@ -54,7 +89,7 @@ type Competition =
         | Status.Suspended _ -> StatusTag.SuspendedTag
         | Status.Cancelled -> StatusTag.CancelledTag
         | Status.Ended -> StatusTag.EndedTag
-        
+
     member this.Status_ = this.Status
 
     member this.CurrentRoundIndex: RoundIndex option =
@@ -113,6 +148,99 @@ type Competition =
                       Results = Results.Empty
                       Jumpers = jumpers }
             }
+
+    static member Restore(snap: CompetitionResume) : Result<Competition, Competition.Error> =
+        result {
+            // 0) Proste sprawdzenia wejścia
+            do!
+                if List.isEmpty snap.Jumpers then
+                    Error Competition.Error.JumpersEmpty
+                else
+                    Ok()
+
+            let jumperSet = snap.Jumpers |> List.map (fun j -> j.Id) |> Set.ofList
+
+            do!
+                if snap.Bibs |> List.forall (fun (jid, _) -> jumperSet.Contains jid) then
+                    Ok()
+                else
+                    Error(CompetitionRestoreHelpers.internalErr "BIB map contains unknown JumperId")
+
+            // 1) Zbuduj bazowy Startlist z mapy BIB
+            let! baseStartlist =
+                Startlist.CreateWithBibs snap.Bibs
+                |> Result.mapError CompetitionRestoreHelpers.mapStartlistErr
+
+            // 2) Ustaw kolejność bieżącej rundy: done ++ remaining
+            let roundOrder = snap.DoneOrder @ snap.RemainingOrder
+
+            do!
+                // duplicates/unknowny złapie WithOrder, ale sprawdźmy też spójność
+                if roundOrder |> Set.ofList |> Set.isSubset jumperSet then
+                    Ok()
+                else
+                    Error(CompetitionRestoreHelpers.internalErr "Round order contains unknown JumperId")
+
+            let! orderedStartlist =
+                Startlist.WithOrder baseStartlist roundOrder
+                |> Result.mapError CompetitionRestoreHelpers.mapStartlistErr
+
+            // 3) Przewiń startlistę o już wykonane skoki (tej rundy)
+            let! startlistAfterProgress = CompetitionRestoreHelpers.markManyDone snap.DoneOrder orderedStartlist
+
+            // 4) Odtwórz Results, walidując spójność (brak duplikatów w rundzie, istniejący zawodnicy)
+            let competExists (jid: JumperId) = jumperSet.Contains jid
+
+            let! results =
+                (Ok Results.Empty, snap.JumpResults)
+                ||> List.fold (fun acc jr ->
+                    acc
+                    |> Result.bind (fun r ->
+                        r.AddJump(jr, competExists)
+                        |> Result.mapError (fun e -> Competition.Error.Internal(string e))))
+
+            // 5) Złóż Status według taga i wymaganych pól
+            let! status =
+                match snap.StatusTag with
+                | Competition.StatusTag.NotStartedTag ->
+                    match snap.GateState with
+                    | Some gs ->
+                        // Optional sanity
+                        if not snap.DoneOrder.IsEmpty || not results.JumpResults.IsEmpty then
+                            Error(
+                                CompetitionRestoreHelpers.internalErr "NotStarted: expected no results and no progress"
+                            )
+                        else
+                            Ok(Competition.Status.NotStarted gs)
+                    | None -> Error(CompetitionRestoreHelpers.internalErr "NotStarted requires GateState")
+                | Competition.StatusTag.RoundInProgressTag ->
+                    match snap.GateState, snap.RoundIndex with
+                    | Some gs, Some r -> Ok(Competition.Status.RoundInProgress(gs, r))
+                    | _ ->
+                        Error(CompetitionRestoreHelpers.internalErr "RoundInProgress requires GateState and RoundIndex")
+                | Competition.StatusTag.SuspendedTag ->
+                    match snap.GateState, snap.RoundIndex with
+                    | Some gs, Some r -> Ok(Competition.Status.Suspended(gs, r))
+                    | _ -> Error(CompetitionRestoreHelpers.internalErr "Suspended requires GateState and RoundIndex")
+                | Competition.StatusTag.CancelledTag -> Ok Competition.Status.Cancelled
+                | Competition.StatusTag.EndedTag ->
+                    // Możemy (miękko) sprawdzić, czy runda wygląda na skończoną.
+                    if not startlistAfterProgress.RoundIsFinished then
+                        // Nie twardo – pozwalamy przywrócić (DB jest źródłem prawdy)
+                        Ok Competition.Status.Ended
+                    else
+                        Ok Competition.Status.Ended
+
+            // 6) Gotowe Competition
+            return
+                { Id = snap.Id
+                  Settings = snap.Settings
+                  Hill = snap.Hill
+                  Status = status
+                  Startlist = startlistAfterProgress
+                  Results = results
+                  Jumpers = snap.Jumpers }
+        }
 
     member this.Classification = this.Results.FinalClassification
 

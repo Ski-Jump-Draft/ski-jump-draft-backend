@@ -22,10 +22,10 @@ public class PodiumAtAllCostFactory(
         }
 
         var playerIds = PlayersModule.toIdsList(game.Players).ToList();
-        var picks = draftPicksArchive.GetPicks(game.Id_.Item);
+        var picks = await draftPicksArchive.GetPicks(game.Id_.Item);
 
         var mainCompetitionClassification = (await gameCompetitionResultsArchive.GetMainResultsAsync(game.Id.Item, ct))?
-            .Results;
+            .JumperResults;
         if (mainCompetitionClassification is null)
         {
             throw new Exception($"Game {game.Id

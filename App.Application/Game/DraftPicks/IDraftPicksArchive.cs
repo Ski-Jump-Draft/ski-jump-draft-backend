@@ -9,6 +9,6 @@ using Picks = Dictionary<PlayerId, IEnumerable<JumperId>>;
 /// </summary>
 public interface IDraftPicksArchive
 {
-    void Archive(Guid gameId, Picks picks);
-    Picks GetPicks(Guid gameId);
+    Task Archive(Guid gameId, Picks picks);
+    Task<Picks?> GetPicks(Guid gameId);
 }

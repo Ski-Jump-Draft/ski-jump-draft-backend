@@ -1,14 +1,29 @@
 using System.Text.Json;
 using App.Application.Extensions;
+using App.Application.Game;
+using App.Application.Game.DraftPicks;
+using App.Application.Game.GameCompetitions;
+using App.Application.Utility;
 using App.Domain.Competition;
 using App.Domain.Game;
+using Microsoft.FSharp.Collections;
 using Microsoft.FSharp.Core;
 using StackExchange.Redis;
 using DraftModule = App.Domain.Game.DraftModule;
+using HillId = App.Domain.Competition.HillId;
+using JumperId = App.Domain.Game.JumperId;
+using RankingModule = App.Domain.Game.RankingModule;
+using StartlistModule = App.Domain.Competition.StartlistModule;
 
 namespace App.Infrastructure.Repository.Game;
 
-public class Redis(IConnectionMultiplexer redis) : IGames
+public class Redis(
+    IConnectionMultiplexer redis,
+    IGameSchedule gameSchedule,
+    IClock clock,
+    IMyLogger logger,
+    IGameCompetitionResultsArchive gameCompetitionResultsArchive,
+    IDraftPicksArchive draftPicksArchive) : IGames
 {
     private readonly IDatabase _db = redis.GetDatabase();
 
@@ -24,7 +39,7 @@ public class Redis(IConnectionMultiplexer redis) : IGames
     public async Task Add(Domain.Game.Game game, CancellationToken ct)
     {
         var gameId = game.Id_.Item;
-        var mapperInput = await CreateMapperInput(game);
+        var mapperInput = await CreateMapperInput(game, ct);
         var dto = GameDtoMapper.Create(mapperInput);
         var serializedGames = JsonSerializer.Serialize(dto);
         if (game.StatusTag.IsEndedTag)
@@ -124,10 +139,98 @@ public class Redis(IConnectionMultiplexer redis) : IGames
         return matchmakings;
     }
 
-    private async Task<GameDtoMapperInput> CreateMapperInput(Domain.Game.Game game)
+    private async Task<GameDtoMapperInput> CreateMapperInput(Domain.Game.Game game, CancellationToken ct)
     {
-        // TODO
-        return new GameDtoMapperInput(game, null, null, null, null, null);
+        var gameGuid = game.Id.Item;
+        var schedule = GetGameSchedule(gameGuid);
+        var nextStatus = GetNextGameStatus(schedule);
+        var nextCompetitionJumpInMs = GetNextCompetitionJumpInMs(schedule);
+        var preDraftResults = await gameCompetitionResultsArchive.GetPreDraftResultsAsync(gameGuid, ct);
+        if (preDraftResults is null)
+        {
+            throw new Exception("Pre-draft results not found");
+        }
+
+        var preDraftEndedCompetitions = preDraftResults.Select(CreateEndedCompetitionFromArchive).ToList();
+
+        var mainCompetitionResults = await gameCompetitionResultsArchive.GetMainResultsAsync(gameGuid, ct);
+        if (mainCompetitionResults is null)
+        {
+            throw new Exception("Main competition results not found");
+        }
+
+        var endedMainCompetition = CreateEndedCompetitionFromArchive(mainCompetitionResults);
+
+        var draftPicksList = await GetArchivedDraftPicks(gameGuid);
+
+        return new GameDtoMapperInput(game, nextStatus, preDraftEndedCompetitions, nextCompetitionJumpInMs,
+            draftPicksList,
+            endedMainCompetition);
+    }
+
+    private async Task<List<PlayerPicksDto>> GetArchivedDraftPicks(Guid gameGuid)
+    {
+        var endedDraftPicks = (await draftPicksArchive.GetPicks(gameGuid))?.ToList();
+        if (endedDraftPicks is null)
+        {
+            throw new Exception("Draft picks not found");
+        }
+
+        var draftPicksList = endedDraftPicks.Select(kvp =>
+        {
+            return new PlayerPicksDto(kvp.Key.Item, kvp.Value.Select(id => id.Item).ToList());
+        }).ToList();
+        return draftPicksList;
+    }
+
+    private EndedCompetitionDto CreateEndedCompetitionFromArchive(CompetitionResultsDto competitionResultsDto)
+    {
+        var jumperResults = competitionResultsDto.JumperResults.Select(result =>
+        {
+            return new CompetitionResultDto(result.CompetitionJumperId, result.Points, result.Rank,
+                result.Jumps.Select((archiveJumpResult, index) => new CompetitionRoundResultDto(archiveJumpResult.Id,
+                    archiveJumpResult.CompetitionJumperId, index,
+                    archiveJumpResult.Distance, archiveJumpResult.Points, archiveJumpResult.Judges,
+                    archiveJumpResult.JudgePoints, archiveJumpResult.WindCompensation,
+                    archiveJumpResult.WindAverage, archiveJumpResult.GateCompensation,
+                    archiveJumpResult.TotalCompensation)).ToList());
+        });
+        return new EndedCompetitionDto(jumperResults.ToList());
+    }
+
+    private Application.Game.GameScheduleDto GetGameSchedule(Guid gameGuid)
+    {
+        var schedule = gameSchedule.GetGameSchedule(gameGuid);
+        if (schedule is null)
+        {
+            throw new Exception("Game schedule not found");
+        }
+
+        return schedule;
+    }
+
+    private string? GetNextGameStatus(Application.Game.GameScheduleDto schedule)
+    {
+        string? nextStatus = null;
+        var now = clock.Now();
+        var nextStatusExistsAndIsValid = !schedule.BreakPassed(now) &&
+                                         schedule.ScheduleTarget != GameScheduleTarget.CompetitionJump;
+        if (nextStatusExistsAndIsValid)
+        {
+            nextStatus = $"{schedule!.ScheduleTarget.ToString()} IN {(int)Math.Floor(schedule!.In.TotalMilliseconds)}";
+        }
+
+        return nextStatus;
+    }
+
+    private int? GetNextCompetitionJumpInMs(Application.Game.GameScheduleDto schedule)
+    {
+        if (schedule.ScheduleTarget == GameScheduleTarget.CompetitionJump)
+        {
+            return (int)Math.Floor(schedule.In.TotalMilliseconds);
+        }
+
+        return null;
     }
 }
 
@@ -146,20 +249,44 @@ public static class GameDtoMapper
     {
         var game = input.Game;
 
+        var jumpers = JumpersModule.toList(game.Jumpers).Select(jumper => new JumperDto(jumper.Id.Item)).ToList();
+        var gameJumperIds = JumpersModule.toIdsList(game.Jumpers).Select(id => id.Item).ToList();
+
+        var players = CreatePlayers(PlayersModule.toList(game.Players));
+        var playersOrder = players.Select(player => player.Id).ToList();
+
         var gameId = game.Id.Item;
         var dto = new GameDto(
             gameId,
             game.StatusTag.ToString(),
             input.NextStatus,
             CreateSettings(input),
-            CreatePlayers(PlayersModule.toList(game.Players)),
+            CreateCompetitionHill(input),
+            players,
+            jumpers,
             CreatePreDraft(input),
-            CreateDraft(input),
+            CreateDraft(input, gameJumperIds, playersOrder),
             CreateMainCompetition(input),
             game.PhaseHasEnded(StatusTag.MainCompetitionTag) ? input.EndedMainCompetition : null,
             CreateGameRanking(input)
         );
         return dto;
+    }
+
+    private static CompetitionHillDto CreateCompetitionHill(GameDtoMapperInput input)
+    {
+        var game = input.Game;
+        if (game.Hill.IsNone())
+        {
+            throw new Exception("Hill is None");
+        }
+
+        var hill = game.Hill.Value;
+
+        return new CompetitionHillDto(hill.Id.Item, HillModule.KPointModule.value(hill.KPoint),
+            HillModule.HsPointModule.value(hill.HsPoint), HillModule.GatePointsModule.value(hill.GatePoints),
+            HillModule.WindPointsModule.value(hill.HeadwindPoints),
+            HillModule.WindPointsModule.value(hill.TailwindPoints));
     }
 
     private static SettingsDto CreateSettings(GameDtoMapperInput input)
@@ -169,6 +296,8 @@ public static class GameDtoMapper
 
         var preDraftCompetitionSettings = game.Settings.PreDraftSettings.Competitions_;
         var preDraftCompetitions = preDraftCompetitionSettings.Select(CreateCompetitionSettingsDto).ToList();
+
+        var mainCompetitionSettings = CreateCompetitionSettingsDto(game.Settings.MainCompetitionSettings);
 
         var draftSettings = game.Settings.DraftSettings;
 
@@ -216,7 +345,7 @@ public static class GameDtoMapper
             GetMilliseconds(breakSettings.BreakBeforePreDraft),
             GetMilliseconds(breakSettings.BreakBetweenPreDraftCompetitions),
             GetMilliseconds(breakSettings.BreakBeforeDraft), GetMilliseconds(breakSettings.BreakBeforeMainCompetition),
-            GetMilliseconds(breakSettings.BreakBeforeEnd), preDraftCompetitions,
+            GetMilliseconds(breakSettings.BreakBeforeEnd), preDraftCompetitions, mainCompetitionSettings,
             DraftModule.SettingsModule.TargetPicksModule.value(draftSettings.TargetPicks),
             DraftModule.SettingsModule.MaxPicksModule.value(draftSettings.MaxPicks), uniqueJumpersPolicy, orderPolicy,
             timeoutPolicyString, rankingPolicyString, competitionJumpIntervalMs);
@@ -329,7 +458,8 @@ public static class GameDtoMapper
                     ? JumpResultModule.GatePointsModule.value(jumpResult.GatePoints.Value)
                     : null;
 
-                return new CompetitionRoundResultDto(jumpResult.JumperId.Item,
+                return new CompetitionRoundResultDto(jumpResult.Id.Item, jumpResult.JumperId.Item,
+                    (int)jumpResult.RoundIndex.Item,
                     JumpModule.DistanceModule.value(jumpResult.Jump.Distance),
                     TotalPointsModule.value(jumpResult.TotalPoints),
                     JumpModule.JudgesModule.value(jumpResult.Jump.JudgeNotes), judgePoints, windPoints,
@@ -343,8 +473,11 @@ public static class GameDtoMapper
 
             return result;
         }).ToList();
+
+        var jumpers = competition.Jumpers_.Select(jumper => new CompetitionJumperDto(jumper.Id.Item)).ToList();
         var competitionDto =
-            new CompetitionDto(statusString, input.NextCompetitionJumpInMs, roundIndex, startlist, jumperResultDtos,
+            new CompetitionDto(competition.Id_.Item, statusString, input.NextCompetitionJumpInMs, roundIndex, jumpers,
+                startlist, jumperResultDtos,
                 gateState);
         return competitionDto;
     }
@@ -359,7 +492,7 @@ public static class GameDtoMapper
         return gateStateDto;
     }
 
-    private static DraftDto? CreateDraft(GameDtoMapperInput input)
+    private static DraftDto? CreateDraft(GameDtoMapperInput input, List<Guid> jumperIds, List<Guid> playersOrder)
     {
         var game = input.Game;
         if (!game.PhaseHasStarted(StatusTag.DraftTag)) return null;
@@ -402,9 +535,9 @@ public static class GameDtoMapper
 
         var draftIsRunning = game.StatusTag.IsDraftTag;
 
-
-        var draftDto = new DraftDto(draftIsRunning, currentTurnPlayerId, currentTurnIndex, picksList,
-            nextPlayers ?? []);
+        var draftDto = new DraftDto(draftIsRunning, currentTurnPlayerId, currentTurnIndex, jumperIds, playersOrder,
+            nextPlayers ?? [],
+            picksList);
 
         return draftDto;
     }
@@ -440,8 +573,328 @@ public static class GameDtoMapper
 
     public static Domain.Game.Game ToDomain(this GameDto dto)
     {
-        var game = Domain.Game.Game.Create();
-        return game;
+        var preDraftCompetitions = dto.Settings.PreDraftCompetitions.Select(DomainCreateCompetitionSettings).ToList();
+        var preDraftSettings = PreDraftSettings.Create(ListModule.OfSeq(preDraftCompetitions)).Value;
+        var uniqueJumpersPolicy = dto.Settings.DraftUniqueJumpersPolicy switch
+        {
+            "Unique" => Domain.Game.DraftModule.SettingsModule.UniqueJumpersPolicy.Unique,
+            "NotUnique" => Domain.Game.DraftModule.SettingsModule.UniqueJumpersPolicy.NotUnique,
+            _ => throw new Exception("Unknown unique jumpers policy")
+        };
+        var orderPolicy = dto.Settings.DraftOrderPolicy switch
+        {
+            "Classic" => Domain.Game.DraftModule.SettingsModule.Order.Classic,
+            "Snake" => Domain.Game.DraftModule.SettingsModule.Order.Snake,
+            "Random" => Domain.Game.DraftModule.SettingsModule.Order.Random,
+            _ => throw new Exception("Unknown order policy")
+        };
+        DraftModule.SettingsModule.TimeoutPolicy timeoutPolicy;
+        switch (dto.Settings.DraftTimeoutPolicy)
+        {
+            case "NoTimeout":
+                timeoutPolicy = Domain.Game.DraftModule.SettingsModule.TimeoutPolicy.NoTimeout;
+                break;
+            case var timeoutAfter when timeoutAfter.StartsWith("TimeoutAfter "):
+                if (int.TryParse(timeoutAfter.AsSpan("TimeoutAfter ".Length), out var timeoutInMs))
+                    timeoutPolicy =
+                        Domain.Game.DraftModule.SettingsModule.TimeoutPolicy.NewTimeoutAfter(
+                            TimeSpan.FromMilliseconds(timeoutInMs));
+                else
+                    throw new FormatException($"Invalid TimeoutAfter: {timeoutAfter}");
+                break;
+            default:
+                throw new Exception("Unknown timeout policy");
+        }
+
+        var rankingPolicy = dto.Settings.DraftRankingPolicy switch
+        {
+            "IsClassic" => Domain.Game.RankingPolicy.Classic,
+            "PodiumAtAllCosts" => Domain.Game.RankingPolicy.PodiumAtAllCosts,
+            _ => throw new Exception("Unknown ranking policy")
+        };
+
+        var draftSettings = new Domain.Game.DraftModule.Settings(
+            DraftModule.SettingsModule.TargetPicksModule.create(dto.Settings.DraftTargetPicks).Value,
+            DraftModule.SettingsModule.MaxPicksModule.create(dto.Settings.DraftMaxPicks).Value,
+            uniqueJumpersPolicy, orderPolicy, timeoutPolicy
+        );
+        var mainCompetitionSettings = DomainCreateCompetitionSettings(dto.Settings.MainCompetition);
+        var settings = new Domain.Game.Settings(
+            new Domain.Game.BreakSettings(
+                PhaseDuration.Create(TimeSpan.FromMilliseconds(dto.Settings.BreakBeforePreDraftMs)),
+                PhaseDuration.Create(TimeSpan.FromMilliseconds(dto.Settings.BreakBetweenPreDraftCompetitionsMs)),
+                PhaseDuration.Create(TimeSpan.FromMilliseconds(dto.Settings.BreakBeforeDraftMs)),
+                PhaseDuration.Create(TimeSpan.FromMilliseconds(dto.Settings.BreakBeforeMainCompetitionMs)),
+                PhaseDuration.Create(TimeSpan.FromMilliseconds(dto.Settings.BreakBeforeEndMs))
+            ), preDraftSettings, draftSettings, mainCompetitionSettings,
+            PhaseDuration.Create(TimeSpan.FromMilliseconds(dto.Settings.CompetitionJumpIntervalMs)), rankingPolicy
+        );
+        var players = dto.Players.Select(playerDto => new Domain.Game.Player(PlayerId.NewPlayerId(playerDto.Id),
+            PlayerModule.NickModule.create(playerDto.Nick).Value));
+        var wrappedPlayers = PlayersModule.create(ListModule.OfSeq(players)).ResultValue;
+        var jumpers =
+            dto.Jumpers.Select(jumperDto => new Domain.Game.Jumper(JumperId.NewJumperId(jumperDto.GameJumperId)))
+                .ToList();
+        var jumperIds = ListModule.OfSeq(jumpers.Select(jumper => jumper.Id));
+        var wrappedJumpers = JumpersModule.create(ListModule.OfSeq(jumpers));
+
+        var hillDto = dto.CompetitionHillDto;
+        var hill = new Domain.Competition.Hill(HillId.NewHillId(hillDto.Id),
+            HillModule.KPointModule.tryCreate(hillDto.KPoint).Value,
+            HillModule.HsPointModule.tryCreate(hillDto.HsPoint).Value,
+            HillModule.GatePointsModule.tryCreate(hillDto.GatePoints).Value,
+            HillModule.WindPointsModule.tryCreate(hillDto.HeadwindPoints).Value,
+            HillModule.WindPointsModule.tryCreate(hillDto.TailwindPoints).Value);
+
+        var gameStatus =
+            DomainCreateGameStatus(dto, preDraftSettings, draftSettings, mainCompetitionSettings, hill, jumperIds);
+
+        var game = Domain.Game.Game.CreateFromState(Domain.Game.GameId.NewGameId(dto.Id), settings, wrappedPlayers,
+            wrappedJumpers, hill, gameStatus);
+        if (game.IsError)
+        {
+            throw new Exception(game.ErrorValue.ToString());
+        }
+
+        return game.ResultValue;
+    }
+
+    private static Domain.Competition.Settings DomainCreateCompetitionSettings(
+        CompetitionSettingsDto competitionSettingsDto)
+    {
+        var rounds = competitionSettingsDto.Rounds.Select(roundSettings =>
+        {
+            var limit = (roundSettings.LimitType, roundSettings.Limit) switch
+            {
+                ("Exact", { } limitValue) => Domain.Competition.RoundLimit.NewExact(
+                    RoundLimitValueModule.tryCreate(limitValue).ResultValue),
+                ("Soft", { } limitValue) => Domain.Competition.RoundLimit.NewSoft(
+                    RoundLimitValueModule.tryCreate(limitValue).ResultValue),
+                ("None", _) => Domain.Competition.RoundLimit.NoneLimit,
+                _ => throw new Exception("Unknown limit type")
+            };
+            return new Domain.Competition.RoundSettings(limit, roundSettings.SortStartlist, roundSettings.ResetPoints);
+        });
+        var settings = Domain.Competition.Settings.Create(ListModule.OfSeq(rounds));
+        if (settings.IsError)
+        {
+            throw new Exception(settings.ErrorValue.ToString());
+        }
+        return settings.ResultValue;
+    }
+
+    private static Domain.Competition.Competition DomainCreateCompetition(GameDto gameDto,
+        CompetitionDto competitionDto, Domain.Competition.Settings settings, Domain.Competition.Hill hill)
+    {
+        var gameId = gameDto.Id;
+        var competitionId = competitionDto.Id;
+        var competitionJumpers = competitionDto.Jumpers.Select(jumperDto =>
+            new Domain.Competition.Jumper(Domain.Competition.JumperId.NewJumperId(jumperDto.Id)));
+
+        var startlist = competitionDto.Startlist;
+        var bibs = startlist.Select(startlistJumperDto =>
+        {
+            return new Tuple<Domain.Competition.JumperId, StartlistModule.Bib>(
+                Domain.Competition.JumperId.NewJumperId(startlistJumperDto.CompetitionJumperId),
+                StartlistModule.BibModule.create(startlistJumperDto.Bib).Value);
+        }).ToList();
+        var doneJumpers = startlist.Where(jumper => jumper.Done)
+            .Select(jumper => Domain.Competition.JumperId.NewJumperId(jumper.CompetitionJumperId)).ToList();
+        var remainingJumpers = startlist
+            .Select(jumper => Domain.Competition.JumperId.NewJumperId(jumper.CompetitionJumperId)).Except(doneJumpers)
+            .ToList();
+        var results = competitionDto.Results;
+        var roundResultDtos = results.SelectMany(result => result.RoundResults).ToList();
+        var jumpResults = roundResultDtos.Select(roundResult =>
+        {
+            var jump = new Domain.Competition.Jump(
+                Domain.Competition.JumperId.NewJumperId(roundResult.CompetitionJumperId),
+                JumpModule.DistanceModule.tryCreate(roundResult.Distance).ResultValue,
+                JumpModule.JudgesModule.tryCreate(ListModule.OfSeq(roundResult.Judges)).Value,
+                JumpModule.WindAverage.FromDouble(roundResult.WindAverage));
+            var roundIndex = RoundIndex.NewRoundIndex((uint)roundResult.RoundIndex);
+            var judgePoints = roundResult.JudgePoints is not null
+                ? JumpResultModule.JudgePointsModule.tryCreate(roundResult.JudgePoints.Value).ResultValue
+                : null;
+            var gatePoints = roundResult.GateCompensation is not null
+                ? JumpResultModule.GatePoints.NewGatePoints(roundResult.GateCompensation.Value)
+                : null;
+            var windPoints = roundResult.WindCompensation is not null
+                ? JumpResultModule.WindPoints.NewWindPoints(roundResult.WindCompensation.Value)
+                : null;
+            var totalPoints = TotalPoints.NewTotalPoints(roundResult.Points);
+            var jumpResult = new Domain.Competition.JumpResult(JumpResultId.NewJumpResultId(roundResult.JumpResultId),
+                Domain.Competition.JumperId.NewJumperId(roundResult.CompetitionJumperId), jump, roundIndex, judgePoints,
+                gatePoints, windPoints, totalPoints);
+            return jumpResult;
+        }).ToList();
+
+        var (statusTag, gateState) = (competitionDto.Status, competitionDto.GateState) switch
+        {
+            ("NotStarted", { } gateStateDto) => (CompetitionModule.StatusTag.SuspendedTag,
+                CreateDomainGateState(gateStateDto.Starting, gateStateDto.CurrentJury, gateStateDto.CoachReduction)),
+            ("Running", { } gateStateDto) => (CompetitionModule.StatusTag.RoundInProgressTag,
+                CreateDomainGateState(gateStateDto.Starting, gateStateDto.CurrentJury, gateStateDto.CoachReduction)),
+            ("Suspended", { } gateStateDto) => (CompetitionModule.StatusTag.SuspendedTag,
+                CreateDomainGateState(gateStateDto.Starting, gateStateDto.CurrentJury, gateStateDto.CoachReduction)),
+            ({ } breakStatus, _) when breakStatus.StartsWith("Break ") => (
+                CreateRawStatusTag(breakStatus.Substring("Break ".Length)),
+                null),
+            _ => throw new Exception("Unknown status: " + competitionDto.Status)
+        };
+
+        var roundIndex = competitionDto.RoundIndex is not null
+            ? RoundIndex.NewRoundIndex((uint)competitionDto.RoundIndex.Value)
+            : null;
+
+        var competitionResume = new CompetitionResume(CompetitionId.NewCompetitionId(competitionId), settings, hill,
+            ListModule.OfSeq(competitionJumpers), ListModule.OfSeq(bibs), ListModule.OfSeq(doneJumpers),
+            ListModule.OfSeq(remainingJumpers), ListModule.OfSeq(jumpResults), statusTag, gateState, roundIndex);
+        var competition = Domain.Competition.Competition.Restore(competitionResume);
+        if (competition.IsError)
+        {
+            throw new Exception(competition.ErrorValue.ToString());
+        }
+
+        return competition.ResultValue;
+
+        Domain.Competition.CompetitionModule.StatusTag CreateRawStatusTag(string statusString)
+        {
+            return statusString switch
+            {
+                "NotStarted" => CompetitionModule.StatusTag.SuspendedTag,
+                "Running" => CompetitionModule.StatusTag.RoundInProgressTag,
+                "Suspended" => CompetitionModule.StatusTag.SuspendedTag,
+                "Ended" => CompetitionModule.StatusTag.EndedTag,
+                "Break" => CompetitionModule.StatusTag.SuspendedTag,
+                _ => throw new Exception("Unknown status")
+            };
+        }
+
+        Domain.Competition.GateState CreateDomainGateState(int starting, int currentJury, int? coachReduction)
+        {
+            return new Domain.Competition.GateState(Gate.NewGate(starting), Gate.NewGate(currentJury),
+                coachReduction > 0 ? GateChange.CreateReduction((uint)coachReduction.Value) : null);
+        }
+    }
+
+    private static Domain.Game.Status DomainCreateGameStatus(GameDto gameDto, PreDraftSettings preDraftSettings,
+        DraftModule.Settings draftSettings, Domain.Competition.Settings mainCompetitionSettings,
+        Domain.Competition.Hill hill,
+        FSharpList<JumperId> jumperIds)
+    {
+        switch (gameDto.Status, gameDto.NextStatus)
+        {
+            case ("Break", var next and not "Break"):
+                var nextStatusTag = next switch
+                {
+                    "PreDraft" => StatusTag.PreDraftTag,
+                    "Draft" => StatusTag.DraftTag,
+                    "MainCompetition" => StatusTag.MainCompetitionTag,
+                    "Ended" => StatusTag.EndedTag,
+                    _ => throw new Exception("Unknown next status")
+                };
+                return Domain.Game.Status.NewBreak(nextStatusTag);
+            case ("PreDraft", _):
+                var preDraftDto = gameDto.PreDraft;
+                if (preDraftDto is null)
+                {
+                    throw new Exception("PreDraftDto is null even though GameDto is in pre-draft");
+                }
+
+                PreDraftStatus? preDraftStatus;
+                switch (preDraftDto.Status, preDraftDto.Index)
+                {
+                    case ("Running", { } competitionIndex) when preDraftDto.CurrentCompetition is not null:
+                        var competitionSettings = preDraftSettings.Competitions_[competitionIndex];
+                        preDraftStatus = Domain.Game.PreDraftStatus.NewRunning(
+                            PreDraftCompetitionIndexModule.create(competitionIndex).Value,
+                            DomainCreateCompetition(gameDto, preDraftDto.CurrentCompetition, competitionSettings,
+                                hill));
+                        break;
+                    case ({ } statusString, _) when statusString.StartsWith("Break "):
+                        preDraftStatus = Domain.Game.PreDraftStatus.NewBreak(PreDraftCompetitionIndexModule
+                            .create(int.Parse(statusString.Substring("Break ".Length)))
+                            .Value);
+                        break;
+                    default:
+                        throw new Exception("Unknown pre-draft status");
+                }
+
+                return Domain.Game.Status.NewPreDraft(preDraftStatus);
+            case ("Draft", _):
+                var draftDto = gameDto.Draft;
+                if (draftDto is null)
+                {
+                    throw new Exception("DraftDto is null even though GameDto is in draft");
+                }
+
+                if (!draftDto.IsRunning)
+                {
+                    throw new Exception("DraftDto is not running even though GameDto is in draft");
+                }
+
+                var gameJumperIds = draftDto.PlayersOrder.Select(PlayerId.NewPlayerId);
+                var picksMap = draftDto.Picks.ToDictionary(keySelector: playerPicksDto =>
+                {
+                    var gamePlayerId = PlayerId.NewPlayerId(playerPicksDto.GamePlayerId);
+                    return gamePlayerId;
+                }, elementSelector: playerPicksDto =>
+                {
+                    var pickedJumperIds = playerPicksDto.GameJumperIds.Select(JumperId.NewJumperId);
+                    return ListModule.OfSeq(pickedJumperIds);
+                });
+                var picksMapFSharp =
+                    MapModule.OfSeq(picksMap.Select(kv => new Tuple<PlayerId, FSharpList<JumperId>>(kv.Key, kv.Value)));
+
+                FSharpList<PlayerId>? nextPlayerIds = null;
+                if (gameDto.Settings.DraftOrderPolicy == "Random")
+                {
+                    if (draftDto.NextPlayersOrder is null)
+                        throw new Exception(
+                            "NextPlayersOrder is null even though GameDto is in draft and order policy is random");
+                    nextPlayerIds =
+                        ListModule.OfSeq(draftDto.NextPlayersOrder.Select(PlayerId.NewPlayerId));
+                }
+
+                var draftResult = Domain.Game.Draft.Restore(draftSettings, ListModule.OfSeq(gameJumperIds), jumperIds,
+                    picksMapFSharp,
+                    nextPlayerIds);
+                if (draftResult.IsError)
+                {
+                    throw new Exception(draftResult.ErrorValue.ToString());
+                }
+
+                var draft = draftResult.ResultValue;
+                return Status.NewDraft(draft);
+            case ("MainCompetition", _):
+                var mainCompetitionDto = gameDto.MainCompetition;
+                if (mainCompetitionDto is null)
+                {
+                    throw new Exception("MainCompetitionDto is null even though GameDto is in main competition");
+                }
+
+                var mainCompetition =
+                    DomainCreateCompetition(gameDto, mainCompetitionDto, mainCompetitionSettings, hill);
+                return Status.NewMainCompetition(mainCompetition);
+            case ("Ended", _):
+                var rankingDto = gameDto.Ranking;
+                if (rankingDto is null)
+                {
+                    throw new Exception("GameRankingDto is null even though GameDto is in ended");
+                }
+
+                var positionAndPointsMap = rankingDto.Records.ToDictionary(
+                    keySelector: rankingRecord => PlayerId.NewPlayerId(rankingRecord.GamePlayerId), elementSelector:
+                    rankingRecord => RankingModule.PointsModule.create(rankingRecord.Points).Value);
+
+                var mapFSharp = MapModule.OfSeq(positionAndPointsMap.Select(kv =>
+                    new Tuple<PlayerId, RankingModule.Points>(kv.Key, kv.Value)));
+                var gameRanking = Domain.Game.Ranking.Create(mapFSharp);
+                return Status.NewEnded(gameRanking);
+            default:
+                throw new Exception("Unknown game status");
+        }
     }
 }
 
@@ -466,19 +919,21 @@ public record SettingsDto(
     int BreakBeforeMainCompetitionMs,
     int BreakBeforeEndMs,
     List<CompetitionSettingsDto> PreDraftCompetitions,
+    CompetitionSettingsDto MainCompetition,
     int DraftTargetPicks,
     int DraftMaxPicks,
-    string UniqueJumpersPolicy,
-    string OrderPolicy,
-    string TimeoutPolicy,
-    string RankingPolicy,
+    string DraftUniqueJumpersPolicy,
+    string DraftOrderPolicy,
+    string DraftTimeoutPolicy,
+    string DraftRankingPolicy,
     int CompetitionJumpIntervalMs);
 
 public record CompetitionDto(
-    // TODO
+    Guid Id,
     string Status, // "NotStarted" | "RoundInProgress" | "Ended"
     int? NextJumpInMs,
     int? RoundIndex,
+    List<CompetitionJumperDto> Jumpers,
     List<StartlistJumperDto> Startlist,
     List<CompetitionResultDto> Results,
     GateStateDto? GateState
@@ -504,7 +959,9 @@ public sealed record CompetitionResultDto(
 
 public sealed record CompetitionRoundResultDto(
     // Guid GameJumperId,
+    Guid JumpResultId,
     Guid CompetitionJumperId,
+    int RoundIndex,
     double Distance,
     double Points,
     IReadOnlyList<double>? Judges,
@@ -516,11 +973,13 @@ public sealed record CompetitionRoundResultDto(
 );
 
 public sealed record CompetitionJumperDto(
-    Guid GameJumperId,
-    Guid CompetitionJumperId,
-    string Name,
-    string Surname,
-    string CountryFisCode
+    Guid Id
+
+    // Guid GameJumperId,
+    // Guid CompetitionJumperId,
+    // string Name,
+    // string Surname,
+    // string CountryFisCode
 );
 
 public sealed record GateStateDto(
@@ -542,11 +1001,27 @@ public record DraftDto(
     bool IsRunning,
     Guid? CurrentTurnPlayerId,
     int? CurrentTurnIndex,
-    List<PlayerPicksDto> Picks,
-    // List<Guid> AvailableGameJumpers,
-    List<Guid> NextPlayers);
+    List<Guid> JumperIds,
+    List<Guid> PlayersOrder,
+    List<Guid>? NextPlayersOrder, // Only for `Random`
+    List<PlayerPicksDto> Picks);
+// List<Guid> AvailableGameJumpers);
 
 public record PlayerDto(Guid Id, string Nick);
+
+// public record JumperDto(Guid GameJumperId, Guid CompetitionJumperId, Guid GameWorldJumperId);
+
+public record JumperDto(Guid GameJumperId);
+
+public record CompetitionHillDto(
+    Guid Id,
+    // string FisCountryCode,
+    double KPoint,
+    double HsPoint,
+    double GatePoints,
+    double HeadwindPoints,
+    double TailwindPoints
+);
 
 public record GameRankingRecordDto(
     Guid GamePlayerId,
@@ -562,7 +1037,9 @@ public record GameDto(
     string Status,
     string? NextStatus,
     SettingsDto Settings,
+    CompetitionHillDto CompetitionHillDto,
     List<PlayerDto> Players,
+    List<JumperDto> Jumpers,
     PreDraftDto? PreDraft,
     DraftDto? Draft,
     CompetitionDto? MainCompetition,

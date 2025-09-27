@@ -101,6 +101,70 @@ type Draft =
             arr.[j] <- tmp
 
         arr |> Array.toList
+        
+    member this.FullTurnOrder : PlayerId list = this.TurnOrder
+
+    static member private buildTurnOrder
+        (order: SettingsModule.Order)
+        (players: PlayerId list)
+        (rounds: int)
+        (shuffleFn: (PlayerId list * int -> PlayerId list) option)
+        (turnOrderOverride: PlayerId list option)
+        : Result<PlayerId list, DraftError> =
+        match order with
+        | Classic -> Ok(List.replicate rounds players |> List.concat)
+        | Snake ->
+            let rs = [ 0 .. rounds - 1 ]
+            Ok(rs |> List.collect (fun r -> if r % 2 = 0 then players else List.rev players))
+        | Random ->
+            match turnOrderOverride with
+            | Some o ->
+                if o.Length = rounds * players.Length then
+                    Ok o
+                else
+                    Error(Other "TurnOrder length mismatch for Random")
+            | None ->
+                match shuffleFn with
+                | None -> Error(Other "Random requires persisted turnOrder (or deterministic shuffle) to restore")
+                | Some shuffle ->
+                    let rs = [ 0 .. rounds - 1 ]
+                    let perRound = rs |> List.map (fun r -> shuffle (players, r))
+                    Ok(perRound |> List.concat)
+
+    static member private make
+        (settings: Draft.Settings)
+        (players: PlayerId list)
+        (jumpers: JumperId list)
+        (picks: Picks)
+        (turnOrder: PlayerId list)
+        : Result<Draft, DraftError> =
+
+        let allJumpersSet = jumpers |> Set.ofList
+
+        // weryfikacje proste
+        let allPicked = picks |> Seq.collect (fun kv -> kv.Value) |> List.ofSeq
+
+        if allPicked |> List.exists (fun j -> not (allJumpersSet.Contains j)) then
+            Error JumperNotFound
+        else
+            match settings.UniqueJumpersPolicy with
+            | Unique when (allPicked.Length <> (allPicked |> Set.ofList |> Set.count)) -> Error JumperNotAllowed
+            | _ ->
+                let maxPer = turnOrder.Length / players.Length
+
+                if picks |> Seq.exists (fun kv -> kv.Value.Length > maxPer) then
+                    Error MaxPicksReached
+                else
+                    let curIdx = min allPicked.Length turnOrder.Length |> TurnIndex.create |> Option.get
+
+                    Ok
+                        { Settings = settings
+                          Picks = picks
+                          AllJumpers = allJumpersSet
+                          TurnOrder = turnOrder
+                          CurrentTurnIndex = curIdx
+                          PicksPerPlayer = maxPer
+                          TotalPicks = turnOrder.Length }
 
     static member Create
         (settings: Draft.Settings)
@@ -109,58 +173,58 @@ type Draft =
         (shuffleFn: (PlayerId list * int -> PlayerId list) option)
         : Result<Draft, DraftError> =
 
-        let playerCount = players.Length
-        let jumperCount = jumpers.Length
+        let pc = players.Length
+        let jc = jumpers.Length
+        if pc = 0 then Error(Other "No players provided") else
+        let target = SettingsModule.TargetPicks.value settings.TargetPicks
+        let byDivision = jc / pc
+        let picksPerPlayerBase = min target byDivision
+        if picksPerPlayerBase < 1 then Error NotEnoughJumpers else
 
-        if playerCount = 0 then
-            Error(Other "No players provided")
+        let effectiveRounds = min picksPerPlayerBase (SettingsModule.MaxPicks.value settings.MaxPicks)
+
+        Draft.buildTurnOrder settings.Order players effectiveRounds shuffleFn None
+        |> Result.bind (fun order ->
+            Draft.make settings players jumpers Map.empty order)
+
+    static member Restore
+        (settings: Draft.Settings)
+        (players: PlayerId list)
+        (jumpers: JumperId list)
+        (picks: Picks)
+        (turnOrderOpt: PlayerId list option)
+        : Result<Draft, DraftError> =
+
+        let pc = players.Length
+        let jc = jumpers.Length
+
+        if pc = 0 then
+            Error(Other "No players")
         else
+
             let target = SettingsModule.TargetPicks.value settings.TargetPicks
+            let byDiv = jc / pc
+            let picksPerPlayerBase = min target byDiv
 
-            let picksPerPlayer =
-                let byDivision = jumperCount / playerCount
-                min target byDivision
-
-            if picksPerPlayer < 1 then
+            if picksPerPlayerBase < 1 then
                 Error NotEnoughJumpers
             else
-                // build baseOrder / per-round orders depending on Order
-                let buildTurnOrder () : Result<PlayerId list, DraftError> =
+
+                let effectiveRounds =
+                    min picksPerPlayerBase (SettingsModule.MaxPicks.value settings.MaxPicks)
+
+                let orderRes =
                     match settings.Order with
-                    | Classic -> Ok(List.init picksPerPlayer (fun _ -> players) |> List.concat)
-                    | Snake ->
-                        let rounds = [ 0 .. picksPerPlayer - 1 ]
-
-                        let turnOrder =
-                            rounds
-                            |> List.collect (fun r -> if r % 2 = 0 then players else List.rev players)
-
-                        Ok turnOrder
+                    | Classic -> Draft.buildTurnOrder Classic players effectiveRounds None None
+                    | Snake -> Draft.buildTurnOrder Snake players effectiveRounds None None
                     | Random ->
-                        match shuffleFn with
-                        | None -> Error(Other "Random order requires shuffleFn (inject via application layer)")
-                        | Some shuffle ->
-                            // shuffle each round separately
-                            let rounds = [ 0 .. picksPerPlayer - 1 ]
-                            let perRound = rounds |> List.map (fun _ -> shuffle (players, 0))
-                            Ok(perRound |> List.concat)
+                        match turnOrderOpt with
+                        | Some o -> Draft.buildTurnOrder Random players effectiveRounds None (Some o)
+                        | None -> Error(Other "Random order requires persisted turnOrder")
 
-                match buildTurnOrder () with
-                | Error e -> Error e
-                | Ok turnOrder ->
-                    let allJumpersSet = jumpers |> Set.ofList
-                    let totalPicks = picksPerPlayer * playerCount
+                orderRes
+                |> Result.bind (fun order -> Draft.make settings players jumpers picks order)
 
-                    let draft =
-                        { Settings = settings
-                          Picks = Map.empty
-                          AllJumpers = allJumpersSet
-                          TurnOrder = turnOrder
-                          CurrentTurnIndex = TurnIndex.zero
-                          PicksPerPlayer = picksPerPlayer
-                          TotalPicks = totalPicks }
-
-                    Ok draft
 
     member this.Ended: bool =
         let i = TurnIndex.value this.CurrentTurnIndex

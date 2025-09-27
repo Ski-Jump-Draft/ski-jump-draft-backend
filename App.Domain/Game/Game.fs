@@ -73,6 +73,42 @@ type Game =
       Jumpers: Jumpers
       Hill: Competition.Hill option }
 
+    static member Create id settings players jumpers (hill: Competition.Hill option) =
+        let game =
+            { Id = id
+              Settings = settings
+              Status = Break PreDraftTag
+              Players = players
+              Jumpers = jumpers
+              Hill = None }
+
+        let newGame =
+            match hill with
+            | Some hill -> game.SetHill hill
+            | None -> Ok game
+
+        match newGame with
+        | Ok newGame -> Ok newGame
+        | Error e -> Error(e)
+
+    static member CreateFromState id settings players jumpers hill status =
+        let game =
+            { Id = id
+              Settings = settings
+              Status = status
+              Players = players
+              Jumpers = jumpers
+              Hill = None }
+
+        let newGame =
+            match hill with
+            | Some hill -> game.SetHill hill
+            | None -> Ok game
+
+        match newGame with
+        | Ok newGame -> Ok newGame
+        | Error e -> Error(e)
+
     override this.Equals(obj) =
         match obj with
         | :? Game as other -> this.Id = other.Id
@@ -165,24 +201,6 @@ type Game =
 
     member this.AvailableDraftPicks: IEnumerable<JumperId> =
         this.Draft.Value.AvailablePicks
-
-    static member Create id settings players jumpers (hill: Competition.Hill option) =
-        let game =
-            { Id = id
-              Settings = settings
-              Status = Break PreDraftTag
-              Players = players
-              Jumpers = jumpers
-              Hill = None }
-
-        let newGame =
-            match hill with
-            | Some hill -> game.SetHill hill
-            | None -> Ok game
-
-        match newGame with
-        | Ok newGame -> Ok newGame
-        | Error e -> Error(e)
 
     /// Hill can be set once and must be before PreDraft. Sets a one hill for every competition in Game.
     member this.SetHill(hill: Competition.Hill) : Result<Game, GameError> =
@@ -281,7 +299,6 @@ type Game =
         match this.Status with
         | Draft draft -> Ok draft.CurrentTurn
         | _ -> Error GameError.InvalidPhase
-
 
     /// Starts the Competition phase of the Game
     member this.StartMainCompetition

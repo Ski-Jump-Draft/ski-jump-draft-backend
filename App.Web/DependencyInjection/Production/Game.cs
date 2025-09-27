@@ -75,12 +75,12 @@ public static class Game
                 App.Domain.Game.DraftModule.SettingsModule.TimeoutPolicy.NewTimeoutAfter(
                     TimeSpan.FromSeconds(15)));
             var breakSettings =
-                new App.Domain.Game.BreakSettings(App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(15)).Value,
-                    App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(30)).Value,
-                    App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(25)).Value,
-                    App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(25)).Value,
-                    App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(20)).Value);
-            var jumpInterval = App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(15)).Value;
+                new App.Domain.Game.BreakSettings(App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(15)),
+                    App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(30)),
+                    App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(25)),
+                    App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(25)),
+                    App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(20)));
+            var jumpInterval = App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(15));
             return new App.Domain.Game.Settings(breakSettings, preDraftSettings, draftSettings, mainCompetitionSettings,
                 jumpInterval,
                 App.Domain.Game.RankingPolicy.Classic);

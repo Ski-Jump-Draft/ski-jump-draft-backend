@@ -27,7 +27,10 @@ public static class CompetitionClassificationMappers
                     ? JumpResultModule.GatePointsModule.value(jumpResult.GatePoints.Value)
                     : null;
 
-                return new ResultJumpRecord(JumpModule.DistanceModule.value(jumpResult.Jump.Distance),
+                return new ArchiveJumpResult(
+                    jumpResult.Id.Item,
+                    jumperClassificationResult.JumperId.Item,
+                    JumpModule.DistanceModule.value(jumpResult.Jump.Distance),
                     TotalPointsModule.value(jumpResult.TotalPoints),
                     JumpModule.JudgesModule.value(jumpResult.Jump.JudgeNotes),
                     judgePoints,
@@ -42,7 +45,7 @@ public static class CompetitionClassificationMappers
             // var gameJumperGuid = gameJumperByCompetitionJumper.Invoke(competitionJumperGuid);
             // var gameWorldJumperGuid = gameWorldJumperByGameJumper.Invoke(gameJumperGuid);
 
-            return new ResultRecord(gameWorldJumperGuid, gameJumperGuid,
+            return new ArchiveJumperResult(gameWorldJumperGuid, gameJumperGuid,
                 competitionJumperGuid,
                 Classification.PositionModule.value(jumperClassificationResult.Position),
                 getBibByCompetitionJumperId(jumperClassificationResult.JumperId.Item),

@@ -80,7 +80,7 @@ public class BestPicker(
 
     private static int CalculateMaxPositionFromResults(ImmutableList<CompetitionResultsDto> preDraftCompetitionResults)
     {
-        var maxPosition = preDraftCompetitionResults.First().Results.Where(record => record.Points != 0).ToList().Count;
+        var maxPosition = preDraftCompetitionResults.First().JumperResults.Where(record => record.Points != 0).ToList().Count;
         return maxPosition;
     }
 
@@ -110,7 +110,7 @@ public class BestPicker(
         var averagePosition = new Dictionary<Guid, double>();
         foreach (var results in competitionResults)
         {
-            foreach (var result in results.Results)
+            foreach (var result in results.JumperResults)
             {
                 var gameJumperId = competitionJumperAcl.GetGameJumper(result.CompetitionJumperId).Id;
                 var positions = _preDraftPositionsByJumper[gameJumperId];
