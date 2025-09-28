@@ -45,14 +45,14 @@ public class WeatherEngine(IRandom random, IMyLogger logger, Configuration confi
 
     public void SimulateTime(TimeSpan time)
     {
-        var minutes = (int)Math.Floor(time.TotalMinutes);
-        logger.Debug($"Simulating {minutes} minutes");
-        for (var i = 0; i < minutes; i++)
+        var seconds = (int)Math.Floor(time.TotalSeconds);
+        logger.Debug($"Simulating {seconds} seconds");
+        for (var i = 0; i < seconds; i++)
         {
-            var change = random.Gaussian(0, configuration.StableWindChangeStdDev);
+            var change = random.Gaussian(0, configuration.StableWindChangeStdDev / Math.Sqrt(60.0));
             _currentBaseWindDouble += change;
         }
-
-        _minutes += minutes;
+        _minutes += seconds / 60;
     }
+
 }

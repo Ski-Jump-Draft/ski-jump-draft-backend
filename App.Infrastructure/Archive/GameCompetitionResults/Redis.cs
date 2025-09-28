@@ -102,7 +102,7 @@ public class Redis(
                         jumpResult.CompetitionJumperId, roundIndex, jumpResult.Distance, jumpResult.Points,
                         jumpResult.Judges,
                         jumpResult.JudgePoints, jumpResult.WindCompensation, jumpResult.WindAverage,
-                        jumpResult.GateCompensation, jumpResult.TotalCompensation);
+                        jumpResult.Gate, jumpResult.GateCompensation, jumpResult.TotalCompensation);
                     return roundResult;
                 }).ToList();
 
@@ -126,6 +126,7 @@ public class Redis(
                         endedCompetitionRoundResult.Points, endedCompetitionRoundResult.Judges,
                         endedCompetitionRoundResult.JudgePoints,
                         endedCompetitionRoundResult.WindCompensation, endedCompetitionRoundResult.WindAverage,
+                        endedCompetitionRoundResult.Gate,
                         endedCompetitionRoundResult.GateCompensation,
                         endedCompetitionRoundResult.TotalCompensation))
                 .ToList();

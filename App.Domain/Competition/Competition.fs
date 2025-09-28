@@ -77,7 +77,7 @@ type Competition =
           Jumpers: Jumper list }
 
     member this.Id_ = this.Id
-    
+
     member this.Jumpers_ = this.Jumpers
 
     member this.Startlist_ = this.Startlist
@@ -104,7 +104,7 @@ type Competition =
         | Status.Suspended(gs, _) -> Some gs
         | _ -> None
 
-    member private this.CurrentGateState() =
+    member private this.CurrentGateState() : GateState =
         match this.Status with
         | Status.NotStarted gs
         | Status.RoundInProgress(gs, _)

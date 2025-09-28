@@ -57,7 +57,7 @@ public static class Application
                 .AddSingleton<App.Application.Game.Gate.IGameStartingGateSelectorFactory,
                     App.Application.Game.Gate.IterativeSimulatedFactory>(sp =>
                 {
-                    const JuryBravery juryBravery = JuryBravery.High;
+                    const JuryBravery juryBravery = JuryBravery.Medium;
                     return new IterativeSimulatedFactory(sp.GetRequiredService<IJumpSimulator>(),
                         sp.GetRequiredService<IWeatherEngine>(),
                         juryBravery, sp.GetRequiredService<ICompetitionJumperAcl>(),

@@ -256,9 +256,10 @@ public class GameUpdatedDtoMapper(
                 var gameJumperId = competitionJumperAcl.GetGameJumper(competitionJumperId).Id;
                 return new CompetitionRoundResultDto(gameJumperId, competitionJumperId, jumpRecord.Distance,
                     jumpRecord.Points, jumpRecord.Judges, jumpRecord.JudgePoints, jumpRecord.WindCompensation,
-                    jumpRecord.WindAverage, jumpRecord.GateCompensation, jumpRecord.TotalCompensation);
+                    jumpRecord.WindAverage, jumpRecord.Gate, jumpRecord.GateCompensation, jumpRecord.TotalCompensation);
             });
-            return new CompetitionResultDto(archiveJumperResult.Rank, archiveJumperResult.Bib, archiveJumperResult.CompetitionJumperId,
+            return new CompetitionResultDto(archiveJumperResult.Rank, archiveJumperResult.Bib,
+                archiveJumperResult.CompetitionJumperId,
                 archiveJumperResult.Points, jumpRecords.ToList().AsReadOnly());
         }
     }
@@ -470,6 +471,7 @@ public class GameUpdatedDtoMapper(
             judgePoints,
             windPoints,
             windAverage,
+            jumpResult.Jump.Gate.Item,
             gatePoints, totalCompetitionPoints
         );
     }

@@ -142,6 +142,7 @@ public sealed record CompetitionRoundResultDto(
     double? JudgePoints,
     double? WindCompensation,
     double WindAverage,
+    int Gate,
     double? GateCompensation,
     double? TotalCompensation
 );

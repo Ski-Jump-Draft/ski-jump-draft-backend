@@ -60,6 +60,7 @@ public class Handler(
 
         var simulationWind = weatherEngine.GetWind();
         var gate = game.CurrentCompetitionGate;
+        var gateInt = App.Domain.Competition.GateModule.value(gate);
         var nextCompetitionJumper = game.NextCompetitionJumper.Value;
         var competitionHill = game.Hill.Value;
 
@@ -82,7 +83,7 @@ public class Handler(
         var simulationHill = competitionHill.ToSimulationHill(overridenMetersByGate: null);
 
         var simulationContext =
-            new SimulationContext(Gate.NewGate(App.Domain.Competition.GateModule.value(gate)),
+            new SimulationContext(Gate.NewGate(gateInt),
                 simulationJumper, simulationHill, simulationWind);
         var simulatedJump = jumpSimulator.Simulate(simulationContext);
 
@@ -105,7 +106,8 @@ public class Handler(
             JumpModule.DistanceModule.tryCreate(DistanceModule.value(simulatedJump.Distance))
                 .OrThrow("Invalid distance"),
             competitionJudges,
-            competitionJumpWind);
+            competitionJumpWind,
+            Domain.Competition.Gate.NewGate(gateInt)); // TODO: Nie powinniśmy ustawiać tego w warstwie Application
 
         var jumpResultId = JumpResultId.NewJumpResultId(guid.NewGuid());
         var gameAfterAddingJumpResult = game.AddJumpInCompetition(jumpResultId, competitionJump);
@@ -230,7 +232,7 @@ public class Handler(
                 WindModule.average(simulationWind),
                 Domain.Competition.TotalPointsModule.value(jumperResultInClassifiation.Points),
                 Domain.Competition.Classification.PositionModule.value(jumperResultInClassifiation.Position));
-            
+
             return new Result(simulatedJumpDto);
         }
 

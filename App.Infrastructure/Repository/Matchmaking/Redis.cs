@@ -71,13 +71,12 @@ public class Redis(IConnectionMultiplexer redis, IMyLogger logger) : IMatchmakin
         var serializedMatchmaking = JsonSerializer.Serialize(dto);
         if (matchmaking.Status_.IsRunning)
         {
-            await _db.StringSetAsync(LiveKey(matchmakingId), serializedMatchmaking);
+            await _db.StringSetAsync(LiveKey(matchmakingId), serializedMatchmaking, TimeSpan.FromSeconds(120));
             await _db.SetAddAsync(LiveSetKey, dto.Id.ToString());
         }
         else
         {
             var transaction = _db.CreateTransaction();
-            object _;
             transaction.StringSetAsync(ArchiveKey(matchmakingId), serializedMatchmaking);
             transaction.SetAddAsync(ArchiveSetKey, dto.Id.ToString());
             await RemoveLiveMatchmaking(matchmakingId, transaction, ct);

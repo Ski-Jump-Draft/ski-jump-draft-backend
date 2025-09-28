@@ -30,7 +30,7 @@ type GateState =
       CurrentJury: Gate
       CoachChange: GateChange option }
 
-    member this.CurrentReal =
+    member this.CurrentReal: Gate =
         let current = Gate.value this.CurrentJury
 
         let coachReduction =

@@ -49,7 +49,7 @@ public class Redis(
         }
         else
         {
-            await _db.StringSetAsync(LiveKey(gameId), serializedGames);
+            await _db.StringSetAsync(LiveKey(gameId), serializedGames, TimeSpan.FromSeconds(120));
             await _db.SetAddAsync(LiveSetKey, dto.Id.ToString());
         }
     }
@@ -201,7 +201,7 @@ public class Redis(
                     archiveJumpResult.CompetitionJumperId, index,
                     archiveJumpResult.Distance, archiveJumpResult.Points, archiveJumpResult.Judges,
                     archiveJumpResult.JudgePoints, archiveJumpResult.WindCompensation,
-                    archiveJumpResult.WindAverage, archiveJumpResult.GateCompensation,
+                    archiveJumpResult.WindAverage, archiveJumpResult.Gate, archiveJumpResult.GateCompensation,
                     archiveJumpResult.TotalCompensation)).ToList());
         });
         return new EndedCompetitionDto(jumperResults.ToList());
@@ -488,7 +488,7 @@ public static class GameDtoMapper
                     JumpModule.DistanceModule.value(jumpResult.Jump.Distance),
                     TotalPointsModule.value(jumpResult.TotalPoints),
                     JumpModule.JudgesModule.value(jumpResult.Jump.JudgeNotes), judgePoints, windPoints,
-                    jumpResult.Jump.Wind.ToDouble(), gatePoints,
+                    jumpResult.Jump.Wind.ToDouble(), jumpResult.Jump.Gate.Item, gatePoints,
                     JumpResultModule.TotalCompensationModule.value(jumpResult.TotalCompensation));
             }).ToList();
 
@@ -743,7 +743,7 @@ public static class GameDtoMapper
                 Domain.Competition.JumperId.NewJumperId(roundResult.CompetitionJumperId),
                 JumpModule.DistanceModule.tryCreate(roundResult.Distance).ResultValue,
                 JumpModule.JudgesModule.tryCreate(ListModule.OfSeq(roundResult.Judges)).Value,
-                JumpModule.WindAverage.FromDouble(roundResult.WindAverage));
+                JumpModule.WindAverage.FromDouble(roundResult.WindAverage), Gate.NewGate(roundResult.Gate));
             var roundIndex = RoundIndex.NewRoundIndex((uint)roundResult.RoundIndex);
             var judgePoints = roundResult.JudgePoints is not null
                 ? JumpResultModule.JudgePointsModule.tryCreate(roundResult.JudgePoints.Value).ResultValue
@@ -1004,6 +1004,7 @@ public sealed record CompetitionRoundResultDto(
     double? JudgePoints,
     double? WindCompensation,
     double WindAverage,
+    int Gate,
     double? GateCompensation,
     double? TotalCompensation
 );

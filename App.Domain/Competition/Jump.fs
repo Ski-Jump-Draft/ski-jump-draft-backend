@@ -4,7 +4,7 @@ open System
 
 module Jump =
     type Id = Id of System.Guid
-
+    
     type Distance = private Distance of double
 
     module Distance =
@@ -65,5 +65,6 @@ type Jump = {
     Distance: Distance
     JudgeNotes: Judges
     Wind: WindAverage
+    Gate: Gate
 }
 

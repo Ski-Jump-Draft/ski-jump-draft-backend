@@ -36,6 +36,7 @@ public static class CompetitionClassificationMappers
                     judgePoints,
                     windPoints,
                     jumpResult.Jump.Wind.ToDouble(),
+                    jumpResult.Jump.Gate.Item,
                     gatePoints,
                     JumpResultModule.TotalCompensationModule.value(jumpResult.TotalCompensation));
             });

@@ -20,6 +20,7 @@ public record ArchiveJumpResult(
     double? JudgePoints,
     double? WindCompensation,
     double WindAverage,
+    int Gate,
     double? GateCompensation,
     double? TotalCompensation
 );
