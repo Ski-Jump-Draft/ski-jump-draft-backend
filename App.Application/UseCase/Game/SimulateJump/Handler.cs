@@ -125,8 +125,7 @@ public class Handler(
                     classificationResult.Points.Item
                 }pts)");
 
-            Competition? previousCompetition = addJumpOutcome.Competition; // TODO
-
+            var previousCompetition = addJumpOutcome.Competition;
 
             if (gameAfterAddingJump.IsDuringCompetition)
             {
@@ -231,11 +230,11 @@ public class Handler(
                 WindModule.average(simulationWind),
                 Domain.Competition.TotalPointsModule.value(jumperResultInClassifiation.Points),
                 Domain.Competition.Classification.PositionModule.value(jumperResultInClassifiation.Position));
-
+            
             return new Result(simulatedJumpDto);
         }
 
-        throw new Exception("Error adding a jump to game.");
+        throw new Exception("Error adding a jump to game: " + gameAfterAddingJumpResult.ErrorValue);
     }
 
 

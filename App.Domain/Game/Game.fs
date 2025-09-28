@@ -2,7 +2,6 @@ namespace App.Domain.Game
 
 open System.Collections.Generic
 open App.Domain
-open App.Domain.Game.Draft.TurnIndex
 
 type GameId = GameId of System.Guid
 

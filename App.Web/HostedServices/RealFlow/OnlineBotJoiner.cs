@@ -82,10 +82,22 @@ public class OnlineBotJoiner(IMatchmakings repo, ICommandBus bus, IRandom random
 
         var allNames = maleNames.Concat(femaleNames).ToList();
 
-        if (matchmakingId is null) return allNames.GetRandomElement(random);
-
+        if (matchmakingId is null) 
+            return $"Bot {allNames.GetRandomElement(random)}";
+        
         var usedNames = _usedBotNicksByMatchmaking.GetOrAdd(matchmakingId.Value, _ => []);
-        var allowedNames = allNames.Except(usedNames).ToList();
-        return allowedNames.Count == 0 ? "Bot" : $"Bot {allowedNames.GetRandomElement(random)}";
+        var allowedNames = allNames
+            .Select(name => $"Bot {name}")
+            .Except(usedNames)
+            .ToList();
+
+
+        if (allowedNames.Count == 0)
+            return "Bot";
+
+        var chosen = allowedNames.GetRandomElement(random);
+        usedNames.Add($"Bot {chosen}");
+        return $"Bot {chosen}";
+
     }
 }

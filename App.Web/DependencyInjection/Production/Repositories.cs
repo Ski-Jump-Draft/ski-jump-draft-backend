@@ -12,6 +12,7 @@ public static class Repositories
             services
                 .AddSingleton<App.Domain.Matchmaking.IMatchmakings,
                     App.Infrastructure.Repository.Matchmaking.InMemory>();
+            services.AddSingleton<App.Domain.Game.IGames, App.Infrastructure.Repository.Game.InMemory>();
         }
         else
         {
@@ -38,9 +39,10 @@ public static class Repositories
             services
                 .AddSingleton<App.Domain.Matchmaking.IMatchmakings,
                     App.Infrastructure.Repository.Matchmaking.Redis>();
+            services.AddSingleton<App.Domain.Game.IGames, App.Infrastructure.Repository.Game.Redis>();
         }
 
-        services.AddSingleton<App.Domain.Game.IGames, App.Infrastructure.Repository.Game.InMemory>();
+
         return services;
     }
 }

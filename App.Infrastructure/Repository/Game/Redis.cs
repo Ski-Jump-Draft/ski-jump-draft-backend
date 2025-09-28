@@ -56,7 +56,11 @@ public class Redis(
 
     public async Task<FSharpOption<Domain.Game.Game>> GetById(GameId gameId, CancellationToken ct)
     {
-        var liveGameJson = await _db.StringGetAsync(LiveKey(gameId.Item));
+        var nextGameStatus = GetNextGameStatus(gameId.Item);
+
+        var liveKey = LiveKey(gameId.Item);
+        logger.Info($"Looking for key {liveKey}");
+        var liveGameJson = await _db.StringGetAsync(liveKey);
         if (liveGameJson.HasValue)
         {
             var dto = JsonSerializer.Deserialize<GameDto>(liveGameJson!);
@@ -65,7 +69,20 @@ public class Redis(
                 throw new Exception("Failed to deserialize live game");
             }
 
-            return dto.ToDomain();
+            await Task.Delay(TimeSpan.FromSeconds(2), ct);
+            logger.Info("Found live game");
+
+            try
+            {
+                var domainGame = dto.ToDomain(nextGameStatus);
+                logger.Info("Constructed domain game");
+                return domainGame;
+            }
+            catch (Exception ex)
+            {
+                logger.Error($"Failed mapping Game domain entity to Redis DTO:: {ex}, {ex.StackTrace}");
+                throw;
+            }
         }
 
         var archivedGameJson = await _db.StringGetAsync(ArchiveKey(gameId.Item));
@@ -77,7 +94,7 @@ public class Redis(
                 throw new Exception("Failed to deserialize archived game");
             }
 
-            return dto.ToDomain();
+            return dto.ToDomain(nextGameStatus);
         }
 
         throw new KeyNotFoundException($"Game {gameId} not found");
@@ -85,36 +102,40 @@ public class Redis(
 
     public async Task<IEnumerable<Domain.Game.Game>> GetNotStarted(CancellationToken ct)
     {
-        var ids = await _db.SetMembersAsync(LiveSetKey);
-        var matchmakings = new List<Domain.Game.Game>();
-        foreach (var id in ids)
+        var gameIds = await _db.SetMembersAsync(LiveSetKey);
+        var games = new List<Domain.Game.Game>();
+        foreach (var gameId in gameIds)
         {
-            if (!id.HasValue) continue;
-            var json = await _db.StringGetAsync(LiveKey(id.ToString()));
+            if (!gameId.HasValue) continue;
+            var json = await _db.StringGetAsync(LiveKey(gameId.ToString()));
             if (!json.HasValue) continue;
             var dto = JsonSerializer.Deserialize<GameDto>(json!);
-            if (dto is { NextStatus: not null } && dto.NextStatus.Contains("PreDraft"))
-                matchmakings.Add(dto.ToDomain());
+            var gameGuid = Guid.Parse(gameId.ToString());
+            if (dto is null) continue;
+
+            if (GetNextScheduledGamePhase(gameGuid) == GameScheduleTarget.PreDraft)
+                games.Add(dto.ToDomain(GetNextGameStatus(gameGuid)));
         }
 
-        return matchmakings;
+        return games;
     }
 
     public async Task<IEnumerable<Domain.Game.Game>> GetInProgress(CancellationToken ct)
     {
-        var ids = await _db.SetMembersAsync(LiveSetKey);
-        var matchmakings = new List<Domain.Game.Game>();
-        foreach (var id in ids)
+        var gameIds = await _db.SetMembersAsync(LiveSetKey);
+        var games = new List<Domain.Game.Game>();
+        foreach (var gameId in gameIds)
         {
-            if (!id.HasValue) continue;
-            var json = await _db.StringGetAsync(LiveKey(id.ToString()));
+            if (!gameId.HasValue) continue;
+            var json = await _db.StringGetAsync(LiveKey(gameId.ToString()));
             if (!json.HasValue) continue;
             var dto = JsonSerializer.Deserialize<GameDto>(json!);
+            var gameGuid = Guid.Parse(gameId.ToString());
             if (dto != null && dto.Status != "Ended")
-                matchmakings.Add(dto.ToDomain());
+                games.Add(dto.ToDomain(GetNextGameStatus(gameGuid)));
         }
 
-        return matchmakings;
+        return games;
     }
 
     public async Task<int> GetInProgressCount(CancellationToken ct)
@@ -132,8 +153,9 @@ public class Redis(
             var json = await _db.StringGetAsync(ArchiveKey(id.ToString()));
             if (!json.HasValue) continue;
             var dto = JsonSerializer.Deserialize<GameDto>(json!);
-            if (dto != null && dto.Status == "Ended")
-                matchmakings.Add(dto.ToDomain());
+            var gameGuid = Guid.Parse(id.ToString());
+            if (dto is { Status: "Ended" })
+                matchmakings.Add(dto.ToDomain(GetNextGameStatus(gameGuid)));
         }
 
         return matchmakings;
@@ -142,41 +164,27 @@ public class Redis(
     private async Task<GameDtoMapperInput> CreateMapperInput(Domain.Game.Game game, CancellationToken ct)
     {
         var gameGuid = game.Id.Item;
-        var schedule = GetGameSchedule(gameGuid);
-        var nextStatus = GetNextGameStatus(schedule);
-        var nextCompetitionJumpInMs = GetNextCompetitionJumpInMs(schedule);
-        var preDraftResults = await gameCompetitionResultsArchive.GetPreDraftResultsAsync(gameGuid, ct);
-        if (preDraftResults is null)
-        {
-            throw new Exception("Pre-draft results not found");
-        }
 
-        var preDraftEndedCompetitions = preDraftResults.Select(CreateEndedCompetitionFromArchive).ToList();
+        var preDraftResults = await gameCompetitionResultsArchive.GetPreDraftResultsAsync(gameGuid, ct);
+
+        var preDraftEndedCompetitions = preDraftResults?.Select(CreateEndedCompetitionFromArchive).ToList();
 
         var mainCompetitionResults = await gameCompetitionResultsArchive.GetMainResultsAsync(gameGuid, ct);
-        if (mainCompetitionResults is null)
-        {
-            throw new Exception("Main competition results not found");
-        }
-
-        var endedMainCompetition = CreateEndedCompetitionFromArchive(mainCompetitionResults);
+        var endedMainCompetition = mainCompetitionResults != null
+            ? CreateEndedCompetitionFromArchive(mainCompetitionResults)
+            : null;
 
         var draftPicksList = await GetArchivedDraftPicks(gameGuid);
 
-        return new GameDtoMapperInput(game, nextStatus, preDraftEndedCompetitions, nextCompetitionJumpInMs,
+        return new GameDtoMapperInput(game, preDraftEndedCompetitions, GetNextCompetitionJumpInMs(gameGuid),
             draftPicksList,
             endedMainCompetition);
     }
 
-    private async Task<List<PlayerPicksDto>> GetArchivedDraftPicks(Guid gameGuid)
+    private async Task<List<PlayerPicksDto>?> GetArchivedDraftPicks(Guid gameGuid)
     {
         var endedDraftPicks = (await draftPicksArchive.GetPicks(gameGuid))?.ToList();
-        if (endedDraftPicks is null)
-        {
-            throw new Exception("Draft picks not found");
-        }
-
-        var draftPicksList = endedDraftPicks.Select(kvp =>
+        var draftPicksList = endedDraftPicks?.Select(kvp =>
         {
             return new PlayerPicksDto(kvp.Key.Item, kvp.Value.Select(id => id.Item).ToList());
         }).ToList();
@@ -199,15 +207,29 @@ public class Redis(
         return new EndedCompetitionDto(jumperResults.ToList());
     }
 
-    private Application.Game.GameScheduleDto GetGameSchedule(Guid gameGuid)
+    private Application.Game.GameScheduleTarget? GetNextScheduledGamePhase(Guid gameId)
     {
-        var schedule = gameSchedule.GetGameSchedule(gameGuid);
-        if (schedule is null)
+        var schedule = gameSchedule.GetGameSchedule(gameId);
+        return schedule?.ScheduleTarget;
+    }
+
+    private int? GetNextCompetitionJumpInMs(Guid gameId)
+    {
+        var schedule = gameSchedule.GetGameSchedule(gameId);
+        if (schedule?.ScheduleTarget == GameScheduleTarget.CompetitionJump)
         {
-            throw new Exception("Game schedule not found");
+            return (int)Math.Floor(schedule.In.TotalMilliseconds);
         }
 
-        return schedule;
+        return null;
+    }
+
+    private string? GetNextGameStatus(Guid gameId)
+    {
+        var schedule = gameSchedule.GetGameSchedule(gameId);
+        return schedule?.ScheduleTarget != GameScheduleTarget.CompetitionJump
+            ? $"{schedule!.ScheduleTarget.ToString()} IN {(int)Math.Floor(schedule!.In.TotalMilliseconds)}"
+            : null;
     }
 
     private string? GetNextGameStatus(Application.Game.GameScheduleDto schedule)
@@ -238,7 +260,7 @@ public class Redis(
 // `PreDraftEndedCompetitions` prawdopodobnie pochodzić będzie z archiwum, które jest asynchroniczne
 public record GameDtoMapperInput(
     Domain.Game.Game Game,
-    string? NextStatus,
+    // string? NextStatus,
     List<EndedCompetitionDto>? PreDraftEndedCompetitions,
     int? NextCompetitionJumpInMs,
     List<PlayerPicksDto>? EndedDraftPicks,
@@ -259,8 +281,7 @@ public static class GameDtoMapper
         var gameId = game.Id.Item;
         var dto = new GameDto(
             gameId,
-            game.StatusTag.ToString(),
-            input.NextStatus,
+            game.StatusTag.ToString().RemoveFromEndInWordsIfPresent("Tag"),
             CreateSettings(input),
             CreateCompetitionHill(input),
             players,
@@ -388,7 +409,7 @@ public static class GameDtoMapper
     private static PreDraftDto? CreatePreDraft(GameDtoMapperInput input)
     {
         var game = input.Game;
-        if (!game.PhaseHasStarted(StatusTag.DraftTag)) return null;
+        if (!game.PhaseHasStarted(StatusTag.PreDraftTag)) return null;
 
         string? preDraftStatusString = null;
         int? preDraftCompetitionIndex = null;
@@ -580,7 +601,7 @@ public static class GameDtoMapper
         return new GameRankingDto(positionAndPointsList);
     }
 
-    public static Domain.Game.Game ToDomain(this GameDto dto)
+    public static Domain.Game.Game ToDomain(this GameDto dto, string? nextGameStatus)
     {
         var preDraftCompetitions = dto.Settings.PreDraftCompetitions.Select(DomainCreateCompetitionSettings).ToList();
         var preDraftSettings = PreDraftSettings.Create(ListModule.OfSeq(preDraftCompetitions)).Value;
@@ -656,7 +677,8 @@ public static class GameDtoMapper
             HillModule.WindPointsModule.tryCreate(hillDto.TailwindPoints).Value);
 
         var gameStatus =
-            DomainCreateGameStatus(dto, preDraftSettings, draftSettings, mainCompetitionSettings, hill, jumperIds);
+            DomainCreateGameStatus(dto, nextGameStatus, preDraftSettings, draftSettings, mainCompetitionSettings, hill,
+                jumperIds);
 
         var game = Domain.Game.Game.CreateFromState(Domain.Game.GameId.NewGameId(dto.Id), settings, wrappedPlayers,
             wrappedJumpers, hill, gameStatus);
@@ -741,12 +763,13 @@ public static class GameDtoMapper
 
         var (statusTag, gateState) = (competitionDto.Status, competitionDto.GateState) switch
         {
-            ("NotStarted", { } gateStateDto) => (CompetitionModule.StatusTag.SuspendedTag,
+            ("NotStarted", { } gateStateDto) => (CompetitionModule.StatusTag.NotStartedTag,
                 CreateDomainGateState(gateStateDto.Starting, gateStateDto.CurrentJury, gateStateDto.CoachReduction)),
-            ("Running", { } gateStateDto) => (CompetitionModule.StatusTag.RoundInProgressTag,
+            ("RoundInProgress", { } gateStateDto) => (CompetitionModule.StatusTag.RoundInProgressTag,
                 CreateDomainGateState(gateStateDto.Starting, gateStateDto.CurrentJury, gateStateDto.CoachReduction)),
             ("Suspended", { } gateStateDto) => (CompetitionModule.StatusTag.SuspendedTag,
                 CreateDomainGateState(gateStateDto.Starting, gateStateDto.CurrentJury, gateStateDto.CoachReduction)),
+            ("Ended", _) => (CompetitionModule.StatusTag.EndedTag, null),
             ({ } breakStatus, _) when breakStatus.StartsWith("Break ") => (
                 CreateRawStatusTag(breakStatus.Substring("Break ".Length)),
                 null),
@@ -772,11 +795,11 @@ public static class GameDtoMapper
         {
             return statusString switch
             {
-                "NotStarted" => CompetitionModule.StatusTag.SuspendedTag,
-                "Running" => CompetitionModule.StatusTag.RoundInProgressTag,
+                "NotStarted" => CompetitionModule.StatusTag.NotStartedTag,
+                "RoundInProgress" => CompetitionModule.StatusTag.RoundInProgressTag,
                 "Suspended" => CompetitionModule.StatusTag.SuspendedTag,
+                "Cancelled" => CompetitionModule.StatusTag.CancelledTag,
                 "Ended" => CompetitionModule.StatusTag.EndedTag,
-                "Break" => CompetitionModule.StatusTag.SuspendedTag,
                 _ => throw new Exception("Unknown status")
             };
         }
@@ -788,15 +811,17 @@ public static class GameDtoMapper
         }
     }
 
-    private static Domain.Game.Status DomainCreateGameStatus(GameDto gameDto, PreDraftSettings preDraftSettings,
+    private static Domain.Game.Status DomainCreateGameStatus(GameDto gameDto, string? nextStatus,
+        PreDraftSettings preDraftSettings,
         DraftModule.Settings draftSettings, Domain.Competition.Settings mainCompetitionSettings,
         Domain.Competition.Hill hill,
         FSharpList<JumperId> jumperIds)
     {
-        switch (gameDto.Status, gameDto.NextStatus)
+        switch (gameDto.Status, nextStatus)
         {
-            case ("Break", var next and not "Break"):
-                var nextStatusTag = next switch
+            case (var breakStatus, not "Break") when breakStatus.StartsWith("Break "):
+                var breakStatusTag = breakStatus["Break ".Length..];
+                var nextStatusTag = breakStatusTag switch
                 {
                     "PreDraft" => StatusTag.PreDraftTag,
                     "Draft" => StatusTag.DraftTag,
@@ -903,7 +928,8 @@ public static class GameDtoMapper
                 var gameRanking = Domain.Game.Ranking.Create(mapFSharp);
                 return Status.NewEnded(gameRanking);
             default:
-                throw new Exception("Unknown game status");
+                throw new Exception("Unknown game status: " + gameDto.Status);
+                ;
         }
     }
 }
@@ -1045,7 +1071,7 @@ public record GameRankingDto(
 public record GameDto(
     Guid Id,
     string Status,
-    string? NextStatus,
+    // string? NextStatus,
     SettingsDto Settings,
     CompetitionHillDto CompetitionHillDto,
     List<PlayerDto> Players,

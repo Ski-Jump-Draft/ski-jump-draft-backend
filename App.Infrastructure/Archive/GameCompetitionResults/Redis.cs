@@ -23,9 +23,10 @@ public class Redis(
         CancellationToken ct)
     {
         var gameDto = await GetGameDto(gameId, searchInArchive: false);
-
+        if (gameDto is null)
+            throw new GameNotFoundException();
         if (gameDto.PreDraft is null)
-            throw new Exception($"PreDraftDto is null (status={gameDto.Status}, next={gameDto.NextStatus})");
+            throw new Exception($"PreDraftDto is null (status={gameDto.Status})");
 
         var endedCompetitionResults = RedisEndedCompetitionFromArchived(archiveCompetitionResults);
 
@@ -44,7 +45,7 @@ public class Redis(
     {
         // TODO: Czy gameDto.PreDraft nie jest nullem po domenowej fazie Draftu?
         var gameDto = await GetGameDto(gameId, searchInArchive: true);
-        if (gameDto.PreDraft is null) return null;
+        if (gameDto?.PreDraft is null) return null;
         var endedCompetitions = gameDto.PreDraft.EndedCompetitions ?? [];
         var archiveCompetitions = endedCompetitions.Select(ArchivedCompetitionResultsFromRedis);
 
@@ -55,8 +56,10 @@ public class Redis(
         CancellationToken ct)
     {
         var gameDto = await GetGameDto(gameId, searchInArchive: false);
+        if (gameDto is null)
+            throw new GameNotFoundException();
         if (gameDto.MainCompetition is null)
-            throw new Exception($"MainCompetitionDto is null (status={gameDto.Status}, next={gameDto.NextStatus})");
+            throw new Exception($"MainCompetitionDto is null (status={gameDto.Status})");
         var redisEndedCompetitionResults = RedisEndedCompetitionFromArchived(archiveCompetitionResults);
         var newGame = gameDto with { EndedMainCompetition = redisEndedCompetitionResults };
         await _db.StringSetAsync(LiveKey(gameId), JsonSerializer.Serialize(newGame));
@@ -65,25 +68,22 @@ public class Redis(
     public async Task<ArchiveCompetitionResultsDto?> GetMainResultsAsync(Guid gameId, CancellationToken ct)
     {
         var gameDto = await GetGameDto(gameId, searchInArchive: true);
-        if (gameDto.MainCompetition is null) return null;
+        if (gameDto?.MainCompetition is null) return null;
         return gameDto.EndedMainCompetition != null
             ? ArchivedCompetitionResultsFromRedis(gameDto.EndedMainCompetition)
             : null;
     }
 
-    private async Task<RedisRepository.GameDto> GetGameDto(Guid gameId, bool searchInArchive)
+    private async Task<RedisRepository.GameDto?> GetGameDto(Guid gameId, bool searchInArchive)
     {
         var liveJson = await _db.StringGetAsync(LiveKey(gameId));
         if (liveJson.HasValue)
             return Deserialize(liveJson);
 
-        if (!searchInArchive) throw new GameNotFoundException();
+        if (!searchInArchive) return null;
 
         var archiveJson = await _db.StringGetAsync(ArchiveKey(gameId));
-        if (archiveJson.HasValue)
-            return Deserialize(archiveJson);
-
-        throw new GameNotFoundException();
+        return archiveJson.HasValue ? Deserialize(archiveJson) : null;
 
         static RedisRepository.GameDto Deserialize(RedisValue json) =>
             JsonSerializer.Deserialize<RedisRepository.GameDto>(json!)

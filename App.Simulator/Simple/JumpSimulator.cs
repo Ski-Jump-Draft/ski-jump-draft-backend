@@ -13,6 +13,12 @@ namespace App.Simulator.Simple;
 /// <param name="FlightToTakeoffRatio">E.g., 3.5 means that the flight has 3.5 times more impact to distance than takeoff</param>
 /// <param name="RandomAdditionsRatio">Multiplies all random additions</param>
 /// <param name="DistanceSpreadByRatingFactor">Scales meters per rating point</param>
+/// <param name="HsFlatteningStartRatio">
+/// Odsetek HS (np. 0.07 = 7%), gdzie zaczyna działać wypłaszczanie
+/// </param>
+/// <param name="HsFlatteningStrength">
+/// Mnożnik siły wypłaszczania (1=normalnie, >1 = mocniej ścina, <1 = łagodniej)
+/// </param>
 public record SimulatorConfiguration(
     double SkillImpactFactor,
     double AverageBigSkill,
@@ -20,7 +26,9 @@ public record SimulatorConfiguration(
     double FlightRatingPointsByForm,
     double FlightToTakeoffRatio = 1,
     double RandomAdditionsRatio = 1,
-    double DistanceSpreadByRatingFactor = 1);
+    double DistanceSpreadByRatingFactor = 1,
+    double HsFlatteningStartRatio = 0.07,
+    double HsFlatteningStrength = 1.0);
 
 public class JumpSimulator(SimulatorConfiguration configuration, IRandom random, IMyLogger logger) : IJumpSimulator
 {
@@ -30,10 +38,12 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
         var flightRating = CalculateFlightRating(context);
         var averageWind = WindModule.average(context.Wind);
         var windInstability = WindModule.instability(context.Wind);
-        var distance = CalculateDistance(context, takeoffRating, flightRating, averageWind, windInstability);
-        var landing = GenerateLanding(context, distance);
-        logger.Debug($"Distance: {distance}, AverageWind: {averageWind}, Landing: {landing}");
-        return new Jump(DistanceModule.tryCreate(distance).Value, landing);
+        var rawDistance = CalculateDistance(context, takeoffRating, flightRating, averageWind, windInstability);
+        var realHs = HillModule.HsPointModule.value(context.Hill.SimulationData.RealHs);
+        var distanceAfterApplyingHsCost = ApplyHsCost(rawDistance, realHs);
+        var landing = GenerateLanding(context, distanceAfterApplyingHsCost);
+        logger.Debug($"Distance: {distanceAfterApplyingHsCost} (raw: {rawDistance}) AverageWind: {averageWind}, Landing: {landing}");
+        return new Jump(DistanceModule.tryCreate(distanceAfterApplyingHsCost).Value, landing);
     }
 
     private double CalculateTakeoffRating(SimulationContext context)
@@ -133,7 +143,7 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
             <= 90 => 1.0,
             < 125 => Lerp(1.0, 1.6, SmoothStep(90, 125, k)),
             < 200 => Lerp(1.6, flightRatioWhenK200, SmoothStep(125, 200, k)),
-            _ => 4.5
+            _ => flightRatioWhenK200
         };
     }
 
@@ -287,5 +297,21 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
         if (edge1 <= edge0) return x < edge0 ? 0 : 1;
         var t = Math.Clamp((x - edge0) / (edge1 - edge0), 0, 1);
         return t * t * (3 - 2 * t);
+    }
+    
+    private double ApplyHsCost(double distance, double realHs)
+    {
+        if (distance <= realHs) return distance;
+
+        var overHs = distance - realHs;
+
+        var hsScale = configuration.HsFlatteningStartRatio <= 0
+            ? 1e-6
+            : realHs * configuration.HsFlatteningStartRatio;
+        
+        var compressed = hsScale * Math.Log(1.0 + overHs / hsScale);
+        compressed /= configuration.HsFlatteningStrength;
+
+        return realHs + compressed;
     }
 }

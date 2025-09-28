@@ -36,13 +36,15 @@ public class Handler(
     ISelectGameStartingGateService selectGameStartingGateService,
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
     IGameSchedule gameSchedule,
-    IGameCompetitionStartlist gameCompetitionStartlist)
+    IGameCompetitionStartlist gameCompetitionStartlist,
+    IMyLogger logger)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
     {
         var game = await games.GetById(Domain.Game.GameId.NewGameId(command.GameId), ct)
             .AwaitOrWrap(_ => new IdNotFoundException(command.GameId));
+        logger.Info($"Starting pre draft for game {game.Id_.Item}");
         var competitionId = Domain.Competition.CompetitionId.NewCompetitionId(guid.NewGuid());
         var competitionJumpersStartlist = await GenerateCompetitionJumpersStartlist(command.GameId, ct);
         var startingGate = await SelectStartingGate(game, competitionJumpersStartlist, ct);

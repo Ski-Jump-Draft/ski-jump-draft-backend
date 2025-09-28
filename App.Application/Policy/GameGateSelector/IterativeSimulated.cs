@@ -72,6 +72,12 @@ public class IterativeSimulated(
             _ => 0
         };
 
+        currentGate += hsPoint switch
+        {
+            >= 180 => -1,
+            _ => 0
+        };
+
         return currentGate;
 
         int CountOvershoots(int gate)

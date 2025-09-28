@@ -24,7 +24,7 @@ public class Redis(IConnectionMultiplexer redis, IMyLogger logger) : IDraftPicks
         var dto = await GetGameDto(gameId, searchInArchive: false);
 
         if (dto.Draft is null)
-            throw new Exception($"DraftDto is null (status={dto.Status}, next={dto.NextStatus})");
+            throw new Exception($"DraftDto is null (status={dto.Status}");
 
         var picksList = picks
             .Select(p => new RedisRepository.PlayerPicksDto(p.Key.Item, p.Value.Select(j => j.Item).ToList()))
@@ -46,7 +46,7 @@ public class Redis(IConnectionMultiplexer redis, IMyLogger logger) : IDraftPicks
                     pick => pick.GameJumperIds.Select(JumperId.NewJumperId)
                 );
 
-            logger.Warn($"DraftDto is null (status={dto.Status}, next={dto.NextStatus})");
+            logger.Warn($"DraftDto is null (status={dto.Status})");
             return null;
         }
         catch (GameNotFoundException)

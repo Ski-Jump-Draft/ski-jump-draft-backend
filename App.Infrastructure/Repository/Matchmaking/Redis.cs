@@ -1,5 +1,6 @@
 using System.Text.Json;
 using App.Application.Extensions;
+using App.Application.Utility;
 using App.Domain.Matchmaking;
 using Microsoft.FSharp.Collections;
 using Microsoft.FSharp.Core;
@@ -36,15 +37,23 @@ public static class MatchmakingDtoMapper
 
         var status = MatchmakingExtensions.CreateDomainStatus(dto.Status);
 
-        var players = dto.Players.Select(player => new Domain.Matchmaking.Player(PlayerId.NewPlayerId(player.Id),
-            PlayerModule.NickModule.create(player.Nick).Value)).ToList();
+        var players = dto.Players.Select(player =>
+        {
+            var nick = PlayerModule.NickModule.create(player.Nick);
+            if (nick.IsNone())
+            {
+                throw new InvalidOperationException("Failed to create nick: " + player.Nick);
+            }
+            return new Domain.Matchmaking.Player(PlayerId.NewPlayerId(player.Id),
+                nick.Value);
+        }).ToList();
         var matchmaking = Domain.Matchmaking.Matchmaking.CreateFromState(MatchmakingId.NewMatchmakingId(dto.Id),
             settings.ResultValue, status, SetModule.OfSeq(players));
         return matchmaking;
     }
 }
 
-public class Redis(IConnectionMultiplexer redis) : IMatchmakings
+public class Redis(IConnectionMultiplexer redis, IMyLogger logger) : IMatchmakings
 {
     private readonly IDatabase _db = redis.GetDatabase();
 
@@ -67,8 +76,28 @@ public class Redis(IConnectionMultiplexer redis) : IMatchmakings
         }
         else
         {
-            await _db.StringSetAsync(ArchiveKey(matchmakingId), serializedMatchmaking);
-            await _db.SetAddAsync(ArchiveSetKey, dto.Id.ToString());
+            var transaction = _db.CreateTransaction();
+            object _;
+            transaction.StringSetAsync(ArchiveKey(matchmakingId), serializedMatchmaking);
+            transaction.SetAddAsync(ArchiveSetKey, dto.Id.ToString());
+            await RemoveLiveMatchmaking(matchmakingId, transaction, ct);
+            var executed = await transaction.ExecuteAsync();
+            if (!executed)
+                logger.Warn("Redis IMatchmakings.Add: Transaction failed");
+        }
+    }
+
+    private async Task RemoveLiveMatchmaking(Guid matchmakingId, ITransaction? transaction, CancellationToken ct)
+    {
+        if (transaction is not null)
+        {
+            transaction.KeyDeleteAsync(LiveKey(matchmakingId));
+            transaction.SetRemoveAsync(LiveSetKey, matchmakingId.ToString());
+        }
+        else
+        {
+            await _db.KeyDeleteAsync(LiveKey(matchmakingId));
+            await _db.SetRemoveAsync(LiveSetKey, matchmakingId.ToString());
         }
     }
 

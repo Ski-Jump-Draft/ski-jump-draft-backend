@@ -16,6 +16,7 @@ public static class GameWorld
     {
         if (isMocked)
         {
+            ConfigureMocked(services, configuration);
         }
         else
         {

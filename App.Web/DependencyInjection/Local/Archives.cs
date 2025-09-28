@@ -1,8 +1,8 @@
-namespace App.Web.DependencyInjection.Shared;
+namespace App.Web.DependencyInjection.Local;
 
 public static class Archives
 {
-    public static IServiceCollection AddArchives(this IServiceCollection services)
+    public static IServiceCollection AddLocalArchives(this IServiceCollection services)
     {
         services
             .AddSingleton<App.Application.Game.DraftPicks.IDraftPicksArchive,
