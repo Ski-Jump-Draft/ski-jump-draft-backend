@@ -4,25 +4,25 @@ namespace App.Infrastructure.Archive.GameCompetitionResults;
 
 public class InMemory : IGameCompetitionResultsArchive
 {
-    private readonly Dictionary<Guid, List<CompetitionResultsDto>> _preDraft = new();
-    private readonly Dictionary<Guid, CompetitionResultsDto> _main = new();
+    private readonly Dictionary<Guid, List<ArchiveCompetitionResultsDto>> _preDraft = new();
+    private readonly Dictionary<Guid, ArchiveCompetitionResultsDto> _main = new();
 
     public Task ArchivePreDraftAsync(
         Guid gameId,
-        CompetitionResultsDto competitionResults,
+        ArchiveCompetitionResultsDto archiveCompetitionResults,
         CancellationToken ct = default)
     {
         if (!_preDraft.TryGetValue(gameId, out var competitionResultsDtos))
         {
-            competitionResultsDtos = new List<CompetitionResultsDto>();
+            competitionResultsDtos = new List<ArchiveCompetitionResultsDto>();
             _preDraft.Add(gameId, competitionResultsDtos);
         }
 
-        competitionResultsDtos.Add(competitionResults);
+        competitionResultsDtos.Add(archiveCompetitionResults);
         return Task.CompletedTask;
     }
 
-    public Task<List<CompetitionResultsDto>?> GetPreDraftResultsAsync(
+    public Task<List<ArchiveCompetitionResultsDto>?> GetPreDraftResultsAsync(
         Guid gameId,
         CancellationToken ct = default)
     {
@@ -31,14 +31,14 @@ public class InMemory : IGameCompetitionResultsArchive
 
     public Task ArchiveMainAsync(
         Guid gameId,
-        CompetitionResultsDto competitionResults,
+        ArchiveCompetitionResultsDto archiveCompetitionResults,
         CancellationToken ct = default)
     {
-        _main[gameId] = competitionResults;
+        _main[gameId] = archiveCompetitionResults;
         return Task.CompletedTask;
     }
 
-    public Task<CompetitionResultsDto?> GetMainResultsAsync(
+    public Task<ArchiveCompetitionResultsDto?> GetMainResultsAsync(
         Guid gameId,
         CancellationToken ct = default)
     {

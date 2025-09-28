@@ -65,7 +65,7 @@ public class BestPicker(
         return gameWorldJumpers;
     }
 
-    private async Task<ImmutableList<CompetitionResultsDto>> RetrievePreDraftCompetitionResultsOrThrow(
+    private async Task<ImmutableList<ArchiveCompetitionResultsDto>> RetrievePreDraftCompetitionResultsOrThrow(
         Domain.Game.Game game, CancellationToken ct)
     {
         var preDraftCompetitionResults =
@@ -78,7 +78,7 @@ public class BestPicker(
         return preDraftCompetitionResults;
     }
 
-    private static int CalculateMaxPositionFromResults(ImmutableList<CompetitionResultsDto> preDraftCompetitionResults)
+    private static int CalculateMaxPositionFromResults(ImmutableList<ArchiveCompetitionResultsDto> preDraftCompetitionResults)
     {
         var maxPosition = preDraftCompetitionResults.First().JumperResults.Where(record => record.Points != 0).ToList().Count;
         return maxPosition;
@@ -105,7 +105,7 @@ public class BestPicker(
         return gameJumperRating;
     }
 
-    private Dictionary<Guid, double> CreateAveragePositions(IEnumerable<CompetitionResultsDto> competitionResults)
+    private Dictionary<Guid, double> CreateAveragePositions(IEnumerable<ArchiveCompetitionResultsDto> competitionResults)
     {
         var averagePosition = new Dictionary<Guid, double>();
         foreach (var results in competitionResults)

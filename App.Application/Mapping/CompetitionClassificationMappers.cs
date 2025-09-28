@@ -7,13 +7,13 @@ namespace App.Application.Mapping;
 
 public static class CompetitionClassificationMappers
 {
-    public static CompetitionResultsDto ToGameCompetitionResultsArchiveDto(
+    public static ArchiveCompetitionResultsDto ToGameCompetitionResultsArchiveDto(
         this IEnumerable<Classification.JumperClassificationResult> jumperClassificationResults,
         // Func<Guid, Guid> gameJumperByCompetitionJumper, Func<Guid, Guid> gameWorldJumperByGameJumper,
         IGameJumperAcl gameJumperAcl, ICompetitionJumperAcl competitionJumperAcl,
         Func<Guid, int> getBibByCompetitionJumperId)
     {
-        return new CompetitionResultsDto(jumperClassificationResults.Select(jumperClassificationResult =>
+        return new ArchiveCompetitionResultsDto(jumperClassificationResults.Select(jumperClassificationResult =>
         {
             var jumpRecords = jumperClassificationResult.JumpResults.Select(jumpResult =>
             {

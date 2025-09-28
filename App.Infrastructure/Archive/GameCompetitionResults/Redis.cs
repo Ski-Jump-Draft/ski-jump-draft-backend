@@ -1,4 +1,5 @@
 using System.Text.Json;
+using App.Application.Acl;
 using App.Application.Game.GameCompetitions;
 using App.Application.Messaging.Notifiers;
 using RedisRepository = App.Infrastructure.Repository.Game;
@@ -6,7 +7,10 @@ using StackExchange.Redis;
 
 namespace App.Infrastructure.Archive.GameCompetitionResults;
 
-public class Redis(IConnectionMultiplexer redis) : IGameCompetitionResultsArchive
+public class Redis(
+    IConnectionMultiplexer redis,
+    ICompetitionJumperAcl competitionJumperAcl,
+    IGameJumperAcl gameJumperAcl) : IGameCompetitionResultsArchive
 {
     private readonly IDatabase _db = redis.GetDatabase();
 
@@ -15,29 +19,15 @@ public class Redis(IConnectionMultiplexer redis) : IGameCompetitionResultsArchiv
     private static string ArchivePattern => $"game:archive";
     private static string ArchiveKey(Guid id) => $"{ArchivePattern}:{id}";
 
-    public async Task ArchivePreDraftAsync(Guid gameId, CompetitionResultsDto competitionResults, CancellationToken ct)
+    public async Task ArchivePreDraftAsync(Guid gameId, ArchiveCompetitionResultsDto archiveCompetitionResults,
+        CancellationToken ct)
     {
         var gameDto = await GetGameDto(gameId, searchInArchive: false);
 
         if (gameDto.PreDraft is null)
             throw new Exception($"PreDraftDto is null (status={gameDto.Status}, next={gameDto.NextStatus})");
 
-        var endedCompetitionResults = new RedisRepository.EndedCompetitionDto(
-            competitionResults.JumperResults.Select(archiveJumperResult =>
-            {
-                var jumperResults = archiveJumperResult.Jumps.Select((jumpResult, roundIndex) =>
-                {
-                    var roundResult = new RedisRepository.CompetitionRoundResultDto(jumpResult.Id,
-                        jumpResult.CompetitionJumperId, roundIndex, jumpResult.Distance, jumpResult.Points,
-                        jumpResult.Judges,
-                        jumpResult.JudgePoints, jumpResult.WindCompensation, jumpResult.WindAverage,
-                        jumpResult.GateCompensation, jumpResult.TotalCompensation);
-                    return roundResult;
-                }).ToList();
-
-                return new RedisRepository.CompetitionResultDto(archiveJumperResult.CompetitionJumperId,
-                    archiveJumperResult.Points, archiveJumperResult.Rank, jumperResults);
-            }).ToList());
+        var endedCompetitionResults = RedisEndedCompetitionFromArchived(archiveCompetitionResults);
 
         var preDraftEndedCompetitions = gameDto.PreDraft.EndedCompetitions is not null
             ? gameDto.PreDraft.EndedCompetitions.ToList()
@@ -50,19 +40,35 @@ public class Redis(IConnectionMultiplexer redis) : IGameCompetitionResultsArchiv
         await _db.StringSetAsync(LiveKey(gameId), JsonSerializer.Serialize(newGame));
     }
 
-    public async Task<List<CompetitionResultsDto>?> GetPreDraftResultsAsync(Guid gameId, CancellationToken ct)
+    public async Task<List<ArchiveCompetitionResultsDto>?> GetPreDraftResultsAsync(Guid gameId, CancellationToken ct)
     {
-        throw new NotImplementedException();
+        // TODO: Czy gameDto.PreDraft nie jest nullem po domenowej fazie Draftu?
+        var gameDto = await GetGameDto(gameId, searchInArchive: true);
+        if (gameDto.PreDraft is null) return null;
+        var endedCompetitions = gameDto.PreDraft.EndedCompetitions ?? [];
+        var archiveCompetitions = endedCompetitions.Select(ArchivedCompetitionResultsFromRedis);
+
+        return archiveCompetitions.ToList();
     }
 
-    public async Task ArchiveMainAsync(Guid gameId, CompetitionResultsDto competitionResults, CancellationToken ct)
+    public async Task ArchiveMainAsync(Guid gameId, ArchiveCompetitionResultsDto archiveCompetitionResults,
+        CancellationToken ct)
     {
-        throw new NotImplementedException();
+        var gameDto = await GetGameDto(gameId, searchInArchive: false);
+        if (gameDto.MainCompetition is null)
+            throw new Exception($"MainCompetitionDto is null (status={gameDto.Status}, next={gameDto.NextStatus})");
+        var redisEndedCompetitionResults = RedisEndedCompetitionFromArchived(archiveCompetitionResults);
+        var newGame = gameDto with { EndedMainCompetition = redisEndedCompetitionResults };
+        await _db.StringSetAsync(LiveKey(gameId), JsonSerializer.Serialize(newGame));
     }
 
-    public async Task<CompetitionResultsDto?> GetMainResultsAsync(Guid gameId, CancellationToken ct)
+    public async Task<ArchiveCompetitionResultsDto?> GetMainResultsAsync(Guid gameId, CancellationToken ct)
     {
-        throw new NotImplementedException();
+        var gameDto = await GetGameDto(gameId, searchInArchive: true);
+        if (gameDto.MainCompetition is null) return null;
+        return gameDto.EndedMainCompetition != null
+            ? ArchivedCompetitionResultsFromRedis(gameDto.EndedMainCompetition)
+            : null;
     }
 
     private async Task<RedisRepository.GameDto> GetGameDto(Guid gameId, bool searchInArchive)
@@ -82,6 +88,61 @@ public class Redis(IConnectionMultiplexer redis) : IGameCompetitionResultsArchiv
         static RedisRepository.GameDto Deserialize(RedisValue json) =>
             JsonSerializer.Deserialize<RedisRepository.GameDto>(json!)
             ?? throw new Exception("Failed to deserialize game JSON");
+    }
+
+    private RedisRepository.EndedCompetitionDto RedisEndedCompetitionFromArchived(
+        ArchiveCompetitionResultsDto archiveCompetitionResults)
+    {
+        var endedCompetitionResults = new RedisRepository.EndedCompetitionDto(
+            archiveCompetitionResults.JumperResults.Select(archiveJumperResult =>
+            {
+                var jumperResults = archiveJumperResult.Jumps.Select((jumpResult, roundIndex) =>
+                {
+                    var roundResult = new RedisRepository.CompetitionRoundResultDto(jumpResult.Id,
+                        jumpResult.CompetitionJumperId, roundIndex, jumpResult.Distance, jumpResult.Points,
+                        jumpResult.Judges,
+                        jumpResult.JudgePoints, jumpResult.WindCompensation, jumpResult.WindAverage,
+                        jumpResult.GateCompensation, jumpResult.TotalCompensation);
+                    return roundResult;
+                }).ToList();
+
+                return new RedisRepository.CompetitionResultDto(archiveJumperResult.CompetitionJumperId,
+                    archiveJumperResult.Bib,
+                    archiveJumperResult.Points, archiveJumperResult.Rank, jumperResults);
+            }).ToList());
+        return endedCompetitionResults;
+    }
+
+    private ArchiveCompetitionResultsDto ArchivedCompetitionResultsFromRedis(
+        RedisRepository.EndedCompetitionDto endedCompetition)
+    {
+        var jumperResults = endedCompetition.Results.Select(endedCompetitionJumperResult =>
+        {
+            var (gameJumperId, gameWorldJumperId) =
+                GetGameJumperAndGameWorldJumper(endedCompetitionJumperResult.CompetitionJumperId);
+            var jumpResults = endedCompetitionJumperResult.RoundResults.Select(endedCompetitionRoundResult =>
+                    new ArchiveJumpResult(endedCompetitionRoundResult.JumpResultId,
+                        endedCompetitionRoundResult.CompetitionJumperId, endedCompetitionRoundResult.Distance,
+                        endedCompetitionRoundResult.Points, endedCompetitionRoundResult.Judges,
+                        endedCompetitionRoundResult.JudgePoints,
+                        endedCompetitionRoundResult.WindCompensation, endedCompetitionRoundResult.WindAverage,
+                        endedCompetitionRoundResult.GateCompensation,
+                        endedCompetitionRoundResult.TotalCompensation))
+                .ToList();
+            var bib = endedCompetitionJumperResult.Bib;
+            var jumperResult = new ArchiveJumperResult(gameWorldJumperId, gameJumperId,
+                endedCompetitionJumperResult.CompetitionJumperId, endedCompetitionJumperResult.Rank, bib,
+                endedCompetitionJumperResult.Total, jumpResults);
+            return jumperResult;
+        }).ToList();
+        return new ArchiveCompetitionResultsDto(jumperResults);
+    }
+
+    private (Guid, Guid) GetGameJumperAndGameWorldJumper(Guid competitionJumperId)
+    {
+        var gameJumperId = competitionJumperAcl.GetGameJumper(competitionJumperId).Id;
+        var gameWorldJumperId = gameJumperAcl.GetGameWorldJumper(gameJumperId).Id;
+        return (gameJumperId, gameWorldJumperId);
     }
 }
 

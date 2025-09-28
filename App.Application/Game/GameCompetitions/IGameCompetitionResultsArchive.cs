@@ -1,6 +1,6 @@
 namespace App.Application.Game.GameCompetitions;
 
-public record CompetitionResultsDto(List<ArchiveJumperResult> JumperResults);
+public record ArchiveCompetitionResultsDto(List<ArchiveJumperResult> JumperResults);
 
 public record ArchiveJumperResult(
     Guid GameWorldJumperId,
@@ -26,8 +26,8 @@ public record ArchiveJumpResult(
 
 public interface IGameCompetitionResultsArchive
 {
-    Task ArchivePreDraftAsync(Guid gameId, CompetitionResultsDto competitionResults, CancellationToken ct);
-    Task<List<CompetitionResultsDto>?> GetPreDraftResultsAsync(Guid gameId, CancellationToken ct);
-    Task ArchiveMainAsync(Guid gameId, CompetitionResultsDto competitionResults, CancellationToken ct);
-    Task<CompetitionResultsDto?> GetMainResultsAsync(Guid gameId, CancellationToken ct);
+    Task ArchivePreDraftAsync(Guid gameId, ArchiveCompetitionResultsDto archiveCompetitionResults, CancellationToken ct);
+    Task<List<ArchiveCompetitionResultsDto>?> GetPreDraftResultsAsync(Guid gameId, CancellationToken ct);
+    Task ArchiveMainAsync(Guid gameId, ArchiveCompetitionResultsDto archiveCompetitionResults, CancellationToken ct);
+    Task<ArchiveCompetitionResultsDto?> GetMainResultsAsync(Guid gameId, CancellationToken ct);
 }

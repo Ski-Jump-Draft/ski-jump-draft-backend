@@ -183,11 +183,12 @@ public class Redis(
         return draftPicksList;
     }
 
-    private EndedCompetitionDto CreateEndedCompetitionFromArchive(CompetitionResultsDto competitionResultsDto)
+    private EndedCompetitionDto CreateEndedCompetitionFromArchive(
+        ArchiveCompetitionResultsDto archiveCompetitionResultsDto)
     {
-        var jumperResults = competitionResultsDto.JumperResults.Select(result =>
+        var jumperResults = archiveCompetitionResultsDto.JumperResults.Select(result =>
         {
-            return new CompetitionResultDto(result.CompetitionJumperId, result.Points, result.Rank,
+            return new CompetitionResultDto(result.CompetitionJumperId, result.Bib, result.Points, result.Rank,
                 result.Jumps.Select((archiveJumpResult, index) => new CompetitionRoundResultDto(archiveJumpResult.Id,
                     archiveJumpResult.CompetitionJumperId, index,
                     archiveJumpResult.Distance, archiveJumpResult.Points, archiveJumpResult.Judges,
@@ -443,6 +444,9 @@ public static class GameDtoMapper
                 domainStartlistEntry.JumperId.Item);
         }).ToList();
 
+        var bibsByJumperId = startlistEntries
+            .ToDictionary(entry => entry.JumperId, entry => entry.Bib);
+
         var results = competition.Classification;
         var jumperResultDtos = results.Select(jumperClassificationResult =>
         {
@@ -467,8 +471,13 @@ public static class GameDtoMapper
                     JumpResultModule.TotalCompensationModule.value(jumpResult.TotalCompensation));
             }).ToList();
 
+            if (!bibsByJumperId.TryGetValue(jumperClassificationResult.JumperId, out var bib))
+            {
+                throw new Exception("Bib not found for jumper");
+            }
+
             var result = new CompetitionResultDto(jumperClassificationResult.JumperId.Item,
-                TotalPointsModule.value(jumperClassificationResult.Points),
+                StartlistModule.BibModule.value(bib), TotalPointsModule.value(jumperClassificationResult.Points),
                 Classification.PositionModule.value(jumperClassificationResult.Position), rounds);
 
             return result;
@@ -680,6 +689,7 @@ public static class GameDtoMapper
         {
             throw new Exception(settings.ErrorValue.ToString());
         }
+
         return settings.ResultValue;
     }
 
@@ -951,9 +961,9 @@ public sealed record StartlistJumperDto(
 
 public sealed record CompetitionResultDto(
     Guid CompetitionJumperId,
-    // int Bib,
+    int Bib,
     double Total,
-    double Rank,
+    int Rank,
     IReadOnlyList<CompetitionRoundResultDto> RoundResults
 );
 

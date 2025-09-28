@@ -47,12 +47,12 @@ public class Classic(IGames games, IGameCompetitionResultsArchive gameCompetitio
         }
     }
 
-    private static List<ArchiveJumperResult> ExtractLastPreDraftCompetitionResults(List<CompetitionResultsDto> preDraftResults)
+    private static List<ArchiveJumperResult> ExtractLastPreDraftCompetitionResults(List<ArchiveCompetitionResultsDto> preDraftResults)
     {
         return ExtractPreDraftCompetitionResults(preDraftResults, preDraftResults.Count - 1);
     }
 
-    private static List<ArchiveJumperResult> ExtractPreDraftCompetitionResults(List<CompetitionResultsDto> preDraftResults,
+    private static List<ArchiveJumperResult> ExtractPreDraftCompetitionResults(List<ArchiveCompetitionResultsDto> preDraftResults,
         int competitionIndex)
     {
         var preDraftCompetitionResults = preDraftResults[competitionIndex];
