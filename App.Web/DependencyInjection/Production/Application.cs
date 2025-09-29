@@ -86,8 +86,7 @@ public static class Application
         services
             .AddSingleton<App.Application.Game.Gate.ISelectGameStartingGateService,
                 App.Application.Game.Gate.SelectCompetitionStartingGateService>();
-
-
+        
         services
             .AddSingleton<App.Application.JumpersForm.IJumperGameFormAlgorithm,
                 App.Application.Policy.GameFormAlgorithm.FullyRandom>();

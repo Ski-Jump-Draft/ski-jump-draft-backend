@@ -44,6 +44,7 @@ public static class MatchmakingDtoMapper
             {
                 throw new InvalidOperationException("Failed to create nick: " + player.Nick);
             }
+
             return new Domain.Matchmaking.Player(PlayerId.NewPlayerId(player.Id),
                 nick.Value);
         }).ToList();
@@ -137,7 +138,12 @@ public class Redis(IConnectionMultiplexer redis, IMyLogger logger) : IMatchmakin
         foreach (var id in ids)
         {
             var json = await _db.StringGetAsync($"matchmaking:live:{id}");
-            if (!json.HasValue) continue;
+            if (!json.HasValue)
+            {
+                await _db.SetRemoveAsync(LiveSetKey, id.ToString());
+                continue;
+            }
+
             var dto = JsonSerializer.Deserialize<MatchmakingDto>(json!);
             if (dto != null)
                 matchmakings.Add(dto.ToDomain());
@@ -153,7 +159,12 @@ public class Redis(IConnectionMultiplexer redis, IMyLogger logger) : IMatchmakin
         foreach (var id in ids)
         {
             var json = await _db.StringGetAsync($"matchmaking:archive:{id}");
-            if (!json.HasValue) continue;
+            if (!json.HasValue)
+            {
+                await _db.SetRemoveAsync(LiveSetKey, id.ToString());
+                continue;
+            }
+
             var dto = JsonSerializer.Deserialize<MatchmakingDto>(json!);
             if (dto != null)
                 matchmakings.Add(dto.ToDomain());

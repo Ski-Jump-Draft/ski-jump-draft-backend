@@ -28,6 +28,8 @@ type Startlist =
         { Remaining: Startlist.Entry list
           Done: Startlist.Entry list
           BibOfMap: Map<JumperId, Startlist.Bib> }
+        
+    member this.AllBibsMap: Map<JumperId, Startlist.Bib> = this.BibOfMap
 
     override this.ToString() =
         let showEntry (e: Startlist.Entry) =
@@ -128,8 +130,11 @@ type Startlist =
 
     member this.DoneEntries: Startlist.Entry list = this.Done
 
-    member this.FullEntries: Startlist.Entry list =
+    member this.FullEntriesFromLatest: Startlist.Entry list =
         (this.Done |> List.rev) @ this.Remaining
+    
+    member this.FullEntries: Startlist.Entry list =
+        (this.Done) @ this.Remaining
 
     member this.BibOf(jumperId: JumperId) : Startlist.Bib option = this.BibOfMap |> Map.tryFind jumperId
 

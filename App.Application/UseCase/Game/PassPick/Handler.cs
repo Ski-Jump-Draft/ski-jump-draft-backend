@@ -28,12 +28,12 @@ public class Handler(
     IMyLogger logger,
     IDraftPassPicker passPicker,
     ICommandBus commandBus,
-    IBotPassPickLock botPassPickLock)
+    IBotPickLock botPickLock)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
     {
-        var passPickIsLocked = botPassPickLock.IsLocked(command.GameId, command.PlayerId);
+        var passPickIsLocked = botPickLock.IsLocked(command.GameId, command.PlayerId);
         if (passPickIsLocked)
         {
             logger.Warn($"Tried to pass-pick, but pass-pick is locked (Game: ${command.GameId}, Player: ${

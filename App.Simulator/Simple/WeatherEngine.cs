@@ -13,6 +13,7 @@ public static class ConfigurationPresetFactory
     public static Configuration VeryStrongHeadwind => new(2.4, 0.04, 0.2);
     public static Configuration TypicalEngelberg => new(-2.1, 0.016, 0.2);
     public static Configuration LotteryHeadwind => new(1.7, 0.2, 0.5);
+    public static Configuration LotteryTailwind => new(-1.2, 0.1, 0.4);
     public static Configuration TotalLottery => new(0.5, 0.3, 1.8);
     public static Configuration StableNeutral => new(-0.03, 0.005, 0.02);
 }

@@ -14,7 +14,7 @@ public class GaussianDistribution(IRandom random) : IDraftBotPickTime
         }
 
         var mean = timeoutInSeconds.Value / 2.0;
-        var stdDev = timeoutInSeconds.Value / 5.0;
+        var stdDev = timeoutInSeconds.Value / 6.5;
         var randomSeconds = Math.Clamp(random.Gaussian(mean, stdDev), 0, timeoutInSeconds.Value);
         return TimeSpan.FromSeconds(randomSeconds);
     }

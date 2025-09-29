@@ -6,7 +6,7 @@ using App.Domain.Matchmaking;
 
 namespace App.Web.HostedServices.RealFlow;
 
-public class OnlineBotJoiner(IMatchmakings repo, ICommandBus bus, IRandom random, IMyLogger log)
+public class OnlineBotJoiner(IMatchmakings matchmakings, ICommandBus bus, IRandom random, IMyLogger log)
     : BackgroundService
 {
     private readonly ConcurrentDictionary<Guid, ConcurrentBag<string>> _usedBotNicksByMatchmaking = new();
@@ -18,7 +18,7 @@ public class OnlineBotJoiner(IMatchmakings repo, ICommandBus bus, IRandom random
             var delayMilliseconds = random.Gaussian(4000, 500);
             await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), ct);
 
-            var all = await repo.GetInProgress(ct);
+            var all = await matchmakings.GetInProgress(ct);
             var matchmaking = all.FirstOrDefault();
 
             if (matchmaking is null)
@@ -96,8 +96,7 @@ public class OnlineBotJoiner(IMatchmakings repo, ICommandBus bus, IRandom random
             return "Bot";
 
         var chosen = allowedNames.GetRandomElement(random);
-        usedNames.Add($"Bot {chosen}");
-        return $"Bot {chosen}";
-
+        usedNames.Add(chosen);
+        return chosen;
     }
 }

@@ -69,7 +69,6 @@ public class Redis(
                 throw new Exception("Failed to deserialize live game");
             }
 
-            await Task.Delay(TimeSpan.FromSeconds(2), ct);
             logger.Info("Found live game");
 
             try
@@ -108,7 +107,12 @@ public class Redis(
         {
             if (!gameId.HasValue) continue;
             var json = await _db.StringGetAsync(LiveKey(gameId.ToString()));
-            if (!json.HasValue) continue;
+            if (!json.HasValue)
+            {
+                await _db.SetRemoveAsync(LiveSetKey, gameId.ToString());
+                continue;
+            }
+
             var dto = JsonSerializer.Deserialize<GameDto>(json!);
             var gameGuid = Guid.Parse(gameId.ToString());
             if (dto is null) continue;
@@ -128,7 +132,12 @@ public class Redis(
         {
             if (!gameId.HasValue) continue;
             var json = await _db.StringGetAsync(LiveKey(gameId.ToString()));
-            if (!json.HasValue) continue;
+            if (!json.HasValue)
+            {
+                await _db.SetRemoveAsync(LiveSetKey, gameId.ToString());
+                continue;
+            }
+
             var dto = JsonSerializer.Deserialize<GameDto>(json!);
             var gameGuid = Guid.Parse(gameId.ToString());
             if (dto != null && dto.Status != "Ended")
@@ -140,6 +149,17 @@ public class Redis(
 
     public async Task<int> GetInProgressCount(CancellationToken ct)
     {
+        var gameIds = await _db.SetMembersAsync(LiveSetKey);
+        foreach (var gameId in gameIds)
+        {
+            if (!gameId.HasValue) continue;
+            var exists = await _db.KeyExistsAsync(LiveKey(gameId.ToString()));
+            if (!exists)
+            {
+                await _db.SetRemoveAsync(LiveSetKey, gameId.ToString());
+            }
+        }
+
         return (int)await _db.SetLengthAsync(LiveSetKey);
     }
 
@@ -465,8 +485,8 @@ public static class GameDtoMapper
                 domainStartlistEntry.JumperId.Item);
         }).ToList();
 
-        var bibsByJumperId = startlistEntries
-            .ToDictionary(entry => entry.JumperId, entry => entry.Bib);
+        var bibsByJumperId = competition.Bibs.ToDictionary();
+
 
         var results = competition.Classification;
         var jumperResultDtos = results.Select(jumperClassificationResult =>
@@ -504,11 +524,22 @@ public static class GameDtoMapper
             return result;
         }).ToList();
 
-        var jumpers = competition.Jumpers_.Select(jumper => new CompetitionJumperDto(jumper.Id.Item)).ToList();
-        var competitionDto =
-            new CompetitionDto(competition.Id_.Item, statusString, input.NextCompetitionJumpInMs, roundIndex, jumpers,
-                startlist, jumperResultDtos,
-                gateState);
+        var jumpers = bibsByJumperId.Keys
+            .Select(jumperId => new CompetitionJumperDto(jumperId.Item))
+            .ToList();
+
+
+        var competitionDto = new CompetitionDto(
+            competition.Id_.Item,
+            statusString,
+            input.NextCompetitionJumpInMs,
+            roundIndex,
+            jumpers,
+            startlist,
+            jumperResultDtos,
+            gateState
+        );
+
         return competitionDto;
     }
 
@@ -720,21 +751,46 @@ public static class GameDtoMapper
     {
         var gameId = gameDto.Id;
         var competitionId = competitionDto.Id;
-        var competitionJumpers = competitionDto.Jumpers.Select(jumperDto =>
-            new Domain.Competition.Jumper(Domain.Competition.JumperId.NewJumperId(jumperDto.Id)));
-
+// Startlist (wszyscy, którzy są w aktualnej kolejce/już skakali)
         var startlist = competitionDto.Startlist;
-        var bibs = startlist.Select(startlistJumperDto =>
-        {
-            return new Tuple<Domain.Competition.JumperId, StartlistModule.Bib>(
-                Domain.Competition.JumperId.NewJumperId(startlistJumperDto.CompetitionJumperId),
-                StartlistModule.BibModule.create(startlistJumperDto.Bib).Value);
-        }).ToList();
-        var doneJumpers = startlist.Where(jumper => jumper.Done)
-            .Select(jumper => Domain.Competition.JumperId.NewJumperId(jumper.CompetitionJumperId)).ToList();
-        var remainingJumpers = startlist
-            .Select(jumper => Domain.Competition.JumperId.NewJumperId(jumper.CompetitionJumperId)).Except(doneJumpers)
+
+// Bibs z Startlist
+        var startlistBibs = startlist
+            .Select(s => Tuple.Create(
+                Domain.Competition.JumperId.NewJumperId(s.CompetitionJumperId),
+                StartlistModule.BibModule.create(s.Bib).Value))
+            .ToDictionary(t => t.Item1, t => t.Item2);
+
+// Bibs z Results (mogą być tylko część, ale lepiej mieć nadpisane z tego źródła)
+        var resultsBibs = (competitionDto.Results ?? new List<CompetitionResultDto>())
+            .Select(r => Tuple.Create(
+                Domain.Competition.JumperId.NewJumperId(r.CompetitionJumperId),
+                StartlistModule.BibModule.create(r.Bib).Value))
+            .ToDictionary(t => t.Item1, t => t.Item2);
+
+// Union obu słowników
+        var allBibs = startlistBibs
+            .Concat(resultsBibs)
+            .GroupBy(kv => kv.Key)
+            .ToDictionary(g => g.Key, g => g.First().Value);
+
+// Zamiana na listę dla CompetitionResume
+        var bibs = allBibs
+            .Select(kv => Tuple.Create(kv.Key, kv.Value))
             .ToList();
+
+
+        var doneJumpers = startlist
+            .Where(startlistJumperDto => startlistJumperDto.Done)
+            .Select(j => Domain.Competition.JumperId.NewJumperId(j.CompetitionJumperId))
+            .ToList();
+
+        var remainingJumpers = startlist
+            .Select(startlistJumperDto =>
+                Domain.Competition.JumperId.NewJumperId(startlistJumperDto.CompetitionJumperId))
+            .Except(doneJumpers)
+            .ToList();
+
         var results = competitionDto.Results;
         var roundResultDtos = results.SelectMany(result => result.RoundResults).ToList();
         var jumpResults = roundResultDtos.Select(roundResult =>
@@ -780,9 +836,38 @@ public static class GameDtoMapper
             ? RoundIndex.NewRoundIndex((uint)competitionDto.RoundIndex.Value)
             : null;
 
-        var competitionResume = new CompetitionResume(CompetitionId.NewCompetitionId(competitionId), settings, hill,
-            ListModule.OfSeq(competitionJumpers), ListModule.OfSeq(bibs), ListModule.OfSeq(doneJumpers),
-            ListModule.OfSeq(remainingJumpers), ListModule.OfSeq(jumpResults), statusTag, gateState, roundIndex);
+        var jumperIdsFromBibs = new HashSet<Guid>(bibs.Select(t => t.Item1.Item));
+        var jumpersList = competitionDto.Jumpers.ToList();
+
+        if (jumpersList.Count != jumperIdsFromBibs.Count)
+        {
+            var known = new HashSet<Guid>(jumpersList.Select(j => j.Id));
+            foreach (var id in jumperIdsFromBibs)
+            {
+                if (!known.Contains(id))
+                    jumpersList.Add(new CompetitionJumperDto(id));
+            }
+        }
+
+        var competitionResume = new CompetitionResume(
+            CompetitionId.NewCompetitionId(competitionId),
+            settings,
+            hill,
+            ListModule.OfSeq(jumpersList.Select(competitionJumperDto =>
+                new Domain.Competition.Jumper(Domain.Competition.JumperId.NewJumperId(competitionJumperDto.Id)))),
+            ListModule.OfSeq(bibs),
+            ListModule.OfSeq(doneJumpers),
+            ListModule.OfSeq(remainingJumpers),
+            ListModule.OfSeq(jumpResults),
+            statusTag,
+            gateState,
+            roundIndex
+        );
+
+
+        // var competitionResume = new CompetitionResume(CompetitionId.NewCompetitionId(competitionId), settings, hill,
+        //     ListModule.OfSeq(competitionJumpers), ListModule.OfSeq(bibs), ListModule.OfSeq(doneJumpers),
+        //     ListModule.OfSeq(remainingJumpers), ListModule.OfSeq(jumpResults), statusTag, gateState, roundIndex);
         var competition = Domain.Competition.Competition.Restore(competitionResume);
         if (competition.IsError)
         {

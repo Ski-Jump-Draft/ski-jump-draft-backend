@@ -138,8 +138,9 @@ public class Handler(
         var endedMatchmakingPlayers = matchmaking.Players_;
         var gamePlayersList = CreateGamePlayersFromMatchmakingPlayers(matchmakingId, gameGuid, endedMatchmakingPlayers,
             gamePlayerByMatchmakingPlayer);
-        var sortedGamePlayers = OrderGamePlayersByNick(gamePlayersList);
-        var gamePlayers = Domain.Game.PlayersModule.create(ListModule.OfSeq(sortedGamePlayers)).ResultValue;
+        var shuffledGamePlayers = ShuffleGamePlayers(gamePlayersList);
+        // var sortedGamePlayers = OrderGamePlayersByNick(gamePlayersList);
+        var gamePlayers = Domain.Game.PlayersModule.create(ListModule.OfSeq(shuffledGamePlayers)).ResultValue;
         return gamePlayers;
     }
 
@@ -147,6 +148,11 @@ public class Handler(
         List<Domain.Game.Player> gamePlayersList)
     {
         return gamePlayersList.OrderBy(player => PlayerModule.NickModule.value(player.Nick));
+    }
+
+    private IEnumerable<Domain.Game.Player> ShuffleGamePlayers(List<Domain.Game.Player> gamePlayersList)
+    {
+        return gamePlayersList.Shuffle(random);
     }
 
     private void SetupCompetitionHillAcl(HillId competitionHillId, Domain.GameWorld.Hill gameWorldHill)

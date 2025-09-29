@@ -55,7 +55,7 @@ public static class Game
                 .ResultValue;
             var preDraftSettings = App.Domain.Game.PreDraftSettings.Create(ListModule.OfSeq(
                     new List<App.Domain.Competition.Settings>
-                        { preDraftCompetitionSettings, preDraftCompetitionSettings }))
+                        { preDraftCompetitionSettings/*, preDraftCompetitionSettings*/ }))
                 .Value;
             var mainCompetitionSettings = App.Domain.Competition.Settings.Create(ListModule.OfSeq([
                 new App.Domain.Competition.RoundSettings(
@@ -73,14 +73,14 @@ public static class Game
                 App.Domain.Game.DraftModule.SettingsModule.UniqueJumpersPolicy.Unique,
                 App.Domain.Game.DraftModule.SettingsModule.Order.Snake,
                 App.Domain.Game.DraftModule.SettingsModule.TimeoutPolicy.NewTimeoutAfter(
-                    TimeSpan.FromSeconds(15)));
+                    TimeSpan.FromSeconds(3)));
             var breakSettings =
                 new App.Domain.Game.BreakSettings(App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(15)),
-                    App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(30)),
-                    App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(25)),
-                    App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(25)),
+                    App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(15)),
+                    App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(20)),
+                    App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(20)),
                     App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(20)));
-            var jumpInterval = App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(15));
+            var jumpInterval = App.Domain.Game.PhaseDuration.Create(TimeSpan.FromMilliseconds(1000));
             return new App.Domain.Game.Settings(breakSettings, preDraftSettings, draftSettings, mainCompetitionSettings,
                 jumpInterval,
                 App.Domain.Game.RankingPolicy.Classic);

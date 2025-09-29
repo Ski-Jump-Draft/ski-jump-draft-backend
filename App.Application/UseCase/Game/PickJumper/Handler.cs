@@ -1,3 +1,4 @@
+using App.Application.Bot;
 using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
@@ -25,10 +26,13 @@ public class Handler(
     IGameNotifier gameNotifier,
     IMyLogger logger,
     IClock clock,
+    IBotRegistry botRegistry,
+    IBotPickLock botPickLock,
     IScheduler scheduler,
     IDraftPicksArchive draftPicksArchive,
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
-    IGameSchedule gameSchedule, DraftSystemSchedulerService draftSystemSchedulerService)
+    IGameSchedule gameSchedule,
+    DraftSystemSchedulerService draftSystemSchedulerService)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -36,8 +40,11 @@ public class Handler(
         var game = await games.GetById(GameId.NewGameId(command.GameId), ct)
             .AwaitOrWrap(_ => new IdNotFoundException(command.GameId));
 
-        logger.Info($"Picking a Jumper ({command.JumperId}) by a Player ({command.PlayerId}) in a Game ({command.GameId
-        })");
+        var playerIsBot = botRegistry.IsGameBot(command.GameId, command.PlayerId);
+        var passPickIsLocked = botPickLock.IsLocked(command.GameId, command.PlayerId);
+        logger.Info($"Picking a Jumper ({command.JumperId}) by a Player ({command.PlayerId}) (IsBot={playerIsBot
+        }), in a Game ({command.GameId
+        }). LOCK: {passPickIsLocked}");
 
         var gameAfterPickResult =
             game.PickInDraft(PlayerId.NewPlayerId(command.PlayerId), JumperId.NewJumperId(command.JumperId));
@@ -69,7 +76,8 @@ public class Handler(
                     ct: ct);
             }
 
-            await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterPick, lastDraftState: pickOutcome.Draft, ct: ct));
+            await gameNotifier.GameUpdated(
+                await gameUpdatedDtoMapper.FromDomain(gameAfterPick, lastDraftState: pickOutcome.Draft, ct: ct));
 
             return new Result();
         }
@@ -94,4 +102,5 @@ Draft: {error}");
 }
 
 public class JumperTakenException(Guid jumperId, string? message = null) : Exception(message);
+
 public class NotYourTurnException(string? message = null) : Exception(message);

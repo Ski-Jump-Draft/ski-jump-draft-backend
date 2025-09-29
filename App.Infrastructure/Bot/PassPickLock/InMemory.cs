@@ -2,7 +2,7 @@ using App.Application.Bot;
 
 namespace App.Infrastructure.Bot.PassPickLock;
 
-public class InMemory : IBotPassPickLock
+public class InMemory : IBotPickLock
 {
     private readonly HashSet<(Guid GameId, Guid PlayerId)> _locks = new();
     private readonly object _sync = new();

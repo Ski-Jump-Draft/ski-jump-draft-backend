@@ -16,7 +16,7 @@ public static class Simulation
         services.AddSingleton<App.Domain.Simulation.IWeatherEngine, App.Simulator.Simple.WeatherEngine>(sp =>
             new WeatherEngine(sp.GetRequiredService<IRandom>(), sp.GetRequiredService<IMyLogger>()
                 // new Configuration(0.5, 0.1, 0.13)
-                , ConfigurationPresetFactory.LotteryHeadwind));
+                , ConfigurationPresetFactory.VeryStrongHeadwind));
         services.AddSingleton<App.Domain.Simulation.IJumpSimulator, App.Simulator.Simple.JumpSimulator>();
         services.AddSingleton<App.Domain.Simulation.IJudgesSimulator, App.Simulator.Simple.JudgesSimulator>();
         return services;

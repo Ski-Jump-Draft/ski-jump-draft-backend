@@ -153,37 +153,44 @@ type Competition =
         result {
             // 0) Proste sprawdzenia wejścia
             do!
-                if List.isEmpty snap.Jumpers then
+                if List.isEmpty snap.Jumpers && List.isEmpty snap.Bibs then
                     Error Competition.Error.JumpersEmpty
                 else
                     Ok()
 
-            let jumperSet = snap.Jumpers |> List.map (fun j -> j.Id) |> Set.ofList
+            let jumpersFromSnap = snap.Jumpers |> List.map (fun j -> j.Id) |> Set.ofList
+            let bibKeys = snap.Bibs |> List.map fst |> Set.ofList
+            let jumperSet = Set.union jumpersFromSnap bibKeys
 
-            do!
-                if snap.Bibs |> List.forall (fun (jid, _) -> jumperSet.Contains jid) then
-                    Ok()
-                else
-                    Error(CompetitionRestoreHelpers.internalErr "BIB map contains unknown JumperId")
+
 
             // 1) Zbuduj bazowy Startlist z mapy BIB
             let! baseStartlist =
                 Startlist.CreateWithBibs snap.Bibs
                 |> Result.mapError CompetitionRestoreHelpers.mapStartlistErr
 
-            // 2) Ustaw kolejność bieżącej rundy: done ++ remaining
             let roundOrder = snap.DoneOrder @ snap.RemainingOrder
 
             do!
-                // duplicates/unknowny złapie WithOrder, ale sprawdźmy też spójność
-                if roundOrder |> Set.ofList |> Set.isSubset jumperSet then
+                let bibSet = snap.Bibs |> List.map fst |> Set.ofList
+                let orderSet = roundOrder |> Set.ofList
+                let missing = orderSet - bibSet
+
+                if Set.isEmpty missing then
                     Ok()
                 else
-                    Error(CompetitionRestoreHelpers.internalErr "Round order contains unknown JumperId")
+                    let first = missing |> Seq.head
+
+                    Error(
+                        CompetitionRestoreHelpers.internalErr
+                            $"Round order contains unknown JumperId (vs Bibs), e.g. {first}"
+                    )
+
 
             let! orderedStartlist =
                 Startlist.WithOrder baseStartlist roundOrder
                 |> Result.mapError CompetitionRestoreHelpers.mapStartlistErr
+
 
             // 3) Przewiń startlistę o już wykonane skoki (tej rundy)
             let! startlistAfterProgress = CompetitionRestoreHelpers.markManyDone snap.DoneOrder orderedStartlist
@@ -490,3 +497,6 @@ type Competition =
 
     member this.ClassificationResultOf(jumperId: JumperId) =
         this.Classification |> List.tryFind (fun result -> result.JumperId = jumperId)
+
+    member this.Bibs: Map<JumperId, Startlist.Bib> =
+        this.Startlist_.AllBibsMap

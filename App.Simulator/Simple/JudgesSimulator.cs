@@ -9,7 +9,7 @@ public class JudgesSimulator(IRandom random, IMyLogger logger) : IJudgesSimulato
     public Judges Evaluate(JudgesSimulationContext context)
     {
         var landingSkill = JumperSkillsModule.LandingSkillModule.value(context.Jumper.Skills.Landing);
-        const double noteAdditionByOneLandingSkill = 0.37;
+        const double noteAdditionByOneLandingSkill = 0.3;
         var baseNote =
             17.5
             + (landingSkill - 7) * noteAdditionByOneLandingSkill;
@@ -58,9 +58,13 @@ public class JudgesSimulator(IRandom random, IMyLogger logger) : IJudgesSimulato
     private double JudgeNoteDistanceBaseBonus(JudgesSimulationContext context)
     {
         var k = HillModule.KPointModule.value(context.Hill.KPoint);
+        var hs = HillModule.HsPointModule.value(context.Hill.HsPoint);
         var distance = DistanceModule.value(context.Jump.Distance);
-        const double kMultiplier = 0.3; // N metrów zwiększa notę o (distance - k) / (k * kMultiplier)
-        return (distance - k) / (k * kMultiplier);
+        var distanceClampedToHs = Math.Min(distance, hs * 1.01); // 141,4 przy HS = 140
+        const double
+            kMultiplier =
+                0.25; // N metrów zwiększa notę o (distance - k) / (k * kMultiplier). Mniejszy kMultiplier = większy wpływ odległości
+        return (distanceClampedToHs - k) / (k * kMultiplier);
     }
 
     private double JudgeNoteSpecificRandom(JudgesSimulationContext context)

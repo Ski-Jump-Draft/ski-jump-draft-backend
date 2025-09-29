@@ -13,7 +13,7 @@ public class DraftSystemSchedulerService(
     IJson json,
     IBotRegistry botRegistry,
     IMyLogger logger,
-    IBotPassPickLock botPassPickLock)
+    IBotPickLock botPickLock)
 {
     public async Task ScheduleSystemDraftEvents(Domain.Game.Game game, CancellationToken ct)
     {
@@ -38,7 +38,7 @@ public class DraftSystemSchedulerService(
         {
             case DraftModule.SettingsModule.TimeoutPolicy.TimeoutAfter timeoutAfter:
                 var timeoutInSeconds = timeoutAfter.Time.Seconds;
-                botPassPickLock.Unlock(gameId, playerId);
+                botPickLock.Unlock(gameId, playerId);
                 await scheduler.ScheduleAsync("PassPick",
                     payloadJson: json.Serialize(new
                         { GameId = gameId, PlayerId = playerId, TurnIndex = turnIndex }),

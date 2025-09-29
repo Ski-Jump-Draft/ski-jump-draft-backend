@@ -24,7 +24,7 @@ public class Handler(
     IJson json,
     IDraftPicker draftPicker,
     IClock clock,
-    IBotPassPickLock botPassPickLock) : ICommandHandler<Command, Result>
+    IBotPickLock botPickLock) : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
     {
@@ -43,11 +43,19 @@ public class Handler(
         var pickedGameJumperId = await draftPicker.Pick(game, ct);
 
         var now = clock.Now();
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(pickTime, ct);
+            // botPickLock.Lock(command.GameId, command.PlayerId);
+        }, ct);
+
         await scheduler.ScheduleAsync("PickJumper",
-            json.Serialize(new { command.GameId, command.PlayerId, JumperId = pickedGameJumperId }), now.Add(pickTime),
+            json.Serialize(new { command.GameId, command.PlayerId, JumperId = pickedGameJumperId, IsBot = true }),
+            now.Add(pickTime),
             $"PickJumper:{command.GameId}_{pickedGameJumperId}", ct);
 
-        await Task.Delay(pickTime, ct);
+        // botPickLock.Unlock(command.GameId, command.PlayerId);
 
         return new Result(pickedGameJumperId);
     }
