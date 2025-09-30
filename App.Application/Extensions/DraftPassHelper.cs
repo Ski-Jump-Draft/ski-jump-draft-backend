@@ -16,7 +16,7 @@ public static class DraftPassHelper
         }
 
         var gameId = game.Id.Item;
-        var currentTurnInDraft = game.CurrentTurnInDraft.ResultValue.Value;
+        var currentTurnInDraft = game.CurrentTurnInDraft.Value;
 
         switch (game.Settings.DraftSettings.TimeoutPolicy)
         {

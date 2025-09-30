@@ -174,7 +174,7 @@ public class InMemory(ICommandBus commandBus, IJson json, IMyLogger logger) : IS
     private async Task HandlePassPick(string payloadJson, CancellationToken ct)
     {
         var payload = json.Deserialize<PassPickPayload>(payloadJson);
-        var command = new Application.UseCase.Game.PassPick.Command(payload.GameId, payload.PlayerId);
+        var command = new Application.UseCase.Game.PassPick.Command(payload.GameId, payload.PlayerId, payload.TurnIndex);
         await commandBus
             .SendAsync<Application.UseCase.Game.PassPick.Command,
                 Application.UseCase.Game.PassPick.Result>(command, ct);

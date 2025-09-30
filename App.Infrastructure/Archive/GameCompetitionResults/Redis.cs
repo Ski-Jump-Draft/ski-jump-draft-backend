@@ -58,8 +58,6 @@ public class Redis(
         var gameDto = await GetGameDto(gameId, searchInArchive: false);
         if (gameDto is null)
             throw new GameNotFoundException();
-        if (gameDto.MainCompetition is null)
-            throw new Exception($"MainCompetitionDto is null (status={gameDto.Status})");
         var redisEndedCompetitionResults = RedisEndedCompetitionFromArchived(archiveCompetitionResults);
         var newGame = gameDto with { EndedMainCompetition = redisEndedCompetitionResults };
         await _db.StringSetAsync(LiveKey(gameId), JsonSerializer.Serialize(newGame));
@@ -68,8 +66,7 @@ public class Redis(
     public async Task<ArchiveCompetitionResultsDto?> GetMainResultsAsync(Guid gameId, CancellationToken ct)
     {
         var gameDto = await GetGameDto(gameId, searchInArchive: true);
-        if (gameDto?.MainCompetition is null) return null;
-        return gameDto.EndedMainCompetition != null
+        return gameDto?.EndedMainCompetition != null
             ? ArchivedCompetitionResultsFromRedis(gameDto.EndedMainCompetition)
             : null;
     }

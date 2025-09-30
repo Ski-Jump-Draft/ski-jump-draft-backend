@@ -294,10 +294,10 @@ type Game =
                           PhaseChangedTo = None }
         | _ -> Error GameError.InvalidPhase
 
-    member this.CurrentTurnInDraft: Result<Draft.Turn option, GameError> =
+    member this.CurrentTurnInDraft: Draft.Turn option =
         match this.Status with
-        | Draft draft -> Ok draft.CurrentTurn
-        | _ -> Error GameError.InvalidPhase
+        | Draft draft -> draft.CurrentTurn
+        | _ -> None
 
     /// Starts the Competition phase of the Game
     member this.StartMainCompetition

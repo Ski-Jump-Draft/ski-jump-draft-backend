@@ -44,17 +44,7 @@ public class Handler(
 
         await games.Add(gameAfterStartDraft, ct);
 
-        logger.Debug(@$"
-Created draft:
-current turn: {gameAfterStartDraft.CurrentTurnInDraft.ResultValue.IsSome()}
-current turn is ok: {gameAfterStartDraft.CurrentTurnInDraft.IsOk}
-available picks: {gameAfterStartDraft.AvailableDraftPicks}
-picks: {gameAfterStartDraft.DraftPicks}
-");
-
         await draftSystemSchedulerService.ScheduleSystemDraftEvents(gameAfterStartDraft, ct);
-
-        // await DraftPassHelper.MaybeScheduleDraftPass(gameAfterStartDraft, scheduler, json, clock, ct);
 
         await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterStartDraft, ct: ct));
 

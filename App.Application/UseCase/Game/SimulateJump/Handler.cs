@@ -215,7 +215,7 @@ public class Handler(
                 ? "null"
                 : $"not null, next jumper exists: {previousCompetition.NextJumper.IsSome()}"));
 
-            var gameUpdatedDto = await CreateGameUpdatedDtoAndCacheIfNeeded(gameAfterAddingJump, previousCompetition,
+            var gameUpdatedDto = await CreateGameUpdatedDto(gameAfterAddingJump, previousCompetition,
                 nextCompetitionJumper.Id, ct);
             await gameNotifier.GameUpdated(gameUpdatedDto
             );
@@ -250,22 +250,13 @@ public class Handler(
             archiveDto, ct);
     }
 
-    private async Task<GameUpdatedDto> CreateGameUpdatedDtoAndCacheIfNeeded(App.Domain.Game.Game game,
+    private async Task<GameUpdatedDto> CreateGameUpdatedDto(App.Domain.Game.Game game,
         App.Domain.Competition.Competition? lastCompetitionState,
         App.Domain.Competition.JumperId lastCompetitionJumperId, CancellationToken ct)
     {
         var dto = await gameUpdatedDtoMapper.FromDomain(game, null,
             lastCompetitionState: lastCompetitionState,
             lastCompetitionJumperId.Item, ct: ct);
-
-        // if (game.StatusTag.IsPreDraftTag)
-        // {
-        //     if (dto.PreDraft is not null)
-        //     {
-        //         await gameUpdatedDtoMapperCache.SetEndedPreDraft(game.Id.Item, dto.PreDraft, ct);
-        //     }
-        // }
-
         return dto;
     }
 

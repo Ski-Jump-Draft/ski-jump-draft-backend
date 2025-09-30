@@ -22,7 +22,7 @@ public class DraftSystemSchedulerService(
             return;
         }
 
-        var currentTurnInDraft = game.CurrentTurnInDraft.ResultValue.Value;
+        var currentTurnInDraft = game.CurrentTurnInDraft.Value;
 
         MaybeScheduleDraftPassPick(game, currentTurnInDraft, ct).FireAndForget(logger);
         MaybeScheduleBotPick(game, currentTurnInDraft, ct).FireAndForget(logger);
