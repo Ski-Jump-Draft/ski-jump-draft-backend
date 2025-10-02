@@ -1,4 +1,4 @@
-app = "ski-jump-draft-backend"
+app = "ski-jump-draft-staging"
 primary_region = "waw"
 
 [build]
