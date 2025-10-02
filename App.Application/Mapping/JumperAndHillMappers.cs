@@ -40,6 +40,12 @@ public static class JumperMapper
         return new Domain.Simulation.Jumper(jumperSkills);
     }
 
+    public static IEnumerable<Domain.Simulation.Jumper> ToSimulationJumpers(
+        this IEnumerable<Domain.GameWorld.Jumper> jumpers, Func<Domain.GameWorld.Jumper, double> form)
+    {
+        return jumpers.Select(jumper => ToSimulationJumper(jumper, false, form(jumper)));
+    }
+
     public static IEnumerable<GameWorldJumperDto> ToGameWorldJumperDtos(
         this IEnumerable<Domain.Game.JumperId> gameJumperIds, IGameJumperAcl acl)
     {

@@ -1,5 +1,11 @@
-using App.Application.Utility;
-using App.Simulator.Simple;
+using App.Application.Game.GameGateSelectionPack;
+using App.Application.Game.GameGateSelectionPack.JuryBraveryFactory;
+using App.Application.Game.GameSimulationPack;
+using App.Application.Game.GameSimulationPack.JudgesSimulatorFactory;
+using App.Application.Game.GameSimulationPack.JumpSimulatorFactory;
+using App.Application.Game.GameSimulationPack.WeatherEngineFactory;
+using App.Application.Policy.GameGateSelector;
+using Random = App.Infrastructure.GameSimulationPack.WeatherEngineFactory.Random;
 
 namespace App.Web.DependencyInjection.Production;
 
@@ -7,18 +13,18 @@ public static class Simulation
 {
     public static IServiceCollection AddProductionSimulation(this IServiceCollection services, bool isMocked)
     {
-        const double baseFormFactor = 2.5;
-        services.AddSingleton<App.Simulator.Simple.SimulatorConfiguration>(sp =>
-            new SimulatorConfiguration(SkillImpactFactor: 1.5, AverageBigSkill: 7,
-                FlightToTakeoffRatio: 1, RandomAdditionsRatio: 0.9, TakeoffRatingPointsByForm: baseFormFactor * 0.9,
-                FlightRatingPointsByForm: baseFormFactor * 1.1, DistanceSpreadByRatingFactor: 1.2,
-                HsFlatteningStartRatio: 0.001, HsFlatteningStrength: 1.15));
-        services.AddSingleton<App.Domain.Simulation.IWeatherEngine, App.Simulator.Simple.WeatherEngine>(sp =>
-            new WeatherEngine(sp.GetRequiredService<IRandom>(), sp.GetRequiredService<IMyLogger>()
-                // new Configuration(0.5, 0.1, 0.13)
-                , ConfigurationPresetFactory.VeryStrongHeadwind));
-        services.AddSingleton<App.Domain.Simulation.IJumpSimulator, App.Simulator.Simple.JumpSimulator>();
-        services.AddSingleton<App.Domain.Simulation.IJudgesSimulator, App.Simulator.Simple.JudgesSimulator>();
+        services
+            .AddSingleton<IJumpSimulatorFactory, Infrastructure.GameSimulationPack.JumpSimulatorFactory.DefaultFixed>();
+        services.AddSingleton<IWeatherEngineFactory, Random>();
+        services
+            .AddSingleton<IJudgesSimulatorFactory,
+                Infrastructure.GameSimulationPack.JudgesSimulatorFactory.DefaultFixed>();
+
+        services.AddSingleton<IGameSimulationPack, InMemory>();
+
+        // services.AddSingleton<IJuryBraveryFactory, FixedBravery>(_ => new FixedBravery(JuryBravery.Medium));
+        services.AddSingleton<IJuryBraveryFactory, RandomBravery>();
+        services.AddSingleton<IGameGateSelectionPack, DefaultInMemory>();
         return services;
     }
 }

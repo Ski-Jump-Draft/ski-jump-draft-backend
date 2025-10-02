@@ -30,18 +30,6 @@ public static class Application
                 .AddSingleton<App.Application.Matchmaking.IMatchmakingDurationCalculator,
                     App.Application.Matchmaking.FixedMatchmakingDurationCalculator>(sp =>
                     new FixedMatchmakingDurationCalculator(TimeSpan.FromSeconds(3)));
-            services
-                .AddSingleton<App.Application.Game.Gate.IGameStartingGateSelectorFactory,
-                    App.Application.Game.Gate.IterativeSimulatedFactory>(sp =>
-                {
-                    const JuryBravery juryBravery = JuryBravery.High;
-                    return new IterativeSimulatedFactory(sp.GetRequiredService<IJumpSimulator>(),
-                        sp.GetRequiredService<IWeatherEngine>(),
-                        juryBravery, sp.GetRequiredService<ICompetitionJumperAcl>(),
-                        sp.GetRequiredService<IGameJumperAcl>(),
-                        sp.GetRequiredService<ICompetitionHillAcl>(), sp.GetRequiredService<IJumpers>(),
-                        sp.GetRequiredService<IJumperGameFormStorage>());
-                });
         }
         else
         {
@@ -53,18 +41,6 @@ public static class Application
                 .AddSingleton<App.Application.Matchmaking.IMatchmakingDurationCalculator,
                     App.Application.Matchmaking.FixedMatchmakingDurationCalculator>(sp =>
                     new FixedMatchmakingDurationCalculator(TimeSpan.FromSeconds(30)));
-            services
-                .AddSingleton<App.Application.Game.Gate.IGameStartingGateSelectorFactory,
-                    App.Application.Game.Gate.IterativeSimulatedFactory>(sp =>
-                {
-                    const JuryBravery juryBravery = JuryBravery.Medium;
-                    return new IterativeSimulatedFactory(sp.GetRequiredService<IJumpSimulator>(),
-                        sp.GetRequiredService<IWeatherEngine>(),
-                        juryBravery, sp.GetRequiredService<ICompetitionJumperAcl>(),
-                        sp.GetRequiredService<IGameJumperAcl>(),
-                        sp.GetRequiredService<ICompetitionHillAcl>(), sp.GetRequiredService<IJumpers>(),
-                        sp.GetRequiredService<IJumperGameFormStorage>());
-                });
         }
 
         services.AddSingleton<IGameJumpersSelector, App.Application.Policy.GameJumpersSelector.All>();
@@ -83,9 +59,6 @@ public static class Application
         services
             .AddSingleton<App.Application.Game.Ranking.IGameRankingFactorySelector,
                 App.Application.Game.Ranking.DefaultSelector>();
-        services
-            .AddSingleton<App.Application.Game.Gate.ISelectGameStartingGateService,
-                App.Application.Game.Gate.SelectCompetitionStartingGateService>();
         
         services
             .AddSingleton<App.Application.JumpersForm.IJumperGameFormAlgorithm,

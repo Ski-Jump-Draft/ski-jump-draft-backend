@@ -4,6 +4,7 @@ using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Game;
+using App.Application.Game.GameGateSelectionPack;
 using App.Application.Game.Gate;
 using App.Application.Mapping;
 using App.Application.Messaging.Notifiers;
@@ -37,11 +38,11 @@ public class Handler(
     IClock clock,
     IGuid guid,
     ICompetitionJumperAcl competitionJumperAcl,
-    ISelectGameStartingGateService selectGameStartingGateService,
     IMyLogger logger,
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
     IGameSchedule gameSchedule,
-    IGameCompetitionStartlist gameCompetitionStartlist)
+    IGameCompetitionStartlist gameCompetitionStartlist,
+    IGameGateSelectionPack gameGateSelectionPack)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -60,9 +61,8 @@ public class Handler(
         var competitionId = CompetitionId.NewCompetitionId(competitionGuid);
 
         var competitionJumpersStartlist = await GenerateCompetitionJumpersStartlist(command.GameId, ct);
-        var startingGateInt =
-            await selectGameStartingGateService.Select(competitionJumpersStartlist, game.Hill.Value, ct);
-        var startingGate = Domain.Competition.Gate.NewGate(startingGateInt);
+
+        var startingGate = await SelectStartingGate(competitionJumpersStartlist, game, ct);
 
         var gameAfterMainCompetitionStartResult =
             game.StartMainCompetition(competitionId, ListModule.OfSeq(competitionJumpersStartlist), startingGate);
@@ -83,6 +83,18 @@ public class Handler(
             ct: ct);
         await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterMainCompetitionStart, ct: ct));
         return new Result(competitionGuid);
+    }
+
+    private async Task<Gate> SelectStartingGate(ImmutableList<Jumper> competitionJumpersStartlist,
+        Domain.Game.Game game, CancellationToken ct)
+    {
+        var gateSelectionPack =
+            await gameGateSelectionPack.GetForCompetition(game.Id.Item, competitionJumpersStartlist, game.Hill.Value,
+                ct);
+        var startingGateSelector = gateSelectionPack.StartingGateSelector;
+        var startingGateInt = startingGateSelector.Select();
+        var startingGate = Domain.Competition.Gate.NewGate(startingGateInt);
+        return startingGate;
     }
 
 

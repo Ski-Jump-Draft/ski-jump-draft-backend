@@ -18,30 +18,16 @@ public static class Application
             new Fixed("Zakopane HS140", sp.GetRequiredService<IHills>()));
         services.AddSingleton<IGameJumpersSelector, App.Application.Policy.GameJumpersSelector.All>();
         services
-            .AddSingleton<App.Application.Policy.DraftPicker.IDraftPicker, App.Application.Policy.DraftPicker.BestPicker>();
+            .AddSingleton<App.Application.Policy.DraftPicker.IDraftPicker,
+                App.Application.Policy.DraftPicker.BestPicker>();
         services
             .AddSingleton<App.Application.Game.Ranking.IGameRankingFactorySelector,
                 App.Application.Game.Ranking.DefaultSelector>();
-        services
-            .AddSingleton<App.Application.Game.Gate.ISelectGameStartingGateService,
-                App.Application.Game.Gate.SelectCompetitionStartingGateService>();
 
         services
             .AddSingleton<App.Application.Matchmaking.IMatchmakingDurationCalculator,
                 App.Application.Matchmaking.FixedMatchmakingDurationCalculator>(sp =>
                 new FixedMatchmakingDurationCalculator(TimeSpan.FromSeconds(20)));
-        services
-            .AddSingleton<App.Application.Game.Gate.IGameStartingGateSelectorFactory,
-                App.Application.Game.Gate.IterativeSimulatedFactory>(sp =>
-            {
-                const JuryBravery juryBravery = JuryBravery.Medium;
-                return new IterativeSimulatedFactory(sp.GetRequiredService<IJumpSimulator>(),
-                    sp.GetRequiredService<IWeatherEngine>(),
-                    juryBravery, sp.GetRequiredService<ICompetitionJumperAcl>(),
-                    sp.GetRequiredService<IGameJumperAcl>(),
-                    sp.GetRequiredService<ICompetitionHillAcl>(), sp.GetRequiredService<IJumpers>(),
-                    sp.GetRequiredService<IJumperGameFormStorage>());
-            });
         services
             .AddSingleton<App.Application.JumpersForm.IJumperGameFormAlgorithm,
                 App.Application.Policy.GameFormAlgorithm.FullyRandom>();

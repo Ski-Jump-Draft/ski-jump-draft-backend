@@ -99,7 +99,7 @@ public static class Program
             ..jumpers, ..jumpers, ..jumpers, ..jumpers, ..jumpers, ..jumpers, ..jumpers, ..jumpers, ..jumpers
         ], hill);
 
-        var gate = gateSelector.Select(new GameStartingGateSelectorContext());
+        var gate = gateSelector.Select();
         Console.WriteLine($"Chosen gate no. {gate}");
 
 

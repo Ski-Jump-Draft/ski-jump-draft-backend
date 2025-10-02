@@ -4,6 +4,7 @@ using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Game;
 using App.Application.Game.GameCompetitions;
+using App.Application.Game.GameSimulationPack;
 using App.Application.JumpersForm;
 using App.Application.Mapping;
 using App.Application.Messaging.Notifiers;
@@ -32,8 +33,7 @@ public class Handler(
     IJson json,
     IGames games,
     IGameNotifier gameNotifier,
-    IJumpSimulator jumpSimulator,
-    IWeatherEngine weatherEngine,
+    IGameSimulationPack gameSimulationPack,
     IScheduler scheduler,
     IClock clock,
     IGuid guid,
@@ -41,7 +41,6 @@ public class Handler(
     IGameJumperAcl gameJumperAcl,
     App.Domain.GameWorld.IJumpers gameWorldJumpers,
     IMyLogger logger,
-    IJudgesSimulator judgesSimulator,
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
     IJumperGameFormStorage jumperGameFormStorage,
     IGameCompetitionResultsArchive competitionResultsArchive,
@@ -58,7 +57,9 @@ public class Handler(
             throw new CompetitionNotRunningException(command.GameId);
         }
 
-        var simulationWind = weatherEngine.GetWind();
+        var simulationPack = gameSimulationPack.GetFor(command.GameId);
+
+        var simulationWind = simulationPack.WeatherEngine.GetWind();
         var gate = game.CurrentCompetitionGate;
         var gateInt = App.Domain.Competition.GateModule.value(gate);
         var nextCompetitionJumper = game.NextCompetitionJumper.Value;
@@ -85,7 +86,7 @@ public class Handler(
         var simulationContext =
             new SimulationContext(Gate.NewGate(gateInt),
                 simulationJumper, simulationHill, simulationWind);
-        var simulatedJump = jumpSimulator.Simulate(simulationContext);
+        var simulatedJump = simulationPack.JumpSimulator.Simulate(simulationContext);
 
         logger.Info($"{gameWorldJumper.Name.Item} {gameWorldJumper.Surname.Item} jumped: {
             DistanceModule.value(simulatedJump.Distance)}m + {simulatedJump.Landing} ({
@@ -94,7 +95,7 @@ public class Handler(
         var judgesSimulationContext =
             new JudgesSimulationContext(simulatedJump, Gate.NewGate(App.Domain.Competition.GateModule.value(gate)),
                 simulationJumper, simulationHill, simulationWind);
-        var simulatedJudges = judgesSimulator.Evaluate(judgesSimulationContext);
+        var simulatedJudges = simulationPack.JudgesSimulator.Evaluate(judgesSimulationContext);
 
         var competitionJudges = JumpModule.JudgesModule
             .tryCreate(JudgesModule.value(simulatedJudges))

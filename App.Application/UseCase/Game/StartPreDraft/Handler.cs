@@ -4,6 +4,8 @@ using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Game;
+using App.Application.Game.GameGateSelectionPack;
+using App.Application.Game.GameSimulationPack;
 using App.Application.Game.Gate;
 using App.Application.Mapping;
 using App.Application.Messaging.Notifiers;
@@ -33,7 +35,7 @@ public class Handler(
     IScheduler scheduler,
     IClock clock,
     IGuid guid,
-    ISelectGameStartingGateService selectGameStartingGateService,
+    IGameGateSelectionPack gameGateSelectionPack,
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
     IGameSchedule gameSchedule,
     IGameCompetitionStartlist gameCompetitionStartlist,
@@ -69,8 +71,11 @@ public class Handler(
     private async Task<Gate> SelectStartingGate(Domain.Game.Game game,
         ImmutableList<Jumper> competitionJumpersStartlist, CancellationToken ct)
     {
-        var startingGateInt =
-            await selectGameStartingGateService.Select(competitionJumpersStartlist, game.Hill.Value, ct);
+        var gateSelectionPack =
+            await gameGateSelectionPack.GetForCompetition(game.Id.Item, competitionJumpersStartlist, game.Hill.Value,
+                ct);
+        var startingGateSelector = gateSelectionPack.StartingGateSelector;
+        var startingGateInt = startingGateSelector.Select();
         var startingGate = Domain.Competition.Gate.NewGate(startingGateInt);
         return startingGate;
     }

@@ -4,6 +4,7 @@ using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Game;
+using App.Application.Game.GameGateSelectionPack;
 using App.Application.Game.Gate;
 using App.Application.Mapping;
 using App.Application.Messaging.Notifiers;
@@ -31,11 +32,11 @@ public class Handler(
     IClock clock,
     IGuid guid,
     ICompetitionJumperAcl competitionJumperAcl,
-    ISelectGameStartingGateService selectGameStartingGateService,
     IMyLogger logger,
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
     IGameSchedule gameSchedule,
-    IGameCompetitionStartlist gameCompetitionStartlist)
+    IGameCompetitionStartlist gameCompetitionStartlist,
+    IGameGateSelectionPack gameGateSelectionPack)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -59,9 +60,7 @@ public class Handler(
         var competitionJumpersStartlist =
             await GenerateCompetitionJumpersStartlist(command.GameId, nextPreDraftCompetitionIndex, ct);
 
-        var startingGateInt =
-            await selectGameStartingGateService.Select(competitionJumpersStartlist, game.Hill.Value, ct);
-        var startingGate = Domain.Competition.Gate.NewGate(startingGateInt);
+        var startingGate = await SelectStartingGate(competitionJumpersStartlist, game, ct);
 
         var gameAfterStartNextPreDraftCompetitionResult =
             game.ContinuePreDraft(competitionId, ListModule.OfSeq(competitionJumpersStartlist), startingGate);
@@ -75,6 +74,17 @@ public class Handler(
         await gameNotifier.GameUpdated(
             await gameUpdatedDtoMapper.FromDomain(gameAfterStartNextPreDraftCompetition, ct: ct));
         return new Result(competitionGuid);
+    }
+
+    private async Task<Gate> SelectStartingGate(ImmutableList<Jumper> competitionJumpersStartlist,
+        Domain.Game.Game game, CancellationToken ct)
+    {
+        var gateSelectionPack =
+            await gameGateSelectionPack.GetForCompetition(game.Id.Item, competitionJumpersStartlist, game.Hill.Value, ct);
+        var startingGateSelector = gateSelectionPack.StartingGateSelector;
+        var startingGateInt = startingGateSelector.Select();
+        var startingGate = Domain.Competition.Gate.NewGate(startingGateInt);
+        return startingGate;
     }
 
     private async Task ScheduleFirstCompetitionJump(Domain.Game.Game game, CancellationToken ct)

@@ -11,9 +11,9 @@ public class IterativeSimulated(
     JuryBravery juryBravery,
     IEnumerable<Domain.Simulation.Jumper> jumpers,
     Domain.Simulation.Hill hill
-) : IGameStartingGateSelector
+) : IStartingGateSelector
 {
-    public int Select(GameStartingGateSelectorContext context)
+    public int Select()
     {
         var simulationHill = hill;
         var simulationJumpers = jumpers.ToImmutableArray();
