@@ -42,7 +42,8 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
         var realHs = HillModule.HsPointModule.value(context.Hill.SimulationData.RealHs);
         var distanceAfterApplyingHsCost = ApplyHsCost(rawDistance, realHs);
         var landing = GenerateLanding(context, distanceAfterApplyingHsCost);
-        logger.Debug($"Distance: {distanceAfterApplyingHsCost} (raw: {rawDistance}) AverageWind: {averageWind}, Landing: {landing}");
+        logger.Debug($"Distance: {distanceAfterApplyingHsCost} (raw: {rawDistance}) AverageWind: {averageWind
+        }, Landing: {landing}");
         return new Jump(DistanceModule.tryCreate(distanceAfterApplyingHsCost).Value, landing);
     }
 
@@ -147,6 +148,12 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
         };
     }
 
+    private static double BigHillSpreadAttenuation(double k)
+    {
+        // 1.0 do K<=160; płynnie do 0.6 przy K>=200 (czyli -40% spreadu)
+        return Lerp(1.0, 0.45, SmoothStep(160, 200, k));
+    }
+
     private static double Lerp(double a, double b, double t) => a + (b - a) * t;
 
     private Landing GenerateLanding(SimulationContext context, double distance)
@@ -207,10 +214,9 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
         var kPoint = HillModule.KPointModule.value(context.Hill.KPoint);
         var startingDistance = kPoint / 2.5;
 
-        // ZMIANA: Upraszczamy bazowy przelicznik punktów ratingu na metry
-        var metersByRatingPoint = 0.2 * (kPoint / 100) * configuration.DistanceSpreadByRatingFactor;
-        logger.Debug($"KPoint: {kPoint}, startingDistance: {startingDistance}, metersByRatingPoint: {metersByRatingPoint
-        }");
+        var baseMetersByRatingPoint = 0.2 * (kPoint / 100) * configuration.DistanceSpreadByRatingFactor;
+        var bigHillSpreadAttenuation = BigHillSpreadAttenuation(kPoint);
+        var metersByRatingPoint = baseMetersByRatingPoint * bigHillSpreadAttenuation;
 
         var takeoffAddition = metersByRatingPoint * takeoffRating;
 
@@ -298,7 +304,7 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
         var t = Math.Clamp((x - edge0) / (edge1 - edge0), 0, 1);
         return t * t * (3 - 2 * t);
     }
-    
+
     private double ApplyHsCost(double distance, double realHs)
     {
         if (distance <= realHs) return distance;
@@ -308,7 +314,7 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
         var hsScale = configuration.HsFlatteningStartRatio <= 0
             ? 1e-6
             : realHs * configuration.HsFlatteningStartRatio;
-        
+
         var compressed = hsScale * Math.Log(1.0 + overHs / hsScale);
         compressed /= configuration.HsFlatteningStrength;
 

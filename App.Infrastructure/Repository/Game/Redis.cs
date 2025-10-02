@@ -46,12 +46,21 @@ public class Redis(
         {
             await _db.StringSetAsync(ArchiveKey(gameId), serializedGames);
             await _db.SetAddAsync(ArchiveSetKey, dto.Id.ToString());
+            await RemoveLiveGame(gameId, ct);
         }
         else
         {
             await _db.StringSetAsync(LiveKey(gameId), serializedGames, TimeSpan.FromSeconds(120));
             await _db.SetAddAsync(LiveSetKey, dto.Id.ToString());
         }
+    }
+
+    private async Task RemoveLiveGame(Guid gameId, CancellationToken ct)
+    {
+        var liveKey = LiveKey(gameId);
+        logger.Debug($"Removing live game {liveKey} from Redis");
+        await _db.KeyDeleteAsync(liveKey);
+        await _db.SetRemoveAsync(LiveSetKey, gameId.ToString());
     }
 
     public async Task<FSharpOption<Domain.Game.Game>> GetById(GameId gameId, CancellationToken ct)
@@ -617,7 +626,7 @@ public static class GameDtoMapper
     private static GameRankingDto? CreateGameRanking(GameDtoMapperInput input)
     {
         var game = input.Game;
-        if (!game.PhaseHasEnded(StatusTag.EndedTag)) return null;
+        if (!game.StatusTag.IsEndedTag) return null;
 
         var endedPhase = ((Domain.Game.Status.Ended)game.Status);
         var positionAndPointsMap = endedPhase.Ranking.PositionsAndPoints;

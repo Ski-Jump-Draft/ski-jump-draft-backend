@@ -15,9 +15,6 @@ public static class Application
 {
     public static IServiceCollection AddProductionApplication(this IServiceCollection services, bool isMocked)
     {
-        // services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.Fixed>(sp =>
-        //     new Fixed("Zakopane HS140", sp.GetRequiredService<IHills>()));
-
         if (isMocked)
         {
             services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.RandomHill>(sp =>
@@ -33,10 +30,12 @@ public static class Application
         }
         else
         {
-            services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.RandomHill>(sp =>
-                new RandomHill(sp.GetRequiredService<IRandom>(), sp.GetRequiredService<IHills>(),
-                [
-                ], sp.GetRequiredService<IMyLogger>()));
+            // services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.RandomHill>(sp =>
+            //     new RandomHill(sp.GetRequiredService<IRandom>(), sp.GetRequiredService<IHills>(),
+            //     [
+            //     ], sp.GetRequiredService<IMyLogger>()));
+            services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.Fixed>(sp =>
+                new Fixed("Vikersund HS240", sp.GetRequiredService<IHills>()));
             services
                 .AddSingleton<App.Application.Matchmaking.IMatchmakingDurationCalculator,
                     App.Application.Matchmaking.FixedMatchmakingDurationCalculator>(sp =>
@@ -59,7 +58,7 @@ public static class Application
         services
             .AddSingleton<App.Application.Game.Ranking.IGameRankingFactorySelector,
                 App.Application.Game.Ranking.DefaultSelector>();
-        
+
         services
             .AddSingleton<App.Application.JumpersForm.IJumperGameFormAlgorithm,
                 App.Application.Policy.GameFormAlgorithm.FullyRandom>();
