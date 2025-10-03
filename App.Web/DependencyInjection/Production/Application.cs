@@ -30,16 +30,16 @@ public static class Application
         }
         else
         {
-            // services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.RandomHill>(sp =>
-            //     new RandomHill(sp.GetRequiredService<IRandom>(), sp.GetRequiredService<IHills>(),
-            //     [
-            //     ], sp.GetRequiredService<IMyLogger>()));
-            services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.Fixed>(sp =>
-                new Fixed("Vikersund HS240", sp.GetRequiredService<IHills>()));
+            services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.RandomHill>(sp =>
+                new RandomHill(sp.GetRequiredService<IRandom>(), sp.GetRequiredService<IHills>(),
+                [
+                ], sp.GetRequiredService<IMyLogger>()));
+            // services.AddSingleton<IGameHillSelector, App.Application.Policy.GameHillSelector.Fixed>(sp =>
+            //     new Fixed("Vikersund HS240", sp.GetRequiredService<IHills>()));
             services
                 .AddSingleton<App.Application.Matchmaking.IMatchmakingDurationCalculator,
                     App.Application.Matchmaking.FixedMatchmakingDurationCalculator>(sp =>
-                    new FixedMatchmakingDurationCalculator(TimeSpan.FromSeconds(30)));
+                    new FixedMatchmakingDurationCalculator(TimeSpan.FromSeconds(60)));
         }
 
         services.AddSingleton<IGameJumpersSelector, App.Application.Policy.GameJumpersSelector.All>();
