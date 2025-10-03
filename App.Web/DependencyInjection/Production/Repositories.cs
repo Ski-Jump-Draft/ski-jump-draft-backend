@@ -25,7 +25,7 @@ public static class Repositories
                                                 "Redis connection string not configured");
                 Console.WriteLine("Redis connection string: " + redisConnectionString);
 
-                logger.Info("Redis connection string: " + redisConnectionString);
+                // logger.Info("Redis connection string: " + redisConnectionString);
 
                 var uri = new Uri(redisConnectionString);
                 var options = new ConfigurationOptions
