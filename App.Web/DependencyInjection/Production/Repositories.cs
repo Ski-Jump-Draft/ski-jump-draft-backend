@@ -6,7 +6,7 @@ namespace App.Web.DependencyInjection.Production;
 public static class Repositories
 {
     public static IServiceCollection AddProductionRepositories(this IServiceCollection services,
-        IConfiguration configuration, bool isMocked, IMyLogger? logger = null)
+        IConfiguration configuration, bool isMocked)
     {
         if (isMocked)
         {
@@ -17,13 +17,14 @@ public static class Repositories
         }
         else
         {
-            var redisConnectionString = configuration["Redis:ConnectionString"]
-                                        ?? throw new InvalidOperationException(
-                                            "Redis connection string not configured");
-            logger?.Info("Redis connection string: " + redisConnectionString + "");
-            services.AddSingleton<IConnectionMultiplexer>(_ =>
+            services.AddSingleton<IConnectionMultiplexer>(sp =>
             {
-                // var options = ConfigurationOptions.Parse(redisConnectionString);
+                var logger = sp.GetRequiredService<IMyLogger>();
+                var redisConnectionString = configuration["Redis:ConnectionString"]
+                                            ?? throw new InvalidOperationException(
+                                                "Redis connection string not configured");
+                logger.Info("Redis connection string: " + redisConnectionString);
+
                 var uri = new Uri(redisConnectionString);
                 var options = new ConfigurationOptions
                 {

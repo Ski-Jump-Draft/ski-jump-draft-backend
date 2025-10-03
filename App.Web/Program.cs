@@ -1,5 +1,4 @@
 using App.Application.Commanding;
-using App.Application.Utility;
 using App.Domain.Game;
 using App.Web;
 using App.Web.DependencyInjection;
@@ -36,7 +35,7 @@ const Mode mode = Mode.Online;
 var app = builder.Build();
 app.UseCors("AllowFrontend");
 
-builder.Services.InjectDependencies(builder.Configuration, mode, app.Services.GetService<IMyLogger>());
+builder.Services.InjectDependencies(builder.Configuration, mode);
 
 // app.UseHttpsRedirection();
 

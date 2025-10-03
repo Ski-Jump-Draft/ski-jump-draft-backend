@@ -1,4 +1,3 @@
-using App.Application.Utility;
 using App.Web.DependencyInjection.Local;
 using App.Web.DependencyInjection.Production;
 using App.Web.DependencyInjection.Shared;
@@ -14,7 +13,7 @@ public enum Mode
 public static class DependencyInjection
 {
     public static IServiceCollection InjectDependencies(this IServiceCollection services, IConfiguration config,
-        Mode mode, IMyLogger? logger)
+        Mode mode)
     {
         services.AddAcl().AddApplication().AddCommanding().AddMappers().AddStorages()
             .AddUtilities().AddBot().AddJson();
@@ -33,7 +32,7 @@ public static class DependencyInjection
                     .AddProductionMatchmaking(isMocked: isMocked)
                     .AddProductionNotifiers().AddProductionSimulation(isMocked: isMocked)
                     .AddGameWorld(config, isMocked: isMocked)
-                    .AddProductionRepositories(config, isMocked: isMocked, logger: logger)
+                    .AddProductionRepositories(config, isMocked: isMocked)
                     .AddProductionArchives(isMocked: isMocked);
                 break;
             default:
