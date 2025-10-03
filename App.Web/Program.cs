@@ -32,10 +32,10 @@ builder.Services.AddSignalR();
 
 const Mode mode = Mode.Online;
 
+builder.Services.InjectDependencies(builder.Configuration, mode);
+
 var app = builder.Build();
 app.UseCors("AllowFrontend");
-
-builder.Services.InjectDependencies(builder.Configuration, mode);
 
 // app.UseHttpsRedirection();
 
