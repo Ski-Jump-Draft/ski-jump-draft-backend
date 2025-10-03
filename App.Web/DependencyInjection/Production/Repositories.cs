@@ -1,3 +1,4 @@
+using App.Application.Utility;
 using StackExchange.Redis;
 
 namespace App.Web.DependencyInjection.Production;
@@ -5,7 +6,7 @@ namespace App.Web.DependencyInjection.Production;
 public static class Repositories
 {
     public static IServiceCollection AddProductionRepositories(this IServiceCollection services,
-        IConfiguration configuration, bool isMocked)
+        IConfiguration configuration, bool isMocked, IMyLogger? logger = null)
     {
         if (isMocked)
         {
@@ -19,6 +20,7 @@ public static class Repositories
             var redisConnectionString = configuration["Redis:ConnectionString"]
                                         ?? throw new InvalidOperationException(
                                             "Redis connection string not configured");
+            logger?.Info("Redis connection string: " + redisConnectionString + "");
             services.AddSingleton<IConnectionMultiplexer>(_ =>
             {
                 // var options = ConfigurationOptions.Parse(redisConnectionString);
