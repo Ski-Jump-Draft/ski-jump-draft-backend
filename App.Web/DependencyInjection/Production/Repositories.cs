@@ -1,3 +1,4 @@
+using App.Application.Utility;
 using StackExchange.Redis;
 
 namespace App.Web.DependencyInjection.Production;
@@ -16,12 +17,16 @@ public static class Repositories
         }
         else
         {
-            var redisConnectionString = configuration["Redis:ConnectionString"]
-                                        ?? throw new InvalidOperationException(
-                                            "Redis connection string not configured");
-            services.AddSingleton<IConnectionMultiplexer>(_ =>
+            services.AddSingleton<IConnectionMultiplexer>(sp =>
             {
-                // var options = ConfigurationOptions.Parse(redisConnectionString);
+                var logger = sp.GetRequiredService<IMyLogger>();
+                var redisConnectionString = configuration["Redis:ConnectionString"]
+                                            ?? throw new InvalidOperationException(
+                                                "Redis connection string not configured");
+                Console.WriteLine("Redis connection string: " + redisConnectionString);
+
+                // logger.Info("Redis connection string: " + redisConnectionString);
+
                 var uri = new Uri(redisConnectionString);
                 var options = new ConfigurationOptions
                 {

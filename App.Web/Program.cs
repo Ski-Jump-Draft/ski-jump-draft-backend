@@ -19,7 +19,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowFrontend",
         policy =>
         {
-            policy.WithOrigins("http://localhost:3000", "https://ski-jump-draft.netlify.app")
+            policy.WithOrigins("http://localhost:3000", "https://ski-jump-draft.netlify.app", "https://staging--ski-jump-draft.netlify.app")
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials(); // jeśli będziesz używał cookies/sse
@@ -31,10 +31,12 @@ DotNetEnv.Env.Load(".env");
 builder.Services.AddSignalR();
 
 const Mode mode = Mode.Online;
+
 builder.Services.InjectDependencies(builder.Configuration, mode);
 
 var app = builder.Build();
 app.UseCors("AllowFrontend");
+
 // app.UseHttpsRedirection();
 
 app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
