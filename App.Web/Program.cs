@@ -1,4 +1,5 @@
 using App.Application.Commanding;
+using App.Application.Utility;
 using App.Domain.Game;
 using App.Web;
 using App.Web.DependencyInjection;
@@ -31,10 +32,12 @@ DotNetEnv.Env.Load(".env");
 builder.Services.AddSignalR();
 
 const Mode mode = Mode.Online;
-builder.Services.InjectDependencies(builder.Configuration, mode);
 
 var app = builder.Build();
 app.UseCors("AllowFrontend");
+
+builder.Services.InjectDependencies(builder.Configuration, mode, app.Services.GetService<IMyLogger>());
+
 // app.UseHttpsRedirection();
 
 app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
