@@ -30,7 +30,7 @@ public class WeatherEngine(IRandom random, IMyLogger logger, Configuration confi
     public Wind GetWind()
     {
         var windDouble = _currentBaseWindDouble + GenerateWindAddition();
-        var windInstability = WindInstabilityModule.create(1);
+        var windInstability = WindInstabilityModule.create(1); // TODO: Wind instability!
         var wind = WindModule.create(windDouble, windInstability);
         logger.Debug($"Generated wind ({_minutes} minutes): " +
                      (WindModule.average(wind).ToString(CultureInfo.InvariantCulture)) + "");
