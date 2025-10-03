@@ -7,7 +7,6 @@ using App.Web.SignalR.Hub;
 using Microsoft.AspNetCore.Mvc;
 using Results = Microsoft.AspNetCore.Http.Results;
 
-
 var builder = WebApplication.CreateBuilder(args);
 
 if (builder.Environment.IsDevelopment())
@@ -20,7 +19,7 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowFrontend",
         policy =>
         {
-            policy.WithOrigins("http://localhost:3000")
+            policy.WithOrigins("http://localhost:3000", "https://ski-jump-draft.netlify.app")
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials(); // jeśli będziesz używał cookies/sse
