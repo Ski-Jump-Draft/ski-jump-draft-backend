@@ -119,23 +119,30 @@ public class Redis(IConnectionMultiplexer redis, IMyLogger logger) : IMatchmakin
 
     public async Task Add(Domain.Matchmaking.Matchmaking matchmaking, CancellationToken ct)
     {
-        var matchmakingId = matchmaking.Id_.Item;
-        var dto = MatchmakingDtoMapper.ToRedis(matchmaking);
-        var serializedMatchmaking = JsonSerializer.Serialize(dto);
-        if (matchmaking.Status_.IsRunning)
+        try
         {
-            await _db.StringSetAsync(LiveKey(matchmakingId), serializedMatchmaking, TimeSpan.FromSeconds(120));
-            await _db.SetAddAsync(LiveSetKey, dto.Id.ToString());
+            var matchmakingId = matchmaking.Id_.Item;
+            var dto = MatchmakingDtoMapper.ToRedis(matchmaking);
+            var serializedMatchmaking = JsonSerializer.Serialize(dto);
+            if (matchmaking.Status_.IsRunning)
+            {
+                await _db.StringSetAsync(LiveKey(matchmakingId), serializedMatchmaking, TimeSpan.FromSeconds(120));
+                await _db.SetAddAsync(LiveSetKey, dto.Id.ToString());
+            }
+            else
+            {
+                var transaction = _db.CreateTransaction();
+                transaction.StringSetAsync(ArchiveKey(matchmakingId), serializedMatchmaking);
+                transaction.SetAddAsync(ArchiveSetKey, dto.Id.ToString());
+                await RemoveLiveMatchmaking(matchmakingId, transaction, ct);
+                var executed = await transaction.ExecuteAsync();
+                if (!executed)
+                    logger.Warn("Redis IMatchmakings.Add: Transaction failed");
+            }
         }
-        else
+        catch (ObjectDisposedException ex)
         {
-            var transaction = _db.CreateTransaction();
-            transaction.StringSetAsync(ArchiveKey(matchmakingId), serializedMatchmaking);
-            transaction.SetAddAsync(ArchiveSetKey, dto.Id.ToString());
-            await RemoveLiveMatchmaking(matchmakingId, transaction, ct);
-            var executed = await transaction.ExecuteAsync();
-            if (!executed)
-                logger.Warn("Redis IMatchmakings.Add: Transaction failed");
+            logger.Warn($"Redis connection was disposed during shutdown. Skipping Add(): {ex.Message}");
         }
     }
 
