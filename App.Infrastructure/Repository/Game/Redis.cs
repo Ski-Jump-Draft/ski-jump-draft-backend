@@ -37,11 +37,12 @@ public class Redis(
     private static string ArchiveKey(Guid id) => $"{ArchivePattern}:{id}";
     private static string LiveSetKey => $"{LivePattern}:ids";
     private static string ArchiveSetKey => $"{ArchivePattern}:ids";
+    private static string LiveHashKey => "game:live";
+    private static string ArchiveHashKey => "game:archive";
 
-    private async Task<IEnumerable<Domain.Game.Game>> GetGamesFromSet(
+    private async Task<IEnumerable<Domain.Game.Game>> GetGamesFromHash(
         string cacheKey,
-        string setKey,
-        Func<Guid, string> keySelector,
+        string hashKey,
         Func<GameDto, Guid, bool> filter,
         TimeSpan ttl,
         CancellationToken ct)
@@ -49,71 +50,45 @@ public class Redis(
         if (_cache.TryGetValue(cacheKey, out IEnumerable<Domain.Game.Game>? cached))
             return cached!;
 
-        var ids = await _db.SetMembersAsync(setKey);
-        if (ids.Length == 0)
-            return [];
-
-        var keys = ids.Select(id => (RedisKey)keySelector(Guid.Parse(id.ToString()))).ToArray();
-        var values = await _db.StringGetAsync(keys);
+        var entries = await _db.HashGetAllAsync(hashKey);
+        if (entries.Length == 0) return [];
 
         var result = new List<Domain.Game.Game>();
         var toRemove = new List<RedisValue>();
 
-        for (var i = 0; i < ids.Length; i++)
+        foreach (var entry in entries)
         {
-            var id = ids[i];
-            var json = values[i];
-
-            if (!json.HasValue)
+            var guid = Guid.Parse(entry.Name!);
+            if (!entry.Value.HasValue)
             {
-                toRemove.Add(id);
+                toRemove.Add(entry.Name);
                 continue;
             }
 
-            var dto = JsonSerializer.Deserialize<GameDto>(json!);
+            var dto = JsonSerializer.Deserialize<GameDto>(entry.Value!);
             if (dto is null) continue;
-            var guid = Guid.Parse(id.ToString());
 
             if (filter(dto, guid))
                 result.Add(dto.ToDomain(GetNextGameStatus(guid)));
         }
 
         if (toRemove.Count > 0)
-            await _db.SetRemoveAsync(setKey, toRemove.ToArray());
+            await _db.HashDeleteAsync(hashKey, toRemove.ToArray());
 
         _cache.Set(cacheKey, result, ttl);
         return result;
     }
 
-    private async Task<int> GetGameCountFromSet(
+    private async Task<int> GetGameCountFromHash(
         string cacheKey,
-        string setKey,
-        Func<Guid, string> keySelector,
+        string hashKey,
         TimeSpan ttl,
         CancellationToken ct)
     {
         if (_cache.TryGetValue(cacheKey, out int cached))
             return cached;
 
-        var ids = await _db.SetMembersAsync(setKey);
-        if (ids.Length == 0)
-        {
-            _cache.Set(cacheKey, 0, ttl);
-            return 0;
-        }
-
-        var keys = ids.Select(id => (RedisKey)keySelector(Guid.Parse(id.ToString()))).ToArray();
-        var values = await _db.StringGetAsync(keys);
-
-        var count = 0;
-        for (var i = 0; i < ids.Length; i++)
-        {
-            if (values[i].HasValue)
-                count++;
-            else
-                await _db.SetRemoveAsync(setKey, ids[i]);
-        }
-
+        var count = (int)await _db.HashLengthAsync(hashKey);
         _cache.Set(cacheKey, count, ttl);
         return count;
     }
@@ -126,35 +101,13 @@ public class Redis(
 
         if (game.StatusTag.IsEndedTag)
         {
-            var setKey = ArchiveKey(gameId);
-            var addKey = ArchiveSetKey;
-            var idStr = dto.Id.ToString();
-
-            await Task.WhenAll(
-                _db.StringSetAsync(setKey, json),
-                _db.SetAddAsync(addKey, idStr)
-            );
-
-            await RemoveLiveGame(gameId, ct);
+            await _db.HashSetAsync(ArchiveHashKey, gameId.ToString(), json);
+            await _db.HashDeleteAsync(LiveHashKey, gameId.ToString());
         }
         else
         {
-            var setKey = LiveKey(gameId);
-            var addKey = LiveSetKey;
-            var idStr = dto.Id.ToString();
-
-            await Task.WhenAll(
-                _db.StringSetAsync(setKey, json, TimeSpan.FromSeconds(120)),
-                _db.SetAddAsync(addKey, idStr)
-            );
+            await _db.HashSetAsync(LiveHashKey, gameId.ToString(), json);
         }
-    }
-
-    private async Task RemoveLiveGame(Guid id, CancellationToken ct)
-    {
-        logger.Debug($"Removing live game {id} from Redis");
-        await _db.KeyDeleteAsync(LiveKey(id));
-        await _db.SetRemoveAsync(LiveSetKey, id.ToString());
     }
 
     public async Task<FSharpOption<Domain.Game.Game>> GetById(GameId gameId, CancellationToken ct)
@@ -163,55 +116,41 @@ public class Redis(
         if (_cache.TryGetValue(cacheKey, out FSharpOption<Domain.Game.Game>? cached))
             return cached!;
 
-        var results = await _db.StringGetAsync([LiveKey(gameId.Item), ArchiveKey(gameId.Item)]);
+        var value = await _db.HashGetAsync(LiveHashKey, gameId.Item.ToString());
+        if (!value.HasValue)
+            value = await _db.HashGetAsync(ArchiveHashKey, gameId.Item.ToString());
 
-        var json = results.FirstOrDefault(v => v.HasValue);
-        if (!json.HasValue)
+        if (!value.HasValue)
         {
             _cache.Set(cacheKey, FSharpOption<Domain.Game.Game>.None, TimeSpan.FromSeconds(3));
             throw new KeyNotFoundException($"Game {gameId} not found");
         }
 
-        var dto = JsonSerializer.Deserialize<GameDto>(json!) ?? throw new Exception("Failed to deserialize GameDto");
+        var dto = JsonSerializer.Deserialize<GameDto>(value!)
+                  ?? throw new Exception("Failed to deserialize GameDto");
         var domain = dto.ToDomain(GetNextGameStatus(gameId.Item));
         _cache.Set(cacheKey, domain, TimeSpan.FromSeconds(3));
         return domain;
     }
 
     public Task<IEnumerable<Domain.Game.Game>> GetNotStarted(CancellationToken ct) =>
-        GetGamesFromSet(
-            "GetNotStarted",
-            LiveSetKey,
-            LiveKey,
+        GetGamesFromHash("GetNotStarted", LiveHashKey,
             (dto, guid) => GetNextScheduledGamePhase(guid) == GameScheduleTarget.PreDraft,
-            TimeSpan.FromSeconds(3),
-            ct);
+            TimeSpan.FromSeconds(3), ct);
 
     public Task<IEnumerable<Domain.Game.Game>> GetInProgress(CancellationToken ct) =>
-        GetGamesFromSet(
-            "GetInProgress",
-            LiveSetKey,
-            LiveKey,
+        GetGamesFromHash("GetInProgress", LiveHashKey,
             (dto, _) => dto.Status != "Ended",
-            TimeSpan.FromSeconds(3),
-            ct);
+            TimeSpan.FromSeconds(3), ct);
 
     public Task<IEnumerable<Domain.Game.Game>> GetEnded(CancellationToken ct) =>
-        GetGamesFromSet(
-            "GetEnded",
-            ArchiveSetKey,
-            ArchiveKey,
+        GetGamesFromHash("GetEnded", ArchiveHashKey,
             (dto, _) => dto.Status == "Ended",
-            TimeSpan.FromSeconds(5),
-            ct);
+            TimeSpan.FromSeconds(5), ct);
 
     public Task<int> GetInProgressCount(CancellationToken ct) =>
-        GetGameCountFromSet(
-            "GetInProgressCount",
-            LiveSetKey,
-            LiveKey,
-            TimeSpan.FromSeconds(2),
-            ct);
+        GetGameCountFromHash("GetInProgressCount", LiveHashKey,
+            TimeSpan.FromSeconds(2), ct);
 
     private async Task<GameDtoMapperInput> CreateMapperInput(Domain.Game.Game game, CancellationToken ct)
     {
