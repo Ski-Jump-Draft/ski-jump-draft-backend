@@ -39,7 +39,7 @@ public static class MatchmakingDtoMapper
 
         var players = dto.Players.Select(player =>
         {
-            var nick = PlayerModule.NickModule.create(player.Nick);
+            var nick = PlayerModule.NickModule.createWithSuffix(player.Nick);
             if (nick.IsNone())
             {
                 throw new InvalidOperationException("Failed to create nick: " + player.Nick);
