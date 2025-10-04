@@ -30,7 +30,7 @@ public class IterativeSimulated(
         {
             JuryBravery.VeryHigh => Math.Round((decimal)6 / 50, 2),
             JuryBravery.High => Math.Round((decimal)3 / 50, 2),
-            JuryBravery.Medium => Math.Round((decimal)0 / 50, 2),
+            JuryBravery.Medium => Math.Round((decimal)1 / 50, 2),
             JuryBravery.Low => Math.Round((decimal)0 / 50, 2),
             JuryBravery.VeryLow => Math.Round((decimal)0 / 50, 2),
             _ => throw new ArgumentOutOfRangeException(nameof(juryBravery), juryBravery, null)
@@ -74,7 +74,7 @@ public class IterativeSimulated(
 
         currentGate += hsPoint switch
         {
-            >= 180 => -1,
+            >= 200 => -1,
             _ => 0
         };
 

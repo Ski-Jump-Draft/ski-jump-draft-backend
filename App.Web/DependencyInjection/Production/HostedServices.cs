@@ -13,9 +13,10 @@ public static class HostedServices
         }
         else
         {
-            services.AddHostedService<OnlineBotJoiner>();
+            services.AddHostedService<App.Web.HostedServices.InternalTest.BotJoiner>();
+            // services.AddHostedService<OnlineBotJoiner>();
         }
-        
+
         return services;
     }
 }

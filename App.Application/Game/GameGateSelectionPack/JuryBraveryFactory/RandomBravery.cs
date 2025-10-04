@@ -13,8 +13,8 @@ public class RandomBravery(IRandom rng) : IJuryBraveryFactory
             { JuryBravery.VeryLow, 1 },
             { JuryBravery.Low, 6 },
             { JuryBravery.Medium, 6 },
-            { JuryBravery.High, 2 },
-            { JuryBravery.VeryHigh, 0.2 }
+            { JuryBravery.High, 3 },
+            { JuryBravery.VeryHigh, 0.5 }
         };
         return probabilityByJuryBravery.WeightedRandomElement(rng);
     }
