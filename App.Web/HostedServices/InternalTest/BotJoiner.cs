@@ -22,9 +22,6 @@ public class BotJoiner(
     {
         while (!ct.IsCancellationRequested)
         {
-            var delayMilliseconds = random.Gaussian(4000, 500);
-            await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), ct);
-
             var all = await matchmakings.GetInProgress(ct);
             var matchmaking = all.FirstOrDefault();
 
