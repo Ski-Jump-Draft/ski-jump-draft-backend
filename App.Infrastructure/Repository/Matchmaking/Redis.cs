@@ -8,26 +8,60 @@ using StackExchange.Redis;
 
 namespace App.Infrastructure.Repository.Matchmaking;
 
-public record SettingsDto(int Min, int Max);
+public record SettingsDto(TimeSpan MaxDuration, string MatchmakingEndPolicy, int Min, int Max);
 
 public record PlayerDto(Guid Id, string Nick);
 
-public record MatchmakingDto(Guid Id, string Status, SettingsDto Settings, List<PlayerDto> Players);
+public record MatchmakingDto(
+    Guid Id,
+    string Status,
+    SettingsDto Settings,
+    List<PlayerDto> Players,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? EndedAt,
+    DateTimeOffset? MaxReachedAt,
+    DateTimeOffset? MinReachedAt,
+    DateTimeOffset? LastUpdatedAt);
 
 public static class MatchmakingDtoMapper
 {
-    public static MatchmakingDto Create(Domain.Matchmaking.Matchmaking matchmaking)
+    public static MatchmakingDto ToRedis(Domain.Matchmaking.Matchmaking matchmaking)
     {
         var players = matchmaking.Players_
             .Select(player => new PlayerDto(player.Id.Item, PlayerModule.NickModule.value(player.Nick))).ToList();
-        var settings = new SettingsDto(SettingsModule.MinPlayersModule.value(matchmaking.MinPlayersCount),
+
+        var matchmakingEndPolicy = RedisMatchmakingEndPolicy(matchmaking.EndPolicy);
+
+        var settings = new SettingsDto(matchmaking.MaxDuration, matchmakingEndPolicy,
+            SettingsModule.MinPlayersModule.value(matchmaking.MinPlayersCount),
             SettingsModule.MaxPlayersModule.value(matchmaking.MaxPlayersCount));
-        return new MatchmakingDto(matchmaking.Id_.Item, matchmaking.Status_.FormattedStatus(), settings, players);
+        return new MatchmakingDto(matchmaking.Id_.Item, matchmaking.Status_.FormattedStatus(), settings, players,
+            matchmaking.StartedAt_, matchmaking.EndedAt_.ToNullable(), matchmaking.ReachedMaxPlayersAt_.ToNullable(),
+            matchmaking.ReachedMinPlayersAt_.ToNullable(), matchmaking.LastUpdatedAt_.ToNullable());
+    }
+
+    private static string RedisMatchmakingEndPolicy(
+        Domain.Matchmaking.SettingsModule.MatchmakingEndPolicy matchmakingEndPolicy)
+    {
+        return matchmakingEndPolicy switch
+        {
+            Domain.Matchmaking.SettingsModule.MatchmakingEndPolicy.AfterNoUpdate afterNoUpdate => $"AfterNoUpdate {
+                afterNoUpdate.Since.ToString()}",
+            Domain.Matchmaking.SettingsModule.MatchmakingEndPolicy.AfterReachingMaxPlayers afterReachingMaxPlayers =>
+                $"AfterReachingMaxPlayers {afterReachingMaxPlayers.After.ToString()}",
+            Domain.Matchmaking.SettingsModule.MatchmakingEndPolicy.AfterReachingMinPlayers afterReachingMinPlayers =>
+                $"AfterReachingMinPlayers {afterReachingMinPlayers.After.ToString()}",
+            { IsAfterTimeout: true } => "AfterTimeout",
+            _ => throw new ArgumentOutOfRangeException(nameof(matchmakingEndPolicy), matchmakingEndPolicy, null)
+        };
     }
 
     public static Domain.Matchmaking.Matchmaking ToDomain(this MatchmakingDto dto)
     {
-        var settings = Domain.Matchmaking.Settings.Create(
+        var matchmakingEndPolicy = DomainMatchmakingEndPolicy(dto.Settings.MatchmakingEndPolicy);
+
+        var settings = Domain.Matchmaking.Settings.Create(SettingsModule.Duration.NewDuration(dto.Settings.MaxDuration),
+            matchmakingEndPolicy,
             SettingsModule.MinPlayersModule.create(dto.Settings.Min).Value,
             SettingsModule.MaxPlayersModule.create(dto.Settings.Max).Value);
         if (settings.IsError)
@@ -49,8 +83,26 @@ public static class MatchmakingDtoMapper
                 nick.Value);
         }).ToList();
         var matchmaking = Domain.Matchmaking.Matchmaking.CreateFromState(MatchmakingId.NewMatchmakingId(dto.Id),
-            settings.ResultValue, status, SetModule.OfSeq(players));
+            settings.ResultValue, status, SetModule.OfSeq(players), dto.StartedAt, dto.EndedAt, dto.MaxReachedAt,
+            dto.MinReachedAt, dto.LastUpdatedAt);
         return matchmaking;
+    }
+
+    private static Domain.Matchmaking.SettingsModule.MatchmakingEndPolicy DomainMatchmakingEndPolicy(
+        string matchmakingEndPolicy)
+    {
+        var parts = matchmakingEndPolicy.Split(' ');
+        return parts[0] switch
+        {
+            "AfterNoUpdate" => SettingsModule.MatchmakingEndPolicy.NewAfterNoUpdate(
+                TimeSpan.Parse(parts[1])),
+            "AfterReachingMaxPlayers" => SettingsModule.MatchmakingEndPolicy.NewAfterReachingMaxPlayers(
+                TimeSpan.Parse(parts[1])),
+            "AfterReachingMinPlayers" => SettingsModule.MatchmakingEndPolicy.NewAfterReachingMinPlayers(
+                TimeSpan.Parse(parts[1])),
+            "AfterTimeout" => SettingsModule.MatchmakingEndPolicy.AfterTimeout,
+            _ => throw new ArgumentOutOfRangeException(nameof(matchmakingEndPolicy), matchmakingEndPolicy, null)
+        };
     }
 }
 
@@ -68,7 +120,7 @@ public class Redis(IConnectionMultiplexer redis, IMyLogger logger) : IMatchmakin
     public async Task Add(Domain.Matchmaking.Matchmaking matchmaking, CancellationToken ct)
     {
         var matchmakingId = matchmaking.Id_.Item;
-        var dto = MatchmakingDtoMapper.Create(matchmaking);
+        var dto = MatchmakingDtoMapper.ToRedis(matchmaking);
         var serializedMatchmaking = JsonSerializer.Serialize(dto);
         if (matchmaking.Status_.IsRunning)
         {

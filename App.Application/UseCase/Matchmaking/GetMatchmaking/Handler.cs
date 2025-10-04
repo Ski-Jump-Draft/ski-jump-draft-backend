@@ -23,12 +23,14 @@ public record Result(
 
 public class Handler(
     IMatchmakings matchmakings,
-    IMatchmakingSchedule matchmakingSchedule)
+    IClock clock)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
     {
-        var matchmaking = await matchmakings.GetById(MatchmakingId.NewMatchmakingId(command.MatchmakingId), ct).AwaitOrWrap(_ => new IdNotFoundException(command.MatchmakingId));;
+        var matchmaking = await matchmakings.GetById(MatchmakingId.NewMatchmakingId(command.MatchmakingId), ct)
+            .AwaitOrWrap(_ => new IdNotFoundException(command.MatchmakingId));
+        ;
 
         string? failReason = null;
         if (matchmaking.Status_.Tag == Status.Tags.Failed)
@@ -37,10 +39,11 @@ public class Handler(
             failReason = failedStatus.Reason;
         }
 
+        var now = clock.Now();
         TimeSpan? remainingTime = null;
         if (matchmaking.Status_.IsRunning)
         {
-            remainingTime = matchmakingSchedule.GetRemainingTime(command.MatchmakingId);
+            remainingTime = matchmaking.RemainingTime(now).Value;
         }
 
         var minRequiredPlayers = OptionModule.ToNullable(matchmaking.MinRequiredPlayers);

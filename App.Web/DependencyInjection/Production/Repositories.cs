@@ -23,7 +23,7 @@ public static class Repositories
                 var redisConnectionString = configuration["Redis:ConnectionString"]
                                             ?? throw new InvalidOperationException(
                                                 "Redis connection string not configured");
-                Console.WriteLine("Redis connection string: " + redisConnectionString);
+                // Console.WriteLine("Redis connection string: " + redisConnectionString);
 
                 // logger.Info("Redis connection string: " + redisConnectionString);
 

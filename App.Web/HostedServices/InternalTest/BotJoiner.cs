@@ -12,7 +12,7 @@ public class BotJoiner(
     ICommandBus bus,
     IRandom random,
     IMyLogger log,
-    IMatchmakingSchedule matchmakingSchedule)
+    IClock clock)
     : BackgroundService
 {
     private readonly ConcurrentDictionary<Guid, ConcurrentBag<string>> _usedBotNicksByMatchmaking = new();
@@ -32,7 +32,9 @@ public class BotJoiner(
 
             var matchmakingId = matchmaking.Id_.Item;
 
-            var remainingTime = matchmakingSchedule.GetRemainingTime(matchmakingId);
+            var now = clock.Now();
+            var remainingTime = matchmaking.RemainingTime(now).Value;
+
             var remainingSlots = matchmaking.RemainingSlots;
             var botsHaveJoinedInThisMatchmaking = _botsHaveJoined.ContainsKey(matchmaking.Id_.Item);
             var botsShouldJoin = remainingTime.TotalSeconds < 5 && remainingSlots > 0 &&

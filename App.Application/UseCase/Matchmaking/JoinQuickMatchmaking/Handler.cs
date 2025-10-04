@@ -29,9 +29,7 @@ public class Handler(
     IScheduler scheduler,
     IJson json,
     IClock clock,
-    IMatchmakingSchedule matchmakingSchedule,
     IMatchmakingNotifier matchmakingNotifier,
-    IMatchmakingDurationCalculator matchmakingDurationCalculator,
     IGames games,
     IBotRegistry botRegistry,
     MatchmakingUpdatedDtoMapper matchmakingUpdatedDtoMapper
@@ -56,6 +54,7 @@ public class Handler(
     {
         var matchmmakingsInProgress = (await matchmakings.GetInProgress(ct)).ToImmutableArray();
         var gamesInProgress = await games.GetInProgressCount(ct);
+        var now = clock.Now();
         switch (matchmmakingsInProgress.Length, gamesInProgress)
         {
             case (_, >= 1):
@@ -68,7 +67,7 @@ public class Handler(
             {
                 var newMatchmaking =
                     Domain.Matchmaking.Matchmaking.CreateNew(MatchmakingId.NewMatchmakingId(guid.NewGuid()),
-                        globalMatchmakingSettings);
+                        globalMatchmakingSettings, now);
                 return new MatchmakingDto(newMatchmaking, JustCreated: true);
             }
         }
@@ -78,7 +77,8 @@ public class Handler(
         Domain.Matchmaking.Matchmaking matchmaking, bool justCreated, bool isBot, CancellationToken ct)
     {
         var player = new Domain.Matchmaking.Player(PlayerId.NewPlayerId(guid.NewGuid()), nick);
-        var joinResult = matchmaking.Join(player);
+        var now = clock.Now();
+        var joinResult = matchmaking.Join(player, now);
         if (joinResult.IsError)
         {
             if (joinResult.ErrorValue.IsTooManyPlayers)
@@ -97,14 +97,13 @@ public class Handler(
         var (matchmakingAfterJoin, correctedNick) = joinResult.ResultValue;
         await matchmakings.Add(matchmakingAfterJoin, ct);
 
-        var matchmakingDuration = matchmakingDurationCalculator.Calculate(matchmakingAfterJoin);
-
         if (justCreated)
         {
-            await scheduler.ScheduleAsync(jobType: "EndMatchmaking",
-                json.Serialize(new { MatchmakingId = matchmaking.Id_.Item }), clock.Now().Add(matchmakingDuration),
-                $"EndMatchmaking:{matchmaking.Id_.Item}", ct);
-            matchmakingSchedule.StartMatchmaking(matchmaking.Id_.Item, matchmakingDuration);
+            now = clock.Now();
+            await scheduler.ScheduleAsync(jobType: "TryEndMatchmaking",
+                json.Serialize(new { MatchmakingId = matchmaking.Id_.Item }),
+                now.Add(TimeSpan.FromMilliseconds(1000)),
+                $"TryEndMatchmaking:{matchmaking.Id_.Item}_{now.ToString()}", ct);
         }
 
         if (isBot)
