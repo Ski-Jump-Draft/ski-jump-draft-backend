@@ -41,7 +41,8 @@ public class BotJoiner(
             if (!botsShouldJoin) continue;
             _botsHaveJoined[matchmaking.Id_.Item] = true;
             var botJoinInterval = TimeSpan.FromMilliseconds(100);
-            for (var i = 0; i < remainingSlots; i++)
+            var botsToJoin = (int)Math.Floor((double)remainingSlots / 2);
+            for (var i = 0; i < botsToJoin; i++)
             {
                 await Task.Delay(botJoinInterval, ct);
                 await JoinBotToMatchmaking(matchmakingId, ct);

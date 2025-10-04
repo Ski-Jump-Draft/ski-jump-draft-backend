@@ -78,9 +78,11 @@ public class BestPicker(
         return preDraftCompetitionResults;
     }
 
-    private static int CalculateMaxPositionFromResults(ImmutableList<ArchiveCompetitionResultsDto> preDraftCompetitionResults)
+    private static int CalculateMaxPositionFromResults(
+        ImmutableList<ArchiveCompetitionResultsDto> preDraftCompetitionResults)
     {
-        var maxPosition = preDraftCompetitionResults.First().JumperResults.Where(record => record.Points != 0).ToList().Count;
+        var maxPosition = preDraftCompetitionResults.First().JumperResults.Where(record => record.Points != 0).ToList()
+            .Count;
         return maxPosition;
     }
 
@@ -105,7 +107,8 @@ public class BestPicker(
         return gameJumperRating;
     }
 
-    private Dictionary<Guid, double> CreateAveragePositions(IEnumerable<ArchiveCompetitionResultsDto> competitionResults)
+    private Dictionary<Guid, double> CreateAveragePositions(
+        IEnumerable<ArchiveCompetitionResultsDto> competitionResults)
     {
         var averagePosition = new Dictionary<Guid, double>();
         foreach (var results in competitionResults)
@@ -133,17 +136,39 @@ public class BestPicker(
         return averagePosition;
     }
 
+    // private static double CalculatePositionsAverage(IEnumerable<double> positions, double p)
+    // {
+    //     var list = positions.ToList();
+    //     return list.Count switch
+    //     {
+    //         0 => 0,
+    //         1 => list.First(),
+    //         _ => Math.Abs(p) < 1e-9
+    //             ? Math.Exp(list.Average(Math.Log))
+    //             : Math.Pow(list.Average(x => Math.Pow(x, p)), 1.0 / p)
+    //     };
+    // }
+
     private static double CalculatePositionsAverage(IEnumerable<double> positions, double p)
     {
         var list = positions.ToList();
-        return list.Count switch
-        {
-            0 => 0,
-            1 => list.First(),
-            _ => Math.Abs(p) < 1e-9
-                ? Math.Exp(list.Average(Math.Log))
-                : Math.Pow(list.Average(x => Math.Pow(x, p)), 1.0 / p)
-        };
+        if (list.Count == 0) return 0;
+        if (list.Count == 1) return list.First();
+
+        double baseAvg = Math.Abs(p) < 1e-9
+            ? Math.Exp(list.Average(Math.Log))
+            : Math.Pow(list.Average(x => Math.Pow(x, p)), 1.0 / p);
+
+        // --- volatility bonus ---
+        var mean = list.Average();
+        var variance = list.Select(x => Math.Pow(x - mean, 2)).Average();
+        var stdDev = Math.Sqrt(variance);
+
+        const double gamma = 0.37; // współczynnik – jak mocno nagradza rozrzut
+        var effectiveAvg = baseAvg - gamma * stdDev;
+        if (effectiveAvg < 1) effectiveAvg = 1; // zabezpieczenie
+
+        return effectiveAvg;
     }
 
 

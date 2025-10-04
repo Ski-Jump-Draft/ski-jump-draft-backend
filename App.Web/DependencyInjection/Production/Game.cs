@@ -80,7 +80,7 @@ public static class Game
                     App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(20)),
                     App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(20)),
                     App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(20)));
-            var jumpInterval = App.Domain.Game.PhaseDuration.Create(TimeSpan.FromMilliseconds(5000));
+            var jumpInterval = App.Domain.Game.PhaseDuration.Create(TimeSpan.FromMilliseconds(6000));
             return new App.Domain.Game.Settings(breakSettings, preDraftSettings, draftSettings, mainCompetitionSettings,
                 jumpInterval,
                 App.Domain.Game.RankingPolicy.Classic);
