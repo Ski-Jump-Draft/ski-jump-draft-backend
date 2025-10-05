@@ -36,8 +36,8 @@ public class InMemory(ICommandBus commandBus, IJson json, IMyLogger logger) : IS
 
                 switch (jobType)
                 {
-                    case "EndMatchmaking":
-                        await HandleEndMatchmaking(payloadJson, CancellationToken.None);
+                    case "TryEndMatchmaking":
+                        await HandleTryEndMatchmaking(payloadJson, CancellationToken.None);
                         break;
                     case "StartGame":
                         await HandleStartGame(payloadJson, CancellationToken.None);
@@ -96,14 +96,14 @@ public class InMemory(ICommandBus commandBus, IJson json, IMyLogger logger) : IS
     }
 
 
-    private async Task HandleEndMatchmaking(string payloadJson, CancellationToken ct)
+    private async Task HandleTryEndMatchmaking(string payloadJson, CancellationToken ct)
     {
         var payload = json.Deserialize<EndMatchmakingPayload>(payloadJson);
         var command =
-            new Application.UseCase.Matchmaking.EndMatchmaking.Command(payload.MatchmakingId);
+            new Application.UseCase.Matchmaking.TryEndMatchmaking.Command(payload.MatchmakingId);
         await commandBus
-            .SendAsync<Application.UseCase.Matchmaking.EndMatchmaking.Command,
-                Application.UseCase.Matchmaking.EndMatchmaking.Result>(command, ct);
+            .SendAsync<Application.UseCase.Matchmaking.TryEndMatchmaking.Command,
+                Application.UseCase.Matchmaking.TryEndMatchmaking.Result>(command, ct);
     }
 
     private async Task HandleStartGame(string payloadJson, CancellationToken ct)

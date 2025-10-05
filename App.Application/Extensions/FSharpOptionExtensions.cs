@@ -15,4 +15,10 @@ public static class FSharpOptionExtensions
 
     public static T OrThrow<T>(this FSharpOption<T> opt, object exception) =>
         opt != null ? opt.Value : throw new Exception(exception.ToString());
+
+
+    public static DateTimeOffset? ToNullable(this Microsoft.FSharp.Core.FSharpOption<DateTimeOffset> opt)
+        => Microsoft.FSharp.Core.FSharpOption<DateTimeOffset>.get_IsSome(opt)
+            ? (DateTimeOffset?)opt.Value
+            : null;
 }

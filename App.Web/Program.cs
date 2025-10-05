@@ -1,4 +1,5 @@
 using App.Application.Commanding;
+using App.Application.Utility;
 using App.Domain.Game;
 using App.Web;
 using App.Web.DependencyInjection;
@@ -19,7 +20,8 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowFrontend",
         policy =>
         {
-            policy.WithOrigins("http://localhost:3000", "https://ski-jump-draft.netlify.app", "https://staging--ski-jump-draft.netlify.app")
+            policy.WithOrigins("http://localhost:3000", "https://ski-jump-draft.netlify.app",
+                    "https://staging--ski-jump-draft.netlify.app")
                 .AllowAnyHeader()
                 .AllowAnyMethod()
                 .AllowCredentials(); // jeśli będziesz używał cookies/sse
@@ -80,23 +82,34 @@ app.MapPost("/matchmaking/join",
         }
         catch (Exception error)
         {
-            myLogger.Error($"Error during joining a matchmaking: {nick}. Error: {error.Message}, StackTrace: {error.StackTrace}");
+            myLogger.Error($"Error during joining a matchmaking: {nick}. Error: {error.Message}, StackTrace: {
+                error.StackTrace}");
             return Results.InternalServerError();
         }
     });
 
 app.MapDelete("/matchmaking/leave",
-    async (Guid matchmakingId, Guid playerId, [FromServices] ICommandBus commandBus,
+    async (Guid matchmakingId, Guid playerId, [FromServices] ICommandBus commandBus, [FromServices] IMyLogger logger,
         CancellationToken ct) =>
     {
-        var command = new App.Application.UseCase.Matchmaking.LeaveMatchmaking.Command(matchmakingId, playerId);
-        await commandBus
-            .SendAsync(command, ct);
-        return Results.NoContent();
+        try
+        {
+            var command = new App.Application.UseCase.Matchmaking.LeaveMatchmaking.Command(matchmakingId, playerId);
+            await commandBus
+                .SendAsync(command, ct);
+            return Results.NoContent();
+        }
+        catch (Exception e)
+        {
+            logger.Error(
+                $"Error during leaving a matchmaking: {e.Message} (matchmakingId: {matchmakingId}, playerId: {playerId
+                }");
+            return Results.Problem("Could not leave");
+        }
     });
 
 app.MapGet("/matchmaking",
-    async (Guid matchmakingId, [FromServices] ICommandBus commandBus,
+    async (Guid matchmakingId, [FromServices] ICommandBus commandBus, [FromServices] IMyLogger logger,
         CancellationToken ct) =>
     {
         var command = new App.Application.UseCase.Matchmaking.GetMatchmaking.Command(matchmakingId);
@@ -107,8 +120,11 @@ app.MapGet("/matchmaking",
                     App.Application.UseCase.Matchmaking.GetMatchmaking.Result>(command, ct);
             return Results.Ok(result);
         }
-        catch (Exception)
+        catch (Exception e)
         {
+            logger.Error($"Error during getting matchmaking info: {e.Message} (matchmakingId: {matchmakingId
+            }), StackTrace: {e.StackTrace}");
+
             return Results.Problem("Could not join");
         }
     });

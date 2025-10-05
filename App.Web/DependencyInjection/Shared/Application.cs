@@ -15,9 +15,9 @@ public static class Application
                 App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Handler>();
         services
             .AddSingleton<
-                ICommandHandler<App.Application.UseCase.Matchmaking.EndMatchmaking.Command,
-                    App.Application.UseCase.Matchmaking.EndMatchmaking.Result>,
-                App.Application.UseCase.Matchmaking.EndMatchmaking.Handler>();
+                ICommandHandler<App.Application.UseCase.Matchmaking.TryEndMatchmaking.Command,
+                    App.Application.UseCase.Matchmaking.TryEndMatchmaking.Result>,
+                App.Application.UseCase.Matchmaking.TryEndMatchmaking.Handler>();
         services
             .AddSingleton<
                 ICommandHandler<App.Application.UseCase.Matchmaking.LeaveMatchmaking.Command>,
@@ -85,7 +85,6 @@ public static class Application
             .AddSingleton<App.Application.Service.DraftSystemSchedulerService,
                 App.Application.Service.DraftSystemSchedulerService>();
 
-        services.AddSingleton<IMatchmakingSchedule, Infrastructure.Schedule.Matchmaking.InMemory>();
         services.AddSingleton<IGameSchedule, Infrastructure.Schedule.Game.InMemory>();
         return services;
     }

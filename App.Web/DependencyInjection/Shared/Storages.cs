@@ -7,6 +7,7 @@ public static class Storages
         services
             .AddSingleton<App.Application.JumpersForm.IJumperGameFormStorage,
                 App.Infrastructure.Storage.JumperGameForm.InMemory>();
+        services.AddSingleton<App.Application.Matchmaking.IMatchmakingUpdatedDtoStorage, App.Infrastructure.Storage.MatchmakingUpdated.InMemory>();
         return services;
     }
 }

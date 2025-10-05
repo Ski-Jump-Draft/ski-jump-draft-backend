@@ -29,13 +29,11 @@ public class Handler(
     IScheduler scheduler,
     IJson json,
     IClock clock,
-    IMatchmakingSchedule matchmakingSchedule,
     IMatchmakingNotifier matchmakingNotifier,
-    IMatchmakingDurationCalculator matchmakingDurationCalculator,
     IGames games,
     IBotRegistry botRegistry,
-    MatchmakingUpdatedDtoMapper matchmakingUpdatedDtoMapper
-)
+    MatchmakingUpdatedDtoMapper matchmakingUpdatedDtoMapper,
+    IMatchmakingUpdatedDtoStorage matchmakingUpdatedDtoStorage)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -56,6 +54,7 @@ public class Handler(
     {
         var matchmmakingsInProgress = (await matchmakings.GetInProgress(ct)).ToImmutableArray();
         var gamesInProgress = await games.GetInProgressCount(ct);
+        var now = clock.Now();
         switch (matchmmakingsInProgress.Length, gamesInProgress)
         {
             case (_, >= 1):
@@ -68,7 +67,7 @@ public class Handler(
             {
                 var newMatchmaking =
                     Domain.Matchmaking.Matchmaking.CreateNew(MatchmakingId.NewMatchmakingId(guid.NewGuid()),
-                        globalMatchmakingSettings);
+                        globalMatchmakingSettings, now);
                 return new MatchmakingDto(newMatchmaking, JustCreated: true);
             }
         }
@@ -77,8 +76,10 @@ public class Handler(
     private async Task<Result> JoinPlayerToMatchmaking(PlayerModule.Nick nick,
         Domain.Matchmaking.Matchmaking matchmaking, bool justCreated, bool isBot, CancellationToken ct)
     {
-        var player = new Domain.Matchmaking.Player(PlayerId.NewPlayerId(guid.NewGuid()), nick);
-        var joinResult = matchmaking.Join(player);
+        var matchmakingGuid = matchmaking.Id_.Item;
+        var now = clock.Now();
+        var player = new Domain.Matchmaking.Player(PlayerId.NewPlayerId(guid.NewGuid()), nick, now);
+        var joinResult = matchmaking.Join(player, now);
         if (joinResult.IsError)
         {
             if (joinResult.ErrorValue.IsTooManyPlayers)
@@ -97,28 +98,33 @@ public class Handler(
         var (matchmakingAfterJoin, correctedNick) = joinResult.ResultValue;
         await matchmakings.Add(matchmakingAfterJoin, ct);
 
-        var matchmakingDuration = matchmakingDurationCalculator.Calculate(matchmakingAfterJoin);
-
+        var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterJoin, now);
+        myLogger.Info("Just created matchmaking? (id= " + matchmakingGuid + "): " + justCreated + "");
         if (justCreated)
         {
-            await scheduler.ScheduleAsync(jobType: "EndMatchmaking",
-                json.Serialize(new { MatchmakingId = matchmaking.Id_.Item }), clock.Now().Add(matchmakingDuration),
-                $"EndMatchmaking:{matchmaking.Id_.Item}", ct);
-            matchmakingSchedule.StartMatchmaking(matchmaking.Id_.Item, matchmakingDuration);
+            now = clock.Now();
+            await scheduler.ScheduleAsync(jobType: "TryEndMatchmaking",
+                json.Serialize(new { MatchmakingId = matchmakingGuid }),
+                now.Add(TimeSpan.FromMilliseconds(1000)),
+                $"TryEndMatchmaking:{matchmakingGuid}_{now.ToString()}", ct);
         }
+        
+        await matchmakingUpdatedDtoStorage.Set(matchmakingGuid, matchmakingUpdatedDto);
 
         if (isBot)
         {
-            botRegistry.RegisterMatchmakingBot(matchmaking.Id_.Item, player.Id.Item);
+            botRegistry.RegisterMatchmakingBot(matchmakingGuid, player.Id.Item);
         }
 
-        await matchmakingNotifier.MatchmakingUpdated(matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterJoin));
-        await matchmakingNotifier.PlayerJoined(matchmakingUpdatedDtoMapper.PlayerJoinedFromDomain(player.Id.Item,
-            PlayerModule.NickModule.value(player.Nick), matchmakingAfterJoin));
+        now = clock.Now();
 
-        myLogger.Info($"{correctedNick} joined the matchmaking ({matchmaking.Id_.Item})");
+        await matchmakingNotifier.MatchmakingUpdated(matchmakingUpdatedDto);
+        await matchmakingNotifier.PlayerJoined(
+            matchmakingUpdatedDtoMapper.PlayerJoinedFromDomain(player, matchmakingAfterJoin));
 
-        return new Result(matchmaking.Id_.Item, PlayerModule.NickModule.value(correctedNick), player.Id.Item);
+        myLogger.Info($"{correctedNick} joined the matchmaking ({matchmakingGuid})");
+
+        return new Result(matchmakingGuid, PlayerModule.NickModule.value(correctedNick), player.Id.Item);
     }
 
     private record MatchmakingDto(Domain.Matchmaking.Matchmaking Matchmaking, bool JustCreated);

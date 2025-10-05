@@ -2,6 +2,7 @@ using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Matchmaking;
+using App.Application.Messaging.Notifiers;
 using App.Application.Utility;
 using App.Domain.Matchmaking;
 using Microsoft.FSharp.Core;
@@ -13,39 +14,20 @@ public record Command(
 ) : ICommand<Result>;
 
 public record Result(
-    string Status,
-    string? FailReason,
-    int PlayersCount,
-    int? MinRequiredPlayers,
-    int MinPlayers,
-    int MaxPlayers,
-    TimeSpan? RemainingTime);
+    MatchmakingUpdatedDto MatchmakingUpdatedDto);
 
 public class Handler(
-    IMatchmakings matchmakings,
-    IMatchmakingSchedule matchmakingSchedule)
+    IMatchmakingUpdatedDtoStorage matchmakingUpdatedDtoStorage)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
     {
-        var matchmaking = await matchmakings.GetById(MatchmakingId.NewMatchmakingId(command.MatchmakingId), ct).AwaitOrWrap(_ => new IdNotFoundException(command.MatchmakingId));;
-
-        string? failReason = null;
-        if (matchmaking.Status_.Tag == Status.Tags.Failed)
+        var dto = await matchmakingUpdatedDtoStorage.Get(command.MatchmakingId);
+        if (dto is null)
         {
-            var failedStatus = (Status.Failed)matchmaking.Status_;
-            failReason = failedStatus.Reason;
+            throw new Exception("Failed to get matchmaking dto because there is no dto in storage");
         }
 
-        TimeSpan? remainingTime = null;
-        if (matchmaking.Status_.IsRunning)
-        {
-            remainingTime = matchmakingSchedule.GetRemainingTime(command.MatchmakingId);
-        }
-
-        var minRequiredPlayers = OptionModule.ToNullable(matchmaking.MinRequiredPlayers);
-        return new Result(FSharpUnionHelper.GetCaseName(matchmaking.Status_), failReason, matchmaking.Players_.Count,
-            minRequiredPlayers, SettingsModule.MinPlayersModule.value(matchmaking.MinPlayersCount),
-            SettingsModule.MaxPlayersModule.value(matchmaking.MaxPlayersCount), remainingTime);
+        return new Result(dto);
     }
 }
