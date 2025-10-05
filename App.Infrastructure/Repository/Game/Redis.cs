@@ -121,7 +121,7 @@ public class Redis(
     public async Task Add(Domain.Game.Game game, CancellationToken ct)
     {
         var gameId = game.Id_.Item;
-        var dto = GameDtoMapper.Create(await CreateMapperInput(game, ct));
+        var dto = GameDtoMapper.Create(await CreateMapperInput(game, ct), clock.Now());
         var json = JsonSerializer.Serialize(dto);
 
         if (game.StatusTag.IsEndedTag)
@@ -333,7 +333,7 @@ public record GameDtoMapperInput(
 
 public static class GameDtoMapper
 {
-    public static GameDto Create(GameDtoMapperInput input)
+    public static GameDto Create(GameDtoMapperInput input, DateTimeOffset now)
     {
         var game = input.Game;
 
@@ -346,6 +346,7 @@ public static class GameDtoMapper
         var gameId = game.Id.Item;
         var dto = new GameDto(
             gameId,
+            now,
             game.StatusTag.ToString().RemoveFromEndInWordsIfPresent("Tag"),
             CreateSettings(input),
             CreateCompetitionHill(input),
@@ -1201,6 +1202,7 @@ public record GameRankingDto(
 
 public record GameDto(
     Guid Id,
+    DateTimeOffset CreatedAt,
     string Status,
     // string? NextStatus,
     SettingsDto Settings,
