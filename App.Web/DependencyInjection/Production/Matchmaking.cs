@@ -23,7 +23,7 @@ public static class Matchmaking
             services.AddSingleton<App.Domain.Matchmaking.Settings>(sp =>
                 App.Domain.Matchmaking.Settings.Create(
                     SettingsModule.Duration.NewDuration(TimeSpan.FromSeconds(60)),
-                    autoStartPolicy: SettingsModule.MatchmakingEndPolicy.NewAfterNoUpdate(
+                    autoStartPolicy: SettingsModule.MatchmakingEndPolicy.NewAfterReachingMinPlayers(
                         TimeSpan.FromSeconds(10)),
                     App.Domain.Matchmaking.SettingsModule.MinPlayersModule.create(3).Value,
                     App.Domain.Matchmaking.SettingsModule.MaxPlayersModule.create(12).Value).ResultValue);
