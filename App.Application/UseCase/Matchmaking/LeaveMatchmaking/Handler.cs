@@ -1,6 +1,7 @@
 using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
+using App.Application.Matchmaking;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
 using App.Application.Utility;
@@ -17,7 +18,8 @@ public class Handler(
     IMatchmakings matchmakings,
     IMatchmakingNotifier notifier,
     MatchmakingUpdatedDtoMapper matchmakingUpdatedDtoMapper,
-    IClock clock)
+    IClock clock,
+    IMatchmakingUpdatedDtoStorage matchmakingUpdatedDtoStorage)
     : ICommandHandler<Command>
 {
     public async Task HandleAsync(Command command, CancellationToken ct)
@@ -31,10 +33,12 @@ public class Handler(
         {
             var matchmakingAfterLeave = matchmakingAfterLeaveResult.ResultValue;
             await matchmakings.Add(matchmakingAfterLeave, ct);
-            await notifier.MatchmakingUpdated(matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterLeave));
-            var playerNick = matchmaking.Players_.Single(p => p.Id.Item == playerId.Item).Nick;
-            await notifier.PlayerLeft(matchmakingUpdatedDtoMapper.PlayerLeftFromDomain(playerId.Item,
-                PlayerModule.NickModule.value(playerNick), matchmakingAfterLeave));
+            now = clock.Now();
+            var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterLeave, now);
+            await matchmakingUpdatedDtoStorage.Set(command.MatchmakingId, matchmakingUpdatedDto);
+            await notifier.MatchmakingUpdated(matchmakingUpdatedDto);
+            var player = matchmaking.Players_.Single(p => p.Id.Item == command.PlayerId);
+            await notifier.PlayerLeft(matchmakingUpdatedDtoMapper.PlayerLeftFromDomain(player, matchmakingAfterLeave));
         }
         else
         {

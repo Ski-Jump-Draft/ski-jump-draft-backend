@@ -10,7 +10,7 @@ namespace App.Infrastructure.Repository.Matchmaking;
 
 public record SettingsDto(TimeSpan MaxDuration, string MatchmakingEndPolicy, int Min, int Max);
 
-public record PlayerDto(Guid Id, string Nick);
+public record PlayerDto(Guid Id, string Nick, DateTimeOffset JoinedAt);
 
 public record MatchmakingDto(
     Guid Id,
@@ -28,7 +28,7 @@ public static class MatchmakingDtoMapper
     public static MatchmakingDto ToRedis(Domain.Matchmaking.Matchmaking matchmaking)
     {
         var players = matchmaking.Players_
-            .Select(player => new PlayerDto(player.Id.Item, PlayerModule.NickModule.value(player.Nick))).ToList();
+            .Select(player => new PlayerDto(player.Id.Item, PlayerModule.NickModule.value(player.Nick), player.JoinedAt)).ToList();
 
         var matchmakingEndPolicy = RedisMatchmakingEndPolicy(matchmaking.EndPolicy);
 
@@ -80,7 +80,7 @@ public static class MatchmakingDtoMapper
             }
 
             return new Domain.Matchmaking.Player(PlayerId.NewPlayerId(player.Id),
-                nick.Value);
+                nick.Value, player.JoinedAt);
         }).ToList();
         var matchmaking = Domain.Matchmaking.Matchmaking.CreateFromState(MatchmakingId.NewMatchmakingId(dto.Id),
             settings.ResultValue, status, SetModule.OfSeq(players), dto.StartedAt, dto.EndedAt, dto.MaxReachedAt,

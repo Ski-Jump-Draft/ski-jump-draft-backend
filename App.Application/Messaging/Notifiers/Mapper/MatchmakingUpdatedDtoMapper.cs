@@ -7,10 +7,10 @@ using Microsoft.FSharp.Core;
 namespace App.Application.Messaging.Notifiers.Mapper;
 
 public class MatchmakingUpdatedDtoMapper(
-    IBotRegistry botRegistry // jedyna zależność teraz, ale łatwo rozbudować
+    IBotRegistry botRegistry
 )
 {
-    public MatchmakingUpdatedDto FromDomain(Domain.Matchmaking.Matchmaking matchmaking)
+    public MatchmakingUpdatedDto FromDomain(Domain.Matchmaking.Matchmaking matchmaking, DateTimeOffset now)
     {
         var statusString = matchmaking.Status_.FormattedStatus();
 
@@ -18,41 +18,46 @@ public class MatchmakingUpdatedDtoMapper(
             matchmaking.Id_.Item,
             statusString,
             matchmaking.Players_
-                .Select(player => CreatePlayerDto(player.Id.Item,
-                    PlayerModule.NickModule.value(player.Nick),
+                .Select(player => CreatePlayerDto(player,
                     matchmaking))
                 .ToImmutableList(),
             matchmaking.PlayersCount,
             OptionModule.ToNullable(matchmaking.MinRequiredPlayers),
             SettingsModule.MinPlayersModule.value(matchmaking.MinPlayersCount),
-            SettingsModule.MaxPlayersModule.value(matchmaking.MaxPlayersCount)
+            SettingsModule.MaxPlayersModule.value(matchmaking.MaxPlayersCount),
+            matchmaking.StartedAt_,
+            matchmaking.ForceEndAt(now),
+            matchmaking.EndedAt_.ToNullable(),
+            matchmaking.EndPolicy.IsAfterNoUpdate,
+            matchmaking.AcceleratedEndAt(now).ToNullable()
         );
     }
 
-    public PlayerJoinedDto PlayerJoinedFromDomain(Guid playerId, string playerNick,
+    public PlayerJoinedDto PlayerJoinedFromDomain(Domain.Matchmaking.Player player,
         Domain.Matchmaking.Matchmaking matchmaking)
         => new(
             matchmaking.Id_.Item,
-            CreatePlayerDto(playerId, playerNick, matchmaking),
+            CreatePlayerDto(player, matchmaking),
             matchmaking.PlayersCount,
             SettingsModule.MaxPlayersModule.value(matchmaking.MaxPlayersCount),
             OptionModule.ToNullable(matchmaking.MinRequiredPlayers)
         );
 
-    public PlayerLeftDto PlayerLeftFromDomain(Guid playerId, string playerNick,
+    public PlayerLeftDto PlayerLeftFromDomain(Domain.Matchmaking.Player player,
         Domain.Matchmaking.Matchmaking matchmaking)
         => new(
             matchmaking.Id_.Item,
-            CreatePlayerDto(playerId, playerNick, matchmaking),
+            CreatePlayerDto(player, matchmaking),
             matchmaking.PlayersCount,
             SettingsModule.MaxPlayersModule.value(matchmaking.MaxPlayersCount),
             OptionModule.ToNullable(matchmaking.MinRequiredPlayers)
         );
 
-    private MatchmakingPlayerDto CreatePlayerDto(Guid playerId, string playerNick,
+    private MatchmakingPlayerDto CreatePlayerDto(Domain.Matchmaking.Player player,
         Domain.Matchmaking.Matchmaking matchmaking)
     {
-        var isBot = botRegistry.IsMatchmakingBot(matchmaking.Id_.Item, playerId);
-        return new MatchmakingPlayerDto(playerId, playerNick, isBot);
+        var isBot = botRegistry.IsMatchmakingBot(matchmaking.Id_.Item, player.Id.Item);
+        return new MatchmakingPlayerDto(player.Id.Item, PlayerModule.NickModule.value(player.Nick), isBot,
+            player.JoinedAt);
     }
 }

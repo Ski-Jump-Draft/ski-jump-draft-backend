@@ -24,7 +24,8 @@ public class Handler(
     IClock clock,
     IMyLogger logger,
     IBotRegistry botRegistry,
-    MatchmakingUpdatedDtoMapper matchmakingUpdatedDtoMapper)
+    MatchmakingUpdatedDtoMapper matchmakingUpdatedDtoMapper,
+    IMatchmakingUpdatedDtoStorage matchmakingUpdatedDtoStorage)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -36,7 +37,9 @@ public class Handler(
         var onlyBotsExist = matchmakingBots.Count == matchmaking.PlayersCount;
         var now = clock.Now();
 
-        if (matchmaking.ShouldEnd(now))
+        var shouldEnd = matchmaking.ShouldEnd(now);
+        logger.Info($"Should end matchmaking? MatchmakingId: {command.MatchmakingId}, shouldEnd: {shouldEnd}");
+        if (shouldEnd)
         {
             if (onlyBotsExist)
             {
@@ -68,7 +71,11 @@ public class Handler(
                 );
             }
 
-            await matchmakingNotifier.MatchmakingUpdated(matchmakingUpdatedDtoMapper.FromDomain(endedMatchmaking));
+            now = clock.Now();
+
+            var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(endedMatchmaking, now);
+            await matchmakingUpdatedDtoStorage.Set(command.MatchmakingId, matchmakingUpdatedDto);
+            await matchmakingNotifier.MatchmakingUpdated(matchmakingUpdatedDto);
 
             return new Result(true);
         }

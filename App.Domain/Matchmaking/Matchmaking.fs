@@ -20,6 +20,7 @@ type MatchmakingError =
     | NotInMatchmaking
     | InvalidStatus of Status: Status
     | TooManyPlayers
+    | InvalidJoinedAt
 
 type Matchmaking =
     private
@@ -80,7 +81,7 @@ type Matchmaking =
     member this.EndedAt_: DateTimeOffset option = this.EndedAt
     member this.ReachedMaxPlayersAt_: DateTimeOffset option = this.ReachedMaxPlayersAt
     member this.ReachedMinPlayersAt_: DateTimeOffset option = this.ReachedMinPlayersAt
-    member this.LastUpdatedAt_ : DateTimeOffset option = this.LastUpdatedAt
+    member this.LastUpdatedAt_: DateTimeOffset option = this.LastUpdatedAt
     member this.EndPolicy = this.Settings.MatchmakingEndPolicy
 
     member this.MinRequiredPlayers =
@@ -93,59 +94,62 @@ type Matchmaking =
             None
 
     member this.Join (player: Player) (now: DateTimeOffset) : Result<Matchmaking * Player.Nick, MatchmakingError> =
-        match this.Status with
-        | Running ->
-            if this.Players |> Set.exists (fun p -> p.Id = player.Id) then
-                Error AlreadyJoined
-            elif this.Players.Count >= Settings.MaxPlayers.value this.Settings.MaxPlayers then
-                Error TooManyPlayers
-            else
-                let newPlayersCount = this.PlayersCount + 1
+        if player.JoinedAt <> now then
+            Error(MatchmakingError.InvalidJoinedAt)
+        else
+            match this.Status with
+            | Running ->
+                if this.Players |> Set.exists (fun p -> p.Id = player.Id) then
+                    Error AlreadyJoined
+                elif this.Players.Count >= Settings.MaxPlayers.value this.Settings.MaxPlayers then
+                    Error TooManyPlayers
+                else
+                    let newPlayersCount = this.PlayersCount + 1
 
-                let existingNicks =
-                    this.Players |> Seq.map (fun p -> Player.Nick.value p.Nick) |> Set.ofSeq
+                    let existingNicks =
+                        this.Players |> Seq.map (fun p -> Player.Nick.value p.Nick) |> Set.ofSeq
 
-                let baseNick = Player.Nick.value player.Nick
+                    let baseNick = Player.Nick.value player.Nick
 
-                let finalNick =
-                    if existingNicks.Contains(baseNick) then
-                        let rec find i =
-                            let candidate = $"{baseNick} ({i})"
+                    let finalNick =
+                        if existingNicks.Contains(baseNick) then
+                            let rec find i =
+                                let candidate = $"{baseNick} ({i})"
 
-                            if existingNicks.Contains(candidate) then
-                                find (i + 1)
-                            else
-                                candidate
+                                if existingNicks.Contains(candidate) then
+                                    find (i + 1)
+                                else
+                                    candidate
 
-                        find 2
-                    else
-                        baseNick
+                            find 2
+                        else
+                            baseNick
 
-                let nick' =
-                    Player.Nick.createWithSuffix finalNick
-                    |> Option.defaultWith (fun () -> failwith "Nick validation error")
+                    let nick' =
+                        Player.Nick.createWithSuffix finalNick
+                        |> Option.defaultWith (fun () -> failwith "Nick validation error")
 
-                let reachedMaxAt =
-                    if this.ReachedMaxPlayers newPlayersCount then
-                        Some now
-                    else
-                        None
+                    let reachedMaxAt =
+                        if this.ReachedMaxPlayers newPlayersCount then
+                            Some now
+                        else
+                            None
 
-                let reachedMinAt =
-                    if this.ReachedMinPlayers newPlayersCount then
-                        Some now
-                    else
-                        None
+                    let reachedMinAt =
+                        if this.ReachedMinPlayers newPlayersCount then
+                            Some now
+                        else
+                            None
 
-                Ok(
-                    { this with
-                        Players = this.Players.Add { player with Nick = nick' }
-                        LastUpdatedAt = Some now
-                        ReachedMaxPlayersAt = reachedMaxAt
-                        ReachedMinPlayersAt = reachedMinAt },
-                    nick'
-                )
-        | _ -> Error(InvalidStatus this.Status)
+                    Ok(
+                        { this with
+                            Players = this.Players.Add { player with Nick = nick' }
+                            LastUpdatedAt = Some now
+                            ReachedMaxPlayersAt = reachedMaxAt
+                            ReachedMinPlayersAt = reachedMinAt },
+                        nick'
+                    )
+            | _ -> Error(InvalidStatus this.Status)
 
     member this.CanJoin: bool =
         match this.Status with
@@ -194,36 +198,42 @@ type Matchmaking =
                 Error NotInMatchmaking
         | _ -> Error(InvalidStatus this.Status)
 
-    member this.RemainingTime(now: DateTimeOffset) : TimeSpan option =
+    member this.ForceEndAt(now: DateTimeOffset) : DateTimeOffset =
         let (Duration maxDuration) = this.Settings.MaxDuration
-        let currentDuration = now - this.StartedAt
-        let remainingToTimeout = maxDuration - currentDuration
+        this.StartedAt + maxDuration
 
-        if remainingToTimeout <= TimeSpan.Zero then
-            None
-        else
-            match this.Settings.MatchmakingEndPolicy with
-            | AfterTimeout -> Some remainingToTimeout
-            | AfterNoUpdate since ->
-                match this.LastUpdatedAt with
-                | None -> Some remainingToTimeout
-                | Some lastUpdateAt ->
-                    let targetTime = lastUpdateAt + since
-                    Some(targetTime - now)
-            | AfterReachingMaxPlayers after ->
-                match this.ReachedMaxPlayersAt with
-                | None -> Some remainingToTimeout
-                | Some reachedMaxPlayersAt ->
-                    let targetTime = reachedMaxPlayersAt + after
-                    Some(targetTime - now)
-            | AfterReachingMinPlayers after ->
-                match this.ReachedMinPlayersAt with
-                | None -> Some remainingToTimeout
-                | Some reachedMinPlayersAt ->
-                    let targetTime = reachedMinPlayersAt + after
-                    Some(targetTime - now)
+    member this.RemainingToForceEnd(now: DateTimeOffset) : TimeSpan =
+        let forceEndAt = this.ForceEndAt now
+        let remainingToForceEnd = forceEndAt - now
+        remainingToForceEnd
 
-    member this.ShouldEnd(now: DateTimeOffset) : bool = this.RemainingTime now = None
+    member this.AcceleratedEndAt(now: DateTimeOffset) : DateTimeOffset option =
+        match this.Settings.MatchmakingEndPolicy with
+        | AfterTimeout -> None
+        | AfterNoUpdate since -> this.LastUpdatedAt |> Option.map (fun lastUpdateAt -> lastUpdateAt + since)
+        | AfterReachingMaxPlayers after ->
+            match (this.ReachedMaxPlayers this.PlayersCount, this.ReachedMaxPlayersAt) with
+            | true, Some reachedAt -> Some(reachedAt + after)
+            | _ -> None
+        | AfterReachingMinPlayers after ->
+            match (this.ReachedMinPlayers this.PlayersCount, this.ReachedMinPlayersAt) with
+            | true, Some reachedAt -> Some(reachedAt + after)
+            | _ -> None
+
+    member this.RemainingTimeFrom(now: DateTimeOffset) : TimeSpan =
+        match this.RemainingTimeToAcceleratedEnd now with
+        | Some timeToAcceleratedEnd -> timeToAcceleratedEnd
+        | None -> this.RemainingToForceEnd now
+
+    member this.RemainingTimeToAcceleratedEnd(now: DateTimeOffset) : TimeSpan option =
+        match this.AcceleratedEndAt now with
+        | None -> None
+        | Some acceleratedEndAt ->
+            let remaining = acceleratedEndAt - now
+            Some remaining
+
+    member this.ShouldEnd(now: DateTimeOffset) : bool =
+        this.RemainingTimeFrom now <= TimeSpan.Zero
 
     member this.End now : Result<(Matchmaking * bool), MatchmakingError> =
         match this.Status with

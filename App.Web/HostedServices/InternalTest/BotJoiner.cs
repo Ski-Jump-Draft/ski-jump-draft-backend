@@ -33,7 +33,7 @@ public class BotJoiner(
             var matchmakingId = matchmaking.Id_.Item;
 
             var now = clock.Now();
-            var remainingTime = matchmaking.RemainingTime(now);
+            var remainingTime = matchmaking.RemainingTimeToAcceleratedEnd(now);
             if (remainingTime is null) continue;
 
             var remainingSlots = matchmaking.RemainingSlots;
