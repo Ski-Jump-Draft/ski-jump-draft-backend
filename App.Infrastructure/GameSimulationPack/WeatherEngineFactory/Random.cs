@@ -37,8 +37,8 @@ public class Random(IRandom random, IMyLogger logger) : IWeatherEngineFactory
 
     private static double SampleStableStdDev(IRandom random)
     {
-        var x = SampleBetaInt(random, 2, 10);
-        return 0.3 * x;
+        var x = SampleBetaInt(random, 2, 12);
+        return 0.26 * x;
     }
 
     private static double SampleWindAdditionStdDev(IRandom random)
