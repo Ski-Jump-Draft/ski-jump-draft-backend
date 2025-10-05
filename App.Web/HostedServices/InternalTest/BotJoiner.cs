@@ -37,12 +37,12 @@ public class BotJoiner(
 
             var remainingSlots = matchmaking.RemainingSlots;
             var botsHaveJoinedInThisMatchmaking = _botsHaveJoined.ContainsKey(matchmaking.Id_.Item);
-            var botsShouldJoin = remainingTime.TotalSeconds < 5 && remainingSlots > 0 &&
+            var botsShouldJoin = remainingTime.TotalSeconds < 10 && remainingSlots > 0 &&
                                  !botsHaveJoinedInThisMatchmaking;
 
             if (!botsShouldJoin) continue;
             _botsHaveJoined[matchmaking.Id_.Item] = true;
-            var botJoinInterval = TimeSpan.FromMilliseconds(100);
+            var botJoinInterval = TimeSpan.FromMilliseconds(350);
             var botsToJoin = (int)Math.Floor((double)remainingSlots / 2);
             for (var i = 0; i < botsToJoin; i++)
             {
