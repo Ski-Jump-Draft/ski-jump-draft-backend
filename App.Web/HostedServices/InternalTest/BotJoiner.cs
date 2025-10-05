@@ -33,12 +33,11 @@ public class BotJoiner(
             var matchmakingId = matchmaking.Id_.Item;
 
             var now = clock.Now();
-            var remainingTime = matchmaking.RemainingTimeToAcceleratedEnd(now);
-            if (remainingTime is null) continue;
+            var remainingTime = matchmaking.RemainingToForceEnd(now);
 
             var remainingSlots = matchmaking.RemainingSlots;
             var botsHaveJoinedInThisMatchmaking = _botsHaveJoined.ContainsKey(matchmaking.Id_.Item);
-            var botsShouldJoin = remainingTime.Value.TotalSeconds < 5 && remainingSlots > 0 &&
+            var botsShouldJoin = remainingTime.TotalSeconds < 5 && remainingSlots > 0 &&
                                  !botsHaveJoinedInThisMatchmaking;
 
             if (!botsShouldJoin) continue;
