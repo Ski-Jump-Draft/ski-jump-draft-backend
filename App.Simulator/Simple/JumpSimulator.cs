@@ -138,15 +138,16 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
 
     private static double DynamicFlightToTakeoffRatio(double k)
     {
-        const double flightRatioWhenK200 = 4.0;
         return k switch
         {
-            <= 90 => 1.0,
-            < 125 => Lerp(1.0, 1.6, SmoothStep(90, 125, k)),
-            < 200 => Lerp(1.6, flightRatioWhenK200, SmoothStep(125, 200, k)),
-            _ => flightRatioWhenK200
+            // Poniżej 90 – mocniejsze wybicie
+            < 90 => Lerp(1.0 / 3.0, 2.0 / 3.0, SmoothStep(50, 90, k)),
+            // Od 90 w górę – coraz większy wpływ lotu (tak jak było)
+            < 125 => Lerp(1.0, 1.5, SmoothStep(90, 125, k)),
+            _ => k < 200 ? Lerp(1.5, 4.0, SmoothStep(125, 200, k)) : 4.0
         };
     }
+
 
     private static double BigHillSpreadAttenuation(double k)
     {
