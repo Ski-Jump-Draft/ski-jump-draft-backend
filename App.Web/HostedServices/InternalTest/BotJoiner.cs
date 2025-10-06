@@ -22,6 +22,7 @@ public class BotJoiner(
     {
         while (!ct.IsCancellationRequested)
         {
+            await Task.Delay(TimeSpan.FromMilliseconds(3000), ct);
             var all = await matchmakings.GetInProgress(ct);
             var matchmaking = all.FirstOrDefault();
 
