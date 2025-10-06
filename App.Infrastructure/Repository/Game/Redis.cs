@@ -184,7 +184,7 @@ public class Redis(
             LiveSetKey,
             LiveKey,
             (dto, guid) => GetNextScheduledGamePhase(guid) == GameScheduleTarget.PreDraft,
-            TimeSpan.FromSeconds(3),
+            TimeSpan.FromSeconds(2),
             ct);
 
     public Task<IEnumerable<Domain.Game.Game>> GetInProgress(CancellationToken ct) =>
@@ -193,7 +193,7 @@ public class Redis(
             LiveSetKey,
             LiveKey,
             (dto, _) => dto.Status != "Ended",
-            TimeSpan.FromSeconds(3),
+            TimeSpan.FromSeconds(2),
             ct);
 
     public Task<IEnumerable<Domain.Game.Game>> GetEnded(CancellationToken ct) =>
@@ -202,7 +202,7 @@ public class Redis(
             ArchiveSetKey,
             ArchiveKey,
             (dto, _) => dto.Status == "Ended",
-            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(2),
             ct);
 
     public Task<int> GetInProgressCount(CancellationToken ct) =>
