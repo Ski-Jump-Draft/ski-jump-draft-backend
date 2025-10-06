@@ -39,7 +39,17 @@ public static class Repositories
                     SyncTimeout = 10000,
                     KeepAlive = 60
                 };
-                return ConnectionMultiplexer.Connect(options);
+                
+                var connectionMultiplexer = ConnectionMultiplexer.Connect(options);
+                
+                connectionMultiplexer.ConnectionFailed += (_, e) => logger.Error("Redis connection failed: " + e.Exception?.Message);
+                connectionMultiplexer.ConnectionRestored += (_, e) => logger.Info("Redis connection restored: " + e.EndPoint);
+                connectionMultiplexer.ErrorMessage += (_, e) => logger.Warn("Redis error: " + e.Message);
+                connectionMultiplexer.InternalError += (_, e) => logger.Error("Redis internal error: " + e.Exception?.Message);
+                
+                logger.Info("Redis connected: " + string.Join(", ", connectionMultiplexer.GetEndPoints().Select(e => e.ToString())));
+                
+                return connectionMultiplexer;
             });
             services
                 .AddSingleton<App.Domain.Matchmaking.IMatchmakings,
