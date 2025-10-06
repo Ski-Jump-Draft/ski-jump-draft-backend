@@ -37,6 +37,7 @@ public class Random(IRandom random, IMyLogger logger) : IWeatherEngineFactory
 
     private static double SampleStableStdDev(IRandom random)
     {
+        // Zwiększyć b/zmniejszyć a dla mniejszych wartości
         var x = SampleBetaInt(random, 2, 12);
         return 0.26 * x;
     }
@@ -45,7 +46,9 @@ public class Random(IRandom random, IMyLogger logger) : IWeatherEngineFactory
     {
         // Beta(2,6) na [0,1] ma modę (2-1)/(2+6-2) = 1/6
         // Skalujemy do [0,1.5] -> moda = 1.5 * 1/6 = 0.25 (idealnie jak chcemy)
-        var x = SampleBetaInt(random, 2, 6);
+        
+        // Zwiększyć b/zmniejszyć a dla mniejszych wartości
+        var x = SampleBetaInt(random, 2, 9);
         return 1.3 * x;
     }
 
