@@ -48,7 +48,7 @@ public class Random(IRandom random, IMyLogger logger) : IWeatherEngineFactory
         // Skalujemy do [0,1.5] -> moda = 1.5 * 1/6 = 0.25 (idealnie jak chcemy)
         
         // Zwiększyć b/zmniejszyć a dla mniejszych wartości
-        var x = SampleBetaInt(random, 2, 9);
+        var x = SampleBetaInt(random, 2, 8);
         return 1.3 * x;
     }
 

@@ -53,23 +53,26 @@ public class Handler(
     private async Task<MatchmakingDto> FindOrCreateMatchmakingAsync(CancellationToken ct)
     {
         var matchmmakingsInProgress = (await matchmakings.GetInProgress(ct)).ToImmutableArray();
-        var gamesInProgress = await games.GetInProgressCount(ct);
+        var gamesInProgressCount = await games.GetInProgressCount(ct);
         var now = clock.Now();
-        switch (matchmmakingsInProgress.Length, gamesInProgress)
+        var matchmakingsCount = matchmmakingsInProgress.Length;
+
+        switch (matchmakingsCount, gamesInProgressCount)
         {
+            case (> 1, _):
             case (_, >= 1):
                 throw new MultipleGamesNotSupportedException();
-            case (1, 0):
-                var matchmaking = matchmmakingsInProgress.Single();
-                return new MatchmakingDto(matchmmakingsInProgress.Single(), JustCreated: false);
-            // 0 matchmakings, 0 games
-            default:
-            {
+            case (0, 0):
                 var newMatchmaking =
                     Domain.Matchmaking.Matchmaking.CreateNew(MatchmakingId.NewMatchmakingId(guid.NewGuid()),
                         globalMatchmakingSettings, now);
                 return new MatchmakingDto(newMatchmaking, JustCreated: true);
-            }
+            case (1, 0):
+                var matchmaking = matchmmakingsInProgress.Single();
+                return new MatchmakingDto(matchmmakingsInProgress.Single(), JustCreated: false);
+            default:
+                throw new Exception($"Unknown error. Matchmaking count: {matchmakingsCount}, games in progress: {
+                    gamesInProgressCount}");
         }
     }
 
@@ -108,9 +111,10 @@ public class Handler(
                 now.Add(TimeSpan.FromMilliseconds(1000)),
                 $"TryEndMatchmaking:{matchmakingGuid}_{now.ToString()}", ct);
         }
-        
+
         await matchmakingUpdatedDtoStorage.Set(matchmakingGuid, matchmakingUpdatedDto);
 
+        myLogger.Info("Is bot? (id= " + matchmakingGuid + "): " + isBot + "");
         if (isBot)
         {
             botRegistry.RegisterMatchmakingBot(matchmakingGuid, player.Id.Item);

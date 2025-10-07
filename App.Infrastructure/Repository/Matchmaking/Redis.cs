@@ -239,7 +239,7 @@ public class Redis(IConnectionMultiplexer redis, IMyLogger logger) : IMatchmakin
 
         var dto = JsonSerializer.Deserialize<MatchmakingDto>(json!) ?? throw new Exception("Failed to deserialize DTO");
         var domain = dto.ToDomain();
-        _cache.Set(cacheKey, domain, TimeSpan.FromSeconds(1000));
+        _cache.Set(cacheKey, domain, TimeSpan.FromMilliseconds(100));
         return domain;
     }
 
@@ -248,8 +248,8 @@ public class Redis(IConnectionMultiplexer redis, IMyLogger logger) : IMatchmakin
             "GetInProgress",
             LiveSetKey,
             LiveKey,
-            dto => dto.Status == "Running" || dto.Status == "Waiting",
-            TimeSpan.FromMilliseconds(1000),
+            dto => dto.Status is "Running" or "Waiting",
+            TimeSpan.FromMilliseconds(100),
             ct);
 
     public Task<IEnumerable<Domain.Matchmaking.Matchmaking>> GetEnded(CancellationToken ct) =>
@@ -258,6 +258,6 @@ public class Redis(IConnectionMultiplexer redis, IMyLogger logger) : IMatchmakin
             ArchiveSetKey,
             ArchiveKey,
             dto => dto.Status != "Running" && dto.Status != "Waiting",
-            TimeSpan.FromSeconds(1000),
+            TimeSpan.FromMilliseconds(100),
             ct);
 }
