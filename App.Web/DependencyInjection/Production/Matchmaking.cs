@@ -10,11 +10,10 @@ public static class Matchmaking
         {
             services.AddSingleton<App.Domain.Matchmaking.Settings>(sp =>
                 App.Domain.Matchmaking.Settings.Create(
-                    SettingsModule.Duration.NewDuration(TimeSpan.FromSeconds(60)),
+                    SettingsModule.Duration.NewDuration(TimeSpan.FromSeconds(5)),
                     // autoStartPolicy: SettingsModule.MatchmakingEndPolicy.NewAfterNoUpdate(
                     //     TimeSpan.FromSeconds(10)),
-                    autoStartPolicy: SettingsModule.MatchmakingEndPolicy.NewAfterReachingMaxPlayers(
-                        TimeSpan.FromSeconds(12)),
+                    autoStartPolicy: SettingsModule.MatchmakingEndPolicy.AfterTimeout,
                     App.Domain.Matchmaking.SettingsModule.MinPlayersModule.create(3).Value,
                     App.Domain.Matchmaking.SettingsModule.MaxPlayersModule.create(6).Value).ResultValue);
         }

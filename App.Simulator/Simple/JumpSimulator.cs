@@ -135,24 +135,38 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
     {
         return random.Gaussian(0, 8);
     }
+    //
+    // private static double DynamicFlightToTakeoffRatio(double k)
+    // {
+    //     return k switch
+    //     {
+    //         <= 50 => 1.0 / 5.0,
+    //         <= 90 => Lerp(1.0 / 5.0, 3.0 / 5.0, SmoothStep(50, 90, k)),
+    //         <= 110 => Lerp(2.0 / 5.0, 1, SmoothStep(90, 110, k)),
+    //         <= 135 => Lerp(1, 1.5, SmoothStep(110, 135, k)),
+    //         <= 200 => Lerp(1.5, 5, SmoothStep(125, 200, k)),
+    //         _ => k / 40
+    //     };
+    // }
 
     private static double DynamicFlightToTakeoffRatio(double k)
     {
         return k switch
         {
-            // Poniżej 90 – mocniejsze wybicie
-            < 90 => Lerp(1.0 / 3.0, 2.0 / 3.0, SmoothStep(50, 90, k)),
-            // Od 90 w górę – coraz większy wpływ lotu (tak jak było)
-            < 125 => Lerp(1.0, 1.5, SmoothStep(90, 125, k)),
-            _ => k < 200 ? Lerp(1.5, 4.0, SmoothStep(125, 200, k)) : 4.0
+            <= 50 => 0.2,
+            <= 90 => 0.2 + (0.6 - 0.2) * ((k - 50) / 40.0),
+            <= 110 => 0.6 + (1.0 - 0.6) * ((k - 90) / 20.0),
+            <= 135 => 1.0 + (1.5 - 1.0) * ((k - 110) / 25.0),
+            <= 200 => 1.5 + (5.0 - 1.5) * ((k - 135) / 65.0),
+            _ => k / 40.0
         };
     }
-
 
     private static double BigHillSpreadAttenuation(double k)
     {
         // 1.0 do K<=160; płynnie do 0.6 przy K>=200 (czyli -40% spreadu)
-        return Lerp(1.0, 0.45, SmoothStep(160, 200, k));
+        // Większe BigHillSpreadAttenuation = większe różnice
+        return Lerp(1.0, 0.6, SmoothStep(160, 200, k));
     }
 
     private static double Lerp(double a, double b, double t) => a + (b - a) * t;

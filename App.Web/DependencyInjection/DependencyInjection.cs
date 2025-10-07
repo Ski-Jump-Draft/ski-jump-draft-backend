@@ -27,7 +27,7 @@ public static class DependencyInjection
                     .AddLocalArchives(); break;
             case Mode.Online:
                 var isMocked = config["ProductionDependencyInjection:IsMocked"] == "true";
-                services.AddProductionApplication(isMocked: isMocked).AddProductionGame()
+                services.AddProductionApplication(isMocked: isMocked).AddProductionGame(isMocked: isMocked)
                     .AddProductionHostedServices(isMocked: isMocked)
                     .AddProductionMatchmaking(isMocked: isMocked)
                     .AddProductionNotifiers().AddProductionSimulation(isMocked: isMocked)
