@@ -166,7 +166,7 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
     {
         // 1.0 do K<=160; płynnie do 0.6 przy K>=200 (czyli -40% spreadu)
         // Większe BigHillSpreadAttenuation = większe różnice
-        return Lerp(1.0, 0.6, SmoothStep(160, 200, k));
+        return Lerp(1.0, 0.54, SmoothStep(160, 200, k));
     }
 
     private static double Lerp(double a, double b, double t) => a + (b - a) * t;
