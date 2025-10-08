@@ -46,8 +46,7 @@ public class Handler(
     IJumperGameFormStorage jumperGameFormStorage,
     IGameCompetitionResultsArchive competitionResultsArchive,
     IGameSchedule gameSchedule,
-    IGameWind gameWind,
-    IGameWind wind)
+    IGameWind gameWind)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -62,7 +61,7 @@ public class Handler(
 
         var simulationPack = gameSimulationPack.GetFor(command.GameId);
 
-        var simulationWind = wind.Get(command.GameId);
+        var simulationWind = gameWind.Get(command.GameId);
         var gate = game.CurrentCompetitionGate;
         var gateInt = App.Domain.Competition.GateModule.value(gate);
         var nextCompetitionJumper = game.NextCompetitionJumper.Value;
