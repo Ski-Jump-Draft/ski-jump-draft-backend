@@ -111,6 +111,12 @@ type Startlist =
                           BibOfMap = bibLookup }
 
     member this.NextEntry: Startlist.Entry option = this.Remaining |> List.tryHead
+    
+    member this.HasNextEntry : bool =
+        this.NextEntry.IsSome
+    
+    member this.EveryoneHasFinished : bool =
+        not this.HasNextEntry
 
     member this.MarkJumpDone(jumperId: JumperId) : Result<Startlist, Startlist.Error> =
         match this.Remaining with

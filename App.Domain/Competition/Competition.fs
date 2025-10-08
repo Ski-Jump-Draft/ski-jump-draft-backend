@@ -121,6 +121,43 @@ type Competition =
 
         { this with Status = newStatus }
 
+    member this.ToBeatDistance(windAverage: double) : double option =
+        if this.Startlist.EveryoneHasFinished then
+            None
+        elif this.Classification.IsEmpty then
+            None
+        else
+            let leaderClassificationResult =
+                this.Classification.Head: Classification.JumperClassificationResult
+
+            let leaderTotalPoints = TotalPoints.value leaderClassificationResult.Points
+
+            match this.GateState with
+            | None -> None
+            | Some gateState ->
+                let targetJudgePoints = 54.0
+
+                let currentTotalPoints =
+                    let nextStartlistEntry = this.Startlist.NextEntry.Value
+                    let jumperId = nextStartlistEntry.JumperId
+                    let currentClassificationResult = this.ClassificationResultOf jumperId
+
+                    match currentClassificationResult with
+                    | Some classificationResult -> TotalPoints.value classificationResult.Points
+                    | None -> 0
+
+
+                let toBeatDistance =
+                    ToBeatLineCalculator.calculateToBeatDistance
+                        this.Hill
+                        gateState
+                        currentTotalPoints
+                        leaderTotalPoints
+                        windAverage
+                        targetJudgePoints
+
+                Some(Jump.Distance.value toBeatDistance)
+
     static member Create
         (id: CompetitionId, settings: Settings, hill: Hill, jumpers: Jumper list, startingGate: Gate)
         : Result<Competition, Error> =
@@ -249,7 +286,8 @@ type Competition =
                   Jumpers = snap.Jumpers }
         }
 
-    member this.Classification = this.Results.FinalClassification
+    member this.Classification: Classification.JumperClassificationResult list =
+        this.Results.FinalClassification
 
     member this.SetStartingGate(gate: Gate) =
         let newGateState =
@@ -495,8 +533,7 @@ type Competition =
     member private this.FindJumper(jid: JumperId) =
         this.Jumpers |> List.find (fun j -> j.Id = jid)
 
-    member this.ClassificationResultOf(jumperId: JumperId) =
+    member this.ClassificationResultOf(jumperId: JumperId) : Classification.JumperClassificationResult option =
         this.Classification |> List.tryFind (fun result -> result.JumperId = jumperId)
 
-    member this.Bibs: Map<JumperId, Startlist.Bib> =
-        this.Startlist_.AllBibsMap
+    member this.Bibs: Map<JumperId, Startlist.Bib> = this.Startlist_.AllBibsMap

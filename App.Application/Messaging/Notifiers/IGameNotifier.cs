@@ -103,7 +103,8 @@ public sealed record CompetitionDto(
     IReadOnlyList<StartlistJumperDto> Startlist,
     GateStateDto GateState,
     IReadOnlyList<CompetitionResultDto> Results,
-    int? NextJumpInMilliseconds
+    int? NextJumpInMilliseconds,
+    double? ToBeatDistance
 )
 {
     public Guid? NextJumperId
