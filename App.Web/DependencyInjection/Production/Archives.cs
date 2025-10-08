@@ -27,6 +27,8 @@ public static class Archives
                     Redis>();
         }
 
+        services.AddSingleton<App.Application.Game.GameWind.IGameWind, App.Infrastructure.GameWind.InMemory>();
+
         return services;
     }
 }

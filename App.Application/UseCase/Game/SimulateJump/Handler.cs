@@ -5,6 +5,7 @@ using App.Application.Extensions;
 using App.Application.Game;
 using App.Application.Game.GameCompetitions;
 using App.Application.Game.GameSimulationPack;
+using App.Application.Game.GameWind;
 using App.Application.JumpersForm;
 using App.Application.Mapping;
 using App.Application.Messaging.Notifiers;
@@ -44,7 +45,9 @@ public class Handler(
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
     IJumperGameFormStorage jumperGameFormStorage,
     IGameCompetitionResultsArchive competitionResultsArchive,
-    IGameSchedule gameSchedule)
+    IGameSchedule gameSchedule,
+    IGameWind gameWind,
+    IGameWind wind)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -59,7 +62,7 @@ public class Handler(
 
         var simulationPack = gameSimulationPack.GetFor(command.GameId);
 
-        var simulationWind = simulationPack.WeatherEngine.GetWind();
+        var simulationWind = wind.Get(command.GameId);
         var gate = game.CurrentCompetitionGate;
         var gateInt = App.Domain.Competition.GateModule.value(gate);
         var nextCompetitionJumper = game.NextCompetitionJumper.Value;
@@ -217,9 +220,11 @@ public class Handler(
                 : $"not null, next jumper exists: {previousCompetition.NextJumper.IsSome()}"));
 
             simulationPack.WeatherEngine.SimulateTime(TimeSpan.FromMinutes(1));
+            var generatedWind = simulationPack.WeatherEngine.GetWind();
+            var generatedWindDouble = WindModule.average(generatedWind);
+            gameWind.Set(command.GameId, generatedWind);
+            var toBeatDistance = competitionAfterAddingJump.ToBeatDistance(generatedWindDouble);
 
-            var windAfterSimulatingTime = simulationPack.WeatherEngine.GetWind();
-            var toBeatDistance = competitionAfterAddingJump.ToBeatDistance(WindModule.average(windAfterSimulatingTime));
             var gameUpdatedDto = await CreateGameUpdatedDto(gameAfterAddingJump, toBeatDistance.ToNullable(),
                 previousCompetition,
                 nextCompetitionJumper.Id, ct);
