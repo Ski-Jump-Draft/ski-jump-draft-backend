@@ -216,7 +216,12 @@ public class Handler(
                 ? "null"
                 : $"not null, next jumper exists: {previousCompetition.NextJumper.IsSome()}"));
 
-            var gameUpdatedDto = await CreateGameUpdatedDto(gameAfterAddingJump, previousCompetition,
+            simulationPack.WeatherEngine.SimulateTime(TimeSpan.FromMinutes(1));
+
+            var windAfterSimulatingTime = simulationPack.WeatherEngine.GetWind();
+            var toBeatDistance = competitionAfterAddingJump.ToBeatDistance(WindModule.average(windAfterSimulatingTime));
+            var gameUpdatedDto = await CreateGameUpdatedDto(gameAfterAddingJump, toBeatDistance.ToNullable(),
+                previousCompetition,
                 nextCompetitionJumper.Id, ct);
             await gameNotifier.GameUpdated(gameUpdatedDto
             );
@@ -251,11 +256,11 @@ public class Handler(
             archiveDto, ct);
     }
 
-    private async Task<GameUpdatedDto> CreateGameUpdatedDto(App.Domain.Game.Game game,
+    private async Task<GameUpdatedDto> CreateGameUpdatedDto(App.Domain.Game.Game game, double? toBeat,
         App.Domain.Competition.Competition? lastCompetitionState,
         App.Domain.Competition.JumperId lastCompetitionJumperId, CancellationToken ct)
     {
-        var dto = await gameUpdatedDtoMapper.FromDomain(game, null,
+        var dto = await gameUpdatedDtoMapper.FromDomain(game, toBeat, lastDraftState: null,
             lastCompetitionState: lastCompetitionState,
             lastCompetitionJumperId.Item, ct: ct);
         return dto;

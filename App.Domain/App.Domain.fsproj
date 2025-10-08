@@ -19,7 +19,9 @@
         <Compile Include="Competition\Results.fs" />
         <Compile Include="Competition\Settings.fs" />
         <Compile Include="Competition\Hill.fs" />
-        <Compile Include="Competition\Services.fs" />
+        <Compile Include="Competition\HillUtilities.fs" />
+        <Compile Include="Competition\ToBeatUtilities.fs" />
+        <Compile Include="Competition\ResultUtilities.fs" />
         <Compile Include="Competition\Competition.fs" />
         <Compile Include="Game\Hill.fs" />
         <Compile Include="Game\Jumper.fs" />

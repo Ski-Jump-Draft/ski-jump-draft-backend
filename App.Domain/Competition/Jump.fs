@@ -4,18 +4,22 @@ open System
 
 module Jump =
     type Id = Id of System.Guid
-    
+
     type Distance = private Distance of double
 
     module Distance =
         type Error = BelowZero of Value: double
 
+        let private roundToHalf v = (v * 2.0 |> round) / 2.0
+
         let tryCreate (v: double) =
-            if v > 0 then Ok(Distance v) else Error(Error.BelowZero v)
+            let v' = roundToHalf v
+            if v' > 0.0 then Ok(Distance v') else Error(BelowZero v')
 
         let value (Distance v) = v
 
     type Judges = private Judges of double list
+
     module Judges =
         let private roundToHalf (x: double) =
             Math.Round(x * 2.0, MidpointRounding.AwayFromZero) / 2.0
@@ -35,7 +39,7 @@ module Jump =
         | Tailwind of Value: double
         | Zero
 
-        member this.ToDouble(): double =
+        member this.ToDouble() : double =
             match this with
             | Headwind value -> value
             | Tailwind value -> -value
@@ -57,14 +61,12 @@ module Jump =
             if v = 0 then Zero
             elif v <= 0.0 then WindAverage.CreateTailwind -v
             else WindAverage.CreateHeadwind v
-          
+
 open Jump
 
-type Jump = {
-    JumperId: JumperId
-    Distance: Distance
-    JudgeNotes: Judges
-    Wind: WindAverage
-    Gate: Gate
-}
-
+type Jump =
+    { JumperId: JumperId
+      Distance: Distance
+      JudgeNotes: Judges
+      Wind: WindAverage
+      Gate: Gate }

@@ -57,14 +57,14 @@ public class GameUpdatedDtoMapper(
     }
 
 
-    public async Task<GameUpdatedDto> FromDomain(App.Domain.Game.Game game,
+    public async Task<GameUpdatedDto> FromDomain(App.Domain.Game.Game game, double? toBeat = null,
         App.Domain.Game.Draft? lastDraftState = null,
         App.Domain.Competition.Competition? lastCompetitionState = null, Guid? lastCompetitionJumperId = null,
         string changeType = "Snapshot", CancellationToken ct = default)
     {
         var header = await MapHeader(game, ct);
         var nextStatus = MapNextStatus(game.Id.Item);
-        var (statusStr, preDraft, draft, mainComp, brk, ended) = await MapStatus(game, ct);
+        var (statusStr, preDraft, draft, mainComp, brk, ended) = await MapStatus(game, toBeat, ct);
         if (draft is null && lastDraftState is not null)
         {
             draft = await MapDraft(game, lastDraftState, ct);
@@ -118,7 +118,7 @@ public class GameUpdatedDtoMapper(
             mainComp,
             brk,
             ended,
-            lastCompetitionState != null ? await MapCompetition(lastCompetitionState, game.Id.Item) : null,
+            lastCompetitionState != null ? await MapCompetition(lastCompetitionState, toBeat, game.Id.Item) : null,
             lastCompetitionResultDto
         );
     }
@@ -196,18 +196,18 @@ public class GameUpdatedDtoMapper(
     }
 
     private async Task<(string, PreDraftDto?, DraftDto?, CompetitionDto?, BreakDto?, EndedDto?)> MapStatus(
-        App.Domain.Game.Game game, CancellationToken ct)
+        App.Domain.Game.Game game, double? toBeat, CancellationToken ct)
     {
         var (caseName, fields) = DeconstructUnion(game.Status);
 
         return caseName switch
         {
-            "PreDraft" => ("PreDraft", await MapPreDraft((App.Domain.Game.PreDraftStatus)fields[0], game.Id.Item), null,
+            "PreDraft" => ("PreDraft", await MapPreDraft((App.Domain.Game.PreDraftStatus)fields[0], toBeat, game.Id.Item), null,
                 null, null,
                 null),
             "Draft" => ("Draft", null, await MapDraft(game, (App.Domain.Game.Draft)fields[0], ct), null, null, null),
             "MainCompetition" => ("MainCompetition", null, null,
-                await MapCompetition((Competition)fields[0], game.Id.Item), null,
+                await MapCompetition((Competition)fields[0], toBeat, game.Id.Item), null,
                 null),
             "Ended" => ("Ended", null, null, null, null, MapEnded(game)),
             "Break" => ($"Break {fields[0].ToString()!.Replace("Tag", "")}", null, null, null,
@@ -217,7 +217,7 @@ public class GameUpdatedDtoMapper(
     }
 
     // ---------- PreDraft ----------
-    private async Task<PreDraftDto> MapPreDraft(App.Domain.Game.PreDraftStatus preDraftStatus, Guid gameId)
+    private async Task<PreDraftDto> MapPreDraft(App.Domain.Game.PreDraftStatus preDraftStatus, double? toBeat, Guid gameId)
     {
         var (caseName, fields) = DeconstructUnion(preDraftStatus);
 
@@ -227,7 +227,7 @@ public class GameUpdatedDtoMapper(
                 "Running",
                 PreDraftCompetitionIndexModule.value((App.Domain.Game.PreDraftCompetitionIndex)fields[0]),
                 // endedCompetitionResultsList.ToList(),
-                await MapCompetition((Competition)fields[1], gameId)),
+                await MapCompetition((Competition)fields[1], toBeat, gameId)),
             "Break" => new PreDraftDto(
                 "Break",
                 PreDraftCompetitionIndexModule.value((App.Domain.Game.PreDraftCompetitionIndex)fields[0]),
@@ -337,7 +337,7 @@ public class GameUpdatedDtoMapper(
     }
 
 
-    private async Task<CompetitionDto> MapCompetition(Competition comp, Guid gameId)
+    private async Task<CompetitionDto> MapCompetition(Competition comp, double? toBeat, Guid gameId)
     {
         var status = comp.GetStatusTag switch
         {
@@ -384,7 +384,7 @@ public class GameUpdatedDtoMapper(
         }
 
         return new CompetitionDto(status, roundIndex, startlist, gate,
-            results.ToImmutableList(), nextJumpIn);
+            results.ToImmutableList(), nextJumpIn, toBeat);
     }
 
     private static GateStateDto MapGate(FSharpOption<GateState> gsOpt)

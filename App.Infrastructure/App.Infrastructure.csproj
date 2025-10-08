@@ -25,6 +25,7 @@
 
     <ItemGroup>
       <Folder Include="Messaging\Notifier\Matchmaking\" />
+      <Folder Include="Utility\GameUpdatedDto\" />
     </ItemGroup>
 
     <ItemGroup>
