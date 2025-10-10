@@ -117,6 +117,9 @@ type Startlist =
     
     member this.EveryoneHasFinished : bool =
         not this.HasNextEntry
+        
+    member this.NoOneHasFinished : bool =
+        this.RemainingEntries.Length = this.FullEntries.Length
 
     member this.MarkJumpDone(jumperId: JumperId) : Result<Startlist, Startlist.Error> =
         match this.Remaining with

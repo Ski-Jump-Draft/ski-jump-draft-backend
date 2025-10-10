@@ -136,7 +136,13 @@ public class Handler(
 
             if (gameAfterAddingJump.IsDuringCompetition)
             {
-                var timeToJump = gameAfterAddingJump.Settings.CompetitionJumpInterval.Value;
+                var roundHasEnded = competitionAfterAddingJump.Startlist_.NoOneHasFinished;
+                var timeToJump = roundHasEnded switch
+                {
+                    true => TimeSpan.FromSeconds(20),
+                    false => gameAfterAddingJump.Settings.CompetitionJumpInterval.Value
+                };
+                
                 var now = clock.Now();
                 gameSchedule.ScheduleEvent(command.GameId, GameScheduleTarget.CompetitionJump, timeToJump);
                 await scheduler.ScheduleAsync(
