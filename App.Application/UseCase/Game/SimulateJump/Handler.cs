@@ -59,9 +59,11 @@ public class Handler(
             throw new CompetitionNotRunningException(command.GameId);
         }
 
+        // TODO: Najpierw albo coś tam ten GameWind, simulationpack
         var simulationPack = gameSimulationPack.GetFor(command.GameId);
 
-        var simulationWind = simulationPack.WeatherEngine.GetWind();
+        var simulationWind = GetOrSetupSimulationWind(command.GameId, simulationPack);
+
         var gate = game.CurrentCompetitionGate;
         var gateInt = App.Domain.Competition.GateModule.value(gate);
         var nextCompetitionJumper = game.NextCompetitionJumper.Value;
@@ -219,10 +221,10 @@ public class Handler(
                 : $"not null, next jumper exists: {previousCompetition.NextJumper.IsSome()}"));
 
             simulationPack.WeatherEngine.SimulateTime(TimeSpan.FromMinutes(1));
-            var generatedWind = simulationPack.WeatherEngine.GetWind();
-            var generatedWindDouble = WindModule.average(generatedWind);
-            gameWind.Set(command.GameId, generatedWind);
-            var toBeatDistance = competitionAfterAddingJump.ToBeatDistance(generatedWindDouble);
+
+            var newSimulationWind = GetAndPreserveSimulationWind(command.GameId, simulationPack);
+            var newSimulationWindDouble = WindModule.average(newSimulationWind);
+            var toBeatDistance = competitionAfterAddingJump.ToBeatDistance(newSimulationWindDouble);
 
             var gameUpdatedDto = await CreateGameUpdatedDto(gameAfterAddingJump, toBeatDistance.ToNullable(),
                 previousCompetition,
@@ -247,6 +249,22 @@ public class Handler(
         }
 
         throw new Exception("Error adding a jump to game: " + gameAfterAddingJumpResult.ErrorValue);
+    }
+
+    private Wind GetOrSetupSimulationWind(Guid gameId, GameSimulationPack simulationPack)
+    {
+        var currentSimulationWind = gameWind.Get(gameId);
+        if (currentSimulationWind is not null) return currentSimulationWind;
+        var generatedSimulationWind = simulationPack.WeatherEngine.GetWind();
+        gameWind.Set(gameId, generatedSimulationWind);
+        return generatedSimulationWind;
+    }
+
+    private Wind GetAndPreserveSimulationWind(Guid gameId, GameSimulationPack simulationPack)
+    {
+        var simulationWind = simulationPack.WeatherEngine.GetWind();
+        gameWind.Set(gameId, simulationWind);
+        return simulationWind;
     }
 
 
