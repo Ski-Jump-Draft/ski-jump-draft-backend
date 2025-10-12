@@ -9,17 +9,21 @@ public class Default(IRandom random) : IGameSettingsFactory
 {
     public Domain.Game.Settings Create()
     {
-        var picksNumber = new List<int>
+ 
+        var picksNumber = new Dictionary<int, double>
         {
-            3, 4, 5
-        }.GetRandomElement(random);
+            { 3, 0.8 },
+            { 4, 1 },
+            { 5, 1 },
+            { 6, 0.5 },
+        }.WeightedRandomElement(random);
 
         var draftOrder = new Dictionary<Domain.Game.DraftModule.SettingsModule.Order, double>
         {
             { Domain.Game.DraftModule.SettingsModule.Order.Snake, 50 },
             { Domain.Game.DraftModule.SettingsModule.Order.Random, 50 },
         }.WeightedRandomElement(random);
-        
+
         var rankingPolicy = new Dictionary<Domain.Game.RankingPolicy, double>
         {
             { Domain.Game.RankingPolicy.Classic, 50 },
