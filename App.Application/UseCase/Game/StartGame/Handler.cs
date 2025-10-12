@@ -5,6 +5,7 @@ using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Game;
+using App.Application.Game.Settings;
 using App.Application.JumpersForm;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
@@ -38,7 +39,7 @@ public class Handler(
     IGames games,
     IGameNotifier gameNotifier,
     IGameJumpersSelector jumpersSelector,
-    Domain.Game.Settings globalGameSettings,
+   IGameSettingsFactory gameSettingsFactory,
     IScheduler scheduler,
     IClock clock,
     IGameHillSelector hillSelector,
@@ -81,9 +82,11 @@ public class Handler(
         var gamePlayers = BuildGamePlayersFromMatchmaking(matchmaking, gameGuid, gamePlayerByMatchmakingPlayer);
         var gameJumpers = SetupGameJumpers(selectedGameWorldJumperDtos);
         var competitionHill = SetupCompetitionHill(gameWorldHill);
+        
+        var gameSettings = gameSettingsFactory.Create();
 
         var gameResult =
-            Domain.Game.Game.Create(gameId, globalGameSettings, gamePlayers, gameJumpers, competitionHill);
+            Domain.Game.Game.Create(gameId, gameSettings, gamePlayers, gameJumpers, competitionHill);
 
         if (gameResult.IsOk)
         {
