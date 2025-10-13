@@ -188,7 +188,7 @@ class Program
                         : null;
                 }
 
-                _countdownCts?.Cancel();
+                await _countdownCts?.CancelAsync();
 
                 if (chosenIndex is { } validIdx)
                 {

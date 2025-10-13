@@ -163,6 +163,9 @@ public class GameUpdatedDtoMapper(
 
         var draftOrderPolicy = GetDraftOrderPolicyString(game.Settings.DraftSettings.Order);
         var draftTimeoutInSeconds = GetDraftTimeoutInSeconds(game.Settings.DraftSettings.TimeoutPolicy);
+        var draftPicksCount =
+            DraftModule.SettingsModule.TargetPicksModule.value(game.Settings.DraftSettings.TargetPicks);
+        var rankingPolicy = GetRankingPolicyString(game.Settings.RankingPolicy);
 
         var hill = game.Hill.Value;
         var gameWorldHill = await hill.ToGameWorldHill(gameWorldHills, competitionHillAcl, ct: ct);
@@ -176,7 +179,8 @@ public class GameUpdatedDtoMapper(
             countryFisCodeString,
             Alpha2CodeModule.value(gameWorldCountry.Alpha2));
 
-        return new GameHeaderDto(draftOrderPolicy, draftTimeoutInSeconds, hillDto, gamePlayers,
+        return new GameHeaderDto(draftOrderPolicy, draftTimeoutInSeconds, draftPicksCount, rankingPolicy, hillDto,
+            gamePlayers,
             gameJumperDtos,
             competitionJumperDtos);
     }
@@ -202,7 +206,8 @@ public class GameUpdatedDtoMapper(
 
         return caseName switch
         {
-            "PreDraft" => ("PreDraft", await MapPreDraft((App.Domain.Game.PreDraftStatus)fields[0], toBeat, game.Id.Item), null,
+            "PreDraft" => ("PreDraft",
+                await MapPreDraft((App.Domain.Game.PreDraftStatus)fields[0], toBeat, game.Id.Item), null,
                 null, null,
                 null),
             "Draft" => ("Draft", null, await MapDraft(game, (App.Domain.Game.Draft)fields[0], ct), null, null, null),
@@ -217,7 +222,8 @@ public class GameUpdatedDtoMapper(
     }
 
     // ---------- PreDraft ----------
-    private async Task<PreDraftDto> MapPreDraft(App.Domain.Game.PreDraftStatus preDraftStatus, double? toBeat, Guid gameId)
+    private async Task<PreDraftDto> MapPreDraft(App.Domain.Game.PreDraftStatus preDraftStatus, double? toBeat,
+        Guid gameId)
     {
         var (caseName, fields) = DeconstructUnion(preDraftStatus);
 
@@ -333,6 +339,17 @@ public class GameUpdatedDtoMapper(
             { IsRandom: true } => "Random",
             _ => throw new InvalidOperationException(
                 $"Unknown DraftSettings.Order: {orderPolicy}")
+        };
+    }
+
+    private static string GetRankingPolicyString(Domain.Game.RankingPolicy rankingPolicy)
+    {
+        return rankingPolicy switch
+        {
+            { IsClassic: true } => "Classic",
+            { IsPodiumAtAllCosts: true } => "PodiumAtAllCosts",
+            _ => throw new InvalidOperationException(
+                $"Unknown DraftSettings.Order: {rankingPolicy}")
         };
     }
 

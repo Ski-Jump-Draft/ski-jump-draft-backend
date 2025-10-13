@@ -56,6 +56,7 @@ public class Handler(
         var gamesInProgressCount = await games.GetInProgressCount(ct);
         var now = clock.Now();
         var matchmakingsCount = matchmmakingsInProgress.Length;
+        // TODO: Oddzielić matchmakingi/gry premium od zwykłych
 
         switch (matchmakingsCount, gamesInProgressCount)
         {
@@ -68,7 +69,6 @@ public class Handler(
                         globalMatchmakingSettings, now);
                 return new MatchmakingDto(newMatchmaking, JustCreated: true);
             case (1, 0):
-                var matchmaking = matchmmakingsInProgress.Single();
                 return new MatchmakingDto(matchmmakingsInProgress.Single(), JustCreated: false);
             default:
                 throw new Exception($"Unknown error. Matchmaking count: {matchmakingsCount}, games in progress: {
@@ -101,7 +101,7 @@ public class Handler(
         var (matchmakingAfterJoin, correctedNick) = joinResult.ResultValue;
         await matchmakings.Add(matchmakingAfterJoin, ct);
 
-        var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterJoin, now);
+        var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterJoin, false, now);
         myLogger.Info("Just created matchmaking? (id= " + matchmakingGuid + "): " + justCreated + "");
         if (justCreated)
         {

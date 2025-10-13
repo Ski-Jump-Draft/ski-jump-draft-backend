@@ -8,6 +8,10 @@ public static class Storages
             .AddSingleton<App.Application.JumpersForm.IJumperGameFormStorage,
                 App.Infrastructure.Storage.JumperGameForm.InMemory>();
         services.AddSingleton<App.Application.Matchmaking.IMatchmakingUpdatedDtoStorage, App.Infrastructure.Storage.MatchmakingUpdated.InMemory>();
+        services
+            .AddSingleton<App.Application.Matchmaking.IPremiumMatchmakingConfigurationStorage,
+                App.Infrastructure.Storage.PremiumMatchmakingConfigs.Hardcoded>();
+        services.AddSingleton<App.Application.Matchmaking.IPremiumMatchmakings, App.Infrastructure.PremiumMatchmakings.InMemory>();
         return services;
     }
 }

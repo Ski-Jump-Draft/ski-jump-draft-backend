@@ -25,7 +25,8 @@ public class Handler(
     IMyLogger logger,
     IBotRegistry botRegistry,
     MatchmakingUpdatedDtoMapper matchmakingUpdatedDtoMapper,
-    IMatchmakingUpdatedDtoStorage matchmakingUpdatedDtoStorage)
+    IMatchmakingUpdatedDtoStorage matchmakingUpdatedDtoStorage,
+    IPremiumMatchmakings premiumMatchmakings)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -34,13 +35,21 @@ public class Handler(
             .AwaitOrWrap(_ => new IdNotFoundException(command.MatchmakingId));
 
         var matchmakingBots = botRegistry.MatchmakingBots(command.MatchmakingId);
-        var onlyBotsExist = matchmakingBots.Count == matchmaking.PlayersCount;
+        var onlyBotsExist = matchmakingBots.Count > 0 && matchmakingBots.Count == matchmaking.PlayersCount;
         var now = clock.Now();
 
         var shouldEnd = matchmaking.ShouldEnd(now);
         logger.Info($"Should end matchmaking? MatchmakingId: {command.MatchmakingId}, shouldEnd: {shouldEnd}");
         if (shouldEnd)
         {
+            var isPremium = await premiumMatchmakings.PremiumMatchmakingIsRunning(command.MatchmakingId);
+
+            if (isPremium)
+            {
+                await premiumMatchmakings.Remove(command.MatchmakingId);
+                logger.Debug($"Removed premium matchmaking. MatchmakingId: {command.MatchmakingId}");
+            }
+
             if (onlyBotsExist)
             {
                 logger.Info($"Did not start a matchmaking cause only bots are present. MatchmakingId: {
@@ -73,7 +82,7 @@ public class Handler(
 
             now = clock.Now();
 
-            var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(endedMatchmaking, now);
+            var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(endedMatchmaking, isPremium, now);
             await matchmakingUpdatedDtoStorage.Set(command.MatchmakingId, matchmakingUpdatedDto);
             await matchmakingNotifier.MatchmakingUpdated(matchmakingUpdatedDto);
 

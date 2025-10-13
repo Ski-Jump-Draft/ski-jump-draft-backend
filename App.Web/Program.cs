@@ -88,6 +88,53 @@ app.MapPost("/matchmaking/join",
         }
     });
 
+app.MapPost("/matchmaking/joinPremium",
+    async (string nick, string password, [FromServices] ICommandBus commandBus,
+        [FromServices] App.Application.Utility.IMyLogger myLogger,
+        CancellationToken ct) =>
+    {
+        var command =
+            new App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Command(nick, Password: password,
+                IsBot: false);
+        try
+        {
+            var (matchmakingId, correctedNick, playerId) = await commandBus
+                .SendAsync<App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Command,
+                    App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Result>(command, ct);
+
+            return Results.Ok(new
+                { MatchmakingId = matchmakingId, CorrectedNick = correctedNick, PlayerId = playerId });
+        }
+        catch (App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.InvalidPasswordException)
+        {
+            return Results.Conflict(new
+            {
+                error = "InvalidPasswordException",
+                message =
+                    "Wpisano niepoprawne hasło dostępu do prywatnego pokoju."
+            });
+        }
+        catch (App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.PlayerAlreadyJoinedException)
+        {
+            return Results.Conflict(new { error = "AlreadyJoined", message = "Gracz już dołączył." });
+        }
+        catch (App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.RoomIsFullException)
+        {
+            return Results.Conflict(new { error = "RoomIsFull", message = "Pokój jest pełny." });
+        }
+        catch (App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.PrivateServerInUse)
+        {
+            return Results.Conflict(new
+                { error = "PrivateServerInUse", message = "Gra na tym serwerze jest już rozgrywana." });
+        }
+        catch (Exception error)
+        {
+            myLogger.Error($"Error during joining a matchmaking: {nick}. Error: {error.Message}, StackTrace: {
+                error.StackTrace}");
+            return Results.InternalServerError();
+        }
+    });
+
 app.MapDelete("/matchmaking/leave",
     async (Guid matchmakingId, Guid playerId, [FromServices] ICommandBus commandBus, [FromServices] IMyLogger logger,
         CancellationToken ct) =>

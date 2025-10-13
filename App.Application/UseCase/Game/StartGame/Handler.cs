@@ -7,6 +7,7 @@ using App.Application.Extensions;
 using App.Application.Game;
 using App.Application.Game.Settings;
 using App.Application.JumpersForm;
+using App.Application.Matchmaking;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
 using App.Application.Policy.GameHillSelector;
@@ -39,7 +40,7 @@ public class Handler(
     IGames games,
     IGameNotifier gameNotifier,
     IGameJumpersSelector jumpersSelector,
-   IGameSettingsFactory gameSettingsFactory,
+    IGameSettingsFactory gameSettingsFactory,
     IScheduler scheduler,
     IClock clock,
     IGameHillSelector hillSelector,
@@ -54,7 +55,8 @@ public class Handler(
     IJumperGameFormStorage jumperGameFormStorage,
     IGameSchedule gameSchedule,
     IBotRegistry botRegistry,
-    IRandom random)
+    IRandom random,
+    IPremiumMatchmakings premiumMatchmakings)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -82,23 +84,22 @@ public class Handler(
         var gamePlayers = BuildGamePlayersFromMatchmaking(matchmaking, gameGuid, gamePlayerByMatchmakingPlayer);
         var gameJumpers = SetupGameJumpers(selectedGameWorldJumperDtos);
         var competitionHill = SetupCompetitionHill(gameWorldHill);
-        
+
         var gameSettings = gameSettingsFactory.Create();
 
         var gameResult =
             Domain.Game.Game.Create(gameId, gameSettings, gamePlayers, gameJumpers, competitionHill);
 
-        if (gameResult.IsOk)
-        {
-            var game = gameResult.ResultValue;
-            var timeToPreDraft = game.Settings.BreakSettings.BreakBeforePreDraft.Value;
-            await games.Add(game, ct);
-            await SchedulePreDraftPhase(gameGuid, timeToPreDraft, ct);
-            await NotifyGameStart(game, gameGuid, gamePlayerByMatchmakingPlayer, command.MatchmakingId, ct);
-            return new Result(gameGuid);
-        }
-
-        throw new GameInitializationException(gameGuid, gameResult.ErrorValue.ToString());
+        if (!gameResult.IsOk) throw new GameInitializationException(gameGuid, gameResult.ErrorValue.ToString());
+        var game = gameResult.ResultValue;
+        var timeToPreDraft = game.Settings.BreakSettings.BreakBeforePreDraft.Value;
+        await games.Add(game, ct);
+        var belongsToPremiumMatchmaking =
+            await premiumMatchmakings.StartGameIfBelongsToMatchmaking(command.MatchmakingId, gameGuid);
+        logger.Info($"Game {gameGuid} belongs to premium matchmaking: {belongsToPremiumMatchmaking}");
+        await SchedulePreDraftPhase(gameGuid, timeToPreDraft, ct);
+        await NotifyGameStart(game, gameGuid, gamePlayerByMatchmakingPlayer, command.MatchmakingId, ct);
+        return new Result(gameGuid);
     }
 
     private async Task<ImmutableList<SelectedGameWorldJumperDto>> SelectAndShuffleGameJumpers(CancellationToken ct)
