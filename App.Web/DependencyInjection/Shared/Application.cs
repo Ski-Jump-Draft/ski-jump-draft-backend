@@ -15,6 +15,11 @@ public static class Application
                 App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Handler>();
         services
             .AddSingleton<
+                ICommandHandler<App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Command,
+                    App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Result>,
+                App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Handler>();
+        services
+            .AddSingleton<
                 ICommandHandler<App.Application.UseCase.Matchmaking.TryEndMatchmaking.Command,
                     App.Application.UseCase.Matchmaking.TryEndMatchmaking.Result>,
                 App.Application.UseCase.Matchmaking.TryEndMatchmaking.Handler>();

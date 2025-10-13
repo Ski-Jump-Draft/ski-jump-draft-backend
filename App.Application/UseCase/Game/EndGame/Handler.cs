@@ -2,6 +2,7 @@ using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Game.Ranking;
+using App.Application.Matchmaking;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
 using App.Application.Utility;
@@ -22,7 +23,8 @@ public class Handler(
     IGameNotifier gameNotifier,
     IMyLogger logger,
     IGameRankingFactorySelector gameRankingFactorySelector,
-    GameUpdatedDtoMapper gameUpdatedDtoMapper)
+    GameUpdatedDtoMapper gameUpdatedDtoMapper,
+    IPremiumMatchmakings premiumMatchmakings)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -43,6 +45,8 @@ public class Handler(
         logger.Info($"Ended game (ID: {command.GameId}) ranking:\n{gameRanking.PrettyPrint(nickByPlayerIdFSharpMap)}");
 
         var endedGameResult = game.EndGame(gameRanking);
+
+        await premiumMatchmakings.EndGameIfRuns(command.GameId);
 
         if (!endedGameResult.IsOk) return new Result();
 

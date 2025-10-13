@@ -101,8 +101,8 @@ type Draft =
             arr.[j] <- tmp
 
         arr |> Array.toList
-        
-    member this.FullTurnOrder : PlayerId list = this.TurnOrder
+
+    member this.FullTurnOrder: PlayerId list = this.TurnOrder
 
     static member private buildTurnOrder
         (order: SettingsModule.Order)
@@ -117,6 +117,24 @@ type Draft =
             let rs = [ 0 .. rounds - 1 ]
             Ok(rs |> List.collect (fun r -> if r % 2 = 0 then players else List.rev players))
         | Random ->
+            let rec genBalancedOrder acc picksCount remaining =
+                match remaining with
+                | 0 -> acc
+                | _ ->
+                    // find min # picks any player has so far
+                    let minPicks = picksCount |> Map.values |> Seq.min
+                    // players who can pick (those <= minPicks)
+                    let eligible =
+                        picksCount
+                        |> Map.filter (fun _ v -> v <= minPicks)
+                        |> Map.toList
+                        |> List.map fst
+
+                    let shuffled = shuffleFn.Value(eligible, remaining)
+                    let nextPid = shuffled.Head
+                    let newCounts = picksCount |> Map.add nextPid (picksCount.[nextPid] + 1)
+                    genBalancedOrder (acc @ [ nextPid ]) newCounts (remaining - 1)
+
             match turnOrderOverride with
             | Some o ->
                 if o.Length = rounds * players.Length then
@@ -125,11 +143,11 @@ type Draft =
                     Error(Other "TurnOrder length mismatch for Random")
             | None ->
                 match shuffleFn with
-                | None -> Error(Other "Random requires persisted turnOrder (or deterministic shuffle) to restore")
+                | None -> Error(Other "Random requires shuffleFn")
                 | Some shuffle ->
-                    let rs = [ 0 .. rounds - 1 ]
-                    let perRound = rs |> List.map (fun r -> shuffle (players, r))
-                    Ok(perRound |> List.concat)
+                    let initCounts = players |> List.map (fun p -> p, 0) |> Map.ofList
+                    Ok(genBalancedOrder [] initCounts (rounds * players.Length))
+
 
     static member private make
         (settings: Draft.Settings)
@@ -175,17 +193,23 @@ type Draft =
 
         let pc = players.Length
         let jc = jumpers.Length
-        if pc = 0 then Error(Other "No players provided") else
-        let target = SettingsModule.TargetPicks.value settings.TargetPicks
-        let byDivision = jc / pc
-        let picksPerPlayerBase = min target byDivision
-        if picksPerPlayerBase < 1 then Error NotEnoughJumpers else
 
-        let effectiveRounds = min picksPerPlayerBase (SettingsModule.MaxPicks.value settings.MaxPicks)
+        if pc = 0 then
+            Error(Other "No players provided")
+        else
+            let target = SettingsModule.TargetPicks.value settings.TargetPicks
+            let byDivision = jc / pc
+            let picksPerPlayerBase = min target byDivision
 
-        Draft.buildTurnOrder settings.Order players effectiveRounds shuffleFn None
-        |> Result.bind (fun order ->
-            Draft.make settings players jumpers Map.empty order)
+            if picksPerPlayerBase < 1 then
+                Error NotEnoughJumpers
+            else
+
+                let effectiveRounds =
+                    min picksPerPlayerBase (SettingsModule.MaxPicks.value settings.MaxPicks)
+
+                Draft.buildTurnOrder settings.Order players effectiveRounds shuffleFn None
+                |> Result.bind (fun order -> Draft.make settings players jumpers Map.empty order)
 
     static member Restore
         (settings: Draft.Settings)

@@ -36,7 +36,7 @@ public static class Game
                         App.Domain.Game.DraftModule.SettingsModule.TargetPicksModule.create(4).Value,
                         App.Domain.Game.DraftModule.SettingsModule.MaxPicksModule.create(4).Value,
                         App.Domain.Game.DraftModule.SettingsModule.UniqueJumpersPolicy.Unique,
-                        App.Domain.Game.DraftModule.SettingsModule.Order.Snake,
+                        App.Domain.Game.DraftModule.SettingsModule.Order.Random,
                         App.Domain.Game.DraftModule.SettingsModule.TimeoutPolicy.NewTimeoutAfter(
                             TimeSpan.FromSeconds(8)));
                     var breakSettings =

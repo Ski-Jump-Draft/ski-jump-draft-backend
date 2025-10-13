@@ -10,12 +10,14 @@ public class MatchmakingUpdatedDtoMapper(
     IBotRegistry botRegistry
 )
 {
-    public MatchmakingUpdatedDto FromDomain(Domain.Matchmaking.Matchmaking matchmaking, DateTimeOffset now)
+    public MatchmakingUpdatedDto FromDomain(Domain.Matchmaking.Matchmaking matchmaking, bool isPremium,
+        DateTimeOffset now)
     {
         var statusString = matchmaking.Status_.FormattedStatus();
 
         return new MatchmakingUpdatedDto(
             matchmaking.Id_.Item,
+            isPremium,
             statusString,
             matchmaking.Players_
                 .Select(player => CreatePlayerDto(player,

@@ -16,7 +16,6 @@ public class InMemory : IMatchmakingUpdatedDtoStorage
 
     public Task Set(Guid matchmakingId, MatchmakingUpdatedDto dto)
     {
-        Console.WriteLine("SetFirst!");
         _store.AddOrUpdate(matchmakingId, dto, (_, __) => dto);
         return Task.CompletedTask;
     }

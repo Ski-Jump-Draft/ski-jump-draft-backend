@@ -27,6 +27,7 @@ public sealed record MatchmakingPlayerDto(Guid PlayerId, string Nick, bool IsBot
 
 public sealed record MatchmakingUpdatedDto(
     Guid MatchmakingId,
+    bool IsPremium,
     string Status,
     IReadOnlyList<MatchmakingPlayerDto> Players,
     int PlayersCount,

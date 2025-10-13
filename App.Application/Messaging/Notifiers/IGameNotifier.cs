@@ -36,6 +36,8 @@ public sealed record GameUpdatedDto(
 public sealed record GameHeaderDto(
     string DraftOrderPolicy,
     int? DraftTimeoutInSeconds,
+    int DraftPicksCount,
+    string RankingPolicy,
     GameHillDto Hill,
     IReadOnlyList<GamePlayerDto> Players,
     IReadOnlyList<GameJumperDto> Jumpers,

@@ -26,8 +26,8 @@ public class Default(IRandom random) : IGameSettingsFactory
 
         var rankingPolicy = new Dictionary<Domain.Game.RankingPolicy, double>
         {
-            { Domain.Game.RankingPolicy.Classic, 50 },
-            { Domain.Game.RankingPolicy.PodiumAtAllCosts, 0 },
+            { Domain.Game.RankingPolicy.Classic, 70 },
+            { Domain.Game.RankingPolicy.PodiumAtAllCosts, 30 },
         }.WeightedRandomElement(random);
 
 

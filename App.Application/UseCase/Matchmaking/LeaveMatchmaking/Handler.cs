@@ -19,7 +19,8 @@ public class Handler(
     IMatchmakingNotifier notifier,
     MatchmakingUpdatedDtoMapper matchmakingUpdatedDtoMapper,
     IClock clock,
-    IMatchmakingUpdatedDtoStorage matchmakingUpdatedDtoStorage)
+    IMatchmakingUpdatedDtoStorage matchmakingUpdatedDtoStorage,
+    IPremiumMatchmakings premiumMatchmakings)
     : ICommandHandler<Command>
 {
     public async Task HandleAsync(Command command, CancellationToken ct)
@@ -34,7 +35,9 @@ public class Handler(
             var matchmakingAfterLeave = matchmakingAfterLeaveResult.ResultValue;
             await matchmakings.Add(matchmakingAfterLeave, ct);
             now = clock.Now();
-            var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterLeave, now);
+            var isPremium = await premiumMatchmakings.PremiumMatchmakingIsRunning(command.MatchmakingId);
+            var matchmakingUpdatedDto =
+                matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterLeave, isPremium, now);
             await matchmakingUpdatedDtoStorage.Set(command.MatchmakingId, matchmakingUpdatedDto);
             await notifier.MatchmakingUpdated(matchmakingUpdatedDto);
             var player = matchmaking.Players_.Single(p => p.Id.Item == command.PlayerId);
