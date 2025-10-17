@@ -17,7 +17,7 @@ public class SignalRGameNotifier(IHubContext<GameHub> hub, IMyLogger logger) : I
 
     public async Task GameUpdated(GameUpdatedDto dto)
     {
-        logger.Info($"GameUpdated to SignalR: {dto}`");
+        logger.Info("GameUpdated to SignalR", dto);
         await hub.Clients.Group(GameHub.GroupNameForGame(dto.GameId))
             .SendAsync("GameUpdated", dto);
     }
