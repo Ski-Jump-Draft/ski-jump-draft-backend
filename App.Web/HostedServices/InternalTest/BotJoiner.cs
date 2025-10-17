@@ -61,19 +61,21 @@ public class BotJoiner(
 
     private async Task JoinBotsToMatchmaking(Matchmaking m, CancellationToken ct)
     {
-        _botsJoined[m.Id_.Item] = true;
         var botsToJoin = Math.Max(1, m.RemainingSlots / 2);
+        var success = false;
 
-        var tasks = Enumerable.Range(0, botsToJoin)
-            .Select(async i =>
-            {
-                await Task.Delay(350 * i, ct);
-                log.Info($"Bot {i} joining {m.Id_.Item}");
-                await JoinBotToMatchmaking(m.Id_.Item, ct);
-            });
+        var tasks = Enumerable.Range(0, botsToJoin).Select(async i =>
+        {
+            await Task.Delay(350 * i, ct);
+            await JoinBotToMatchmaking(m.Id_.Item, ct);
+            success = true;
+        });
 
         await Task.WhenAll(tasks);
+        if (success)
+            _botsJoined[m.Id_.Item] = true;
     }
+
 
     private async Task JoinBotToMatchmaking(Guid matchmakingId, CancellationToken ct)
     {
