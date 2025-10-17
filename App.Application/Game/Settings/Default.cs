@@ -9,6 +9,7 @@ public class Default(IRandom random) : IGameSettingsFactory
 {
     public Domain.Game.Settings Create()
     {
+ 
         var picksNumber = new Dictionary<int, double>
         {
             { 3, 0.8 },
@@ -19,8 +20,8 @@ public class Default(IRandom random) : IGameSettingsFactory
 
         var draftOrder = new Dictionary<Domain.Game.DraftModule.SettingsModule.Order, double>
         {
-            { Domain.Game.DraftModule.SettingsModule.Order.Snake, 1 },
-            { Domain.Game.DraftModule.SettingsModule.Order.Random, 1 },
+            { Domain.Game.DraftModule.SettingsModule.Order.Snake, 50 },
+            { Domain.Game.DraftModule.SettingsModule.Order.Random, 0 },
         }.WeightedRandomElement(random);
 
         var rankingPolicy = new Dictionary<Domain.Game.RankingPolicy, double>
@@ -59,7 +60,7 @@ public class Default(IRandom random) : IGameSettingsFactory
         var breakSettings =
             new App.Domain.Game.BreakSettings(App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(15)),
                 App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(15)),
-                App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(30)),
+                App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(20)),
                 App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(20)),
                 App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(20)));
         var jumpInterval = App.Domain.Game.PhaseDuration.Create(TimeSpan.FromMilliseconds(6000));
