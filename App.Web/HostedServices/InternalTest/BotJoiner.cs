@@ -13,7 +13,8 @@ public class BotJoiner(
     ICommandBus bus,
     IRandom random,
     IMyLogger log,
-    IClock clock)
+    IClock clock,
+    IPremiumMatchmakingGames premiumMatchmakingGames)
     : BackgroundService
 {
     private static readonly List<string> MaleNames =
@@ -67,7 +68,7 @@ public class BotJoiner(
         var tasks = Enumerable.Range(0, botsToJoin).Select(async i =>
         {
             await Task.Delay(350 * i, ct);
-            await JoinBotToMatchmaking(m.Id_.Item, ct);
+            await JoinBotToMatchmaking(m.Id_.Item, m.IsPremium_, ct);
             success = true;
         });
 
@@ -77,30 +78,69 @@ public class BotJoiner(
     }
 
 
-    private async Task JoinBotToMatchmaking(Guid matchmakingId, CancellationToken ct)
+    private async Task JoinBotToMatchmaking(Guid matchmakingId, bool isPremium, CancellationToken ct)
     {
         var nick = GenerateBotName(matchmakingId);
-        var cmd = new App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command(nick, true);
 
-        try
-        {
-            var (id, corrected, pid) =
-                await bus.SendAsync<
-                    App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command,
-                    App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Result>(cmd, ct);
 
-            _usedNicks.GetOrAdd(id, _ => []).Add(corrected);
-            log.Debug($"Bot {corrected} joined {id} (playerId={pid})");
-        }
-        catch (Exception ex) when (ex is
-                                       App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.RoomIsFullException or
-                                       App.Application.UseCase.Matchmaking.JoinQuickMatchmaking
-                                           .MultipleGamesNotSupportedException)
+        if (isPremium)
         {
+            var password = await premiumMatchmakingGames.GetPassword(matchmakingId);
+
+            if (password is null)
+            {
+                throw new Exception("Password is null. Some conflict. It should not be reached.");
+            }
+
+            var cmd = new App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Command(nick, true, password);
+
+            try
+            {
+                var (id, corrected, pid) =
+                    await bus.SendAsync<
+                        App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Command,
+                        App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Result>(cmd, ct);
+
+                _usedNicks.GetOrAdd(id, _ => []).Add(corrected);
+                log.Debug($"Bot {corrected} joined {id} (PREMIUM) (playerId={pid})");
+            }
+            catch (Exception ex) when (ex is
+                                           App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking
+                                               .RoomIsFullException or
+                                           App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking
+                                               .PrivateServerInUse)
+            {
+            }
+            catch (Exception ex)
+            {
+                log.Error("Bot failed to join", ex);
+            }
         }
-        catch (Exception ex)
+        else
         {
-            log.Error("Bot failed to join", ex);
+            var cmd = new App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command(nick, true);
+
+            try
+            {
+                var (id, corrected, pid) =
+                    await bus.SendAsync<
+                        App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command,
+                        App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Result>(cmd, ct);
+
+                _usedNicks.GetOrAdd(id, _ => []).Add(corrected);
+                log.Debug($"Bot {corrected} joined {id} (playerId={pid})");
+            }
+            catch (Exception ex) when (ex is
+                                           App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.RoomIsFullException
+                                           or
+                                           App.Application.UseCase.Matchmaking.JoinQuickMatchmaking
+                                               .MultipleGamesNotSupportedException)
+            {
+            }
+            catch (Exception ex)
+            {
+                log.Error("Bot failed to join", ex);
+            }
         }
     }
 

@@ -24,7 +24,7 @@ public record Result(Guid MatchmakingId, string Nick, Guid PlayerId);
 public class Handler(
     IGuid guid,
     IMatchmakings matchmakings,
-    IMyLogger myLogger,
+    IMyLogger logger,
     Domain.Matchmaking.Settings globalMatchmakingSettings,
     IScheduler scheduler,
     IJson json,
@@ -55,12 +55,12 @@ public class Handler(
     {
         var matchmmakingsInProgress = (await matchmakings.GetInProgress(MatchmakingType.Normal, ct)).ToImmutableArray();
         var allGamesInProgressCount = await games.GetInProgressCount(ct);
-        var premiumMatchmakingGames = await matchmakingGames.GetGamesCount();
-        var normalGamesInProgressCount = allGamesInProgressCount - premiumMatchmakingGames;
+        var premiumMatchmakingGamesCount = await matchmakingGames.GetGamesCount();
+        logger.Info("Premium matchmaking games: " + premiumMatchmakingGamesCount + "");
+        var normalGamesInProgressCount = allGamesInProgressCount - premiumMatchmakingGamesCount;
 
         var now = clock.Now();
         var matchmakingsCount = matchmmakingsInProgress.Length;
-        // TODO: Oddzielić matchmakingi/gry premium od zwykłych
 
         switch (matchmakingsCount, normalGamesInProgressCount)
         {
@@ -107,7 +107,7 @@ public class Handler(
         await matchmakings.Add(matchmakingAfterJoin, ct);
 
         var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterJoin, now);
-        myLogger.Info("Just created matchmaking? (id= " + matchmakingGuid + "): " + justCreated + "");
+        logger.Info("Just created matchmaking? (id= " + matchmakingGuid + "): " + justCreated + "");
         if (justCreated)
         {
             now = clock.Now();
@@ -119,7 +119,7 @@ public class Handler(
 
         await matchmakingUpdatedDtoStorage.Set(matchmakingGuid, matchmakingUpdatedDto);
 
-        myLogger.Info("Is bot? (id= " + matchmakingGuid + "): " + isBot + "");
+        logger.Info("Is bot? (id= " + matchmakingGuid + "): " + isBot + "");
         if (isBot)
         {
             botRegistry.RegisterMatchmakingBot(matchmakingGuid, player.Id.Item);
@@ -131,7 +131,7 @@ public class Handler(
         await matchmakingNotifier.PlayerJoined(
             matchmakingUpdatedDtoMapper.PlayerJoinedFromDomain(player, matchmakingAfterJoin));
 
-        myLogger.Info($"{correctedNick} joined the matchmaking ({matchmakingGuid})");
+        logger.Info($"{correctedNick} joined the matchmaking ({matchmakingGuid})");
 
         return new Result(matchmakingGuid, PlayerModule.NickModule.value(correctedNick), player.Id.Item);
     }
