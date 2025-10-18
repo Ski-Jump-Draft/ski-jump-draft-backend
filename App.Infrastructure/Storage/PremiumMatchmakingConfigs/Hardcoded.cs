@@ -7,7 +7,7 @@ public class Hardcoded : IPremiumMatchmakingConfigurationStorage
     public Task<ISet<PremiumMatchmakingConfig>> PremiumMatchmakingConfigs =>
         Task.FromResult<ISet<PremiumMatchmakingConfig>>(new HashSet<PremiumMatchmakingConfig>()
         {
-            new("visca el barca"),
+            new("sjdraft123"),
             new(Password: "siekamy cebulkę")
         });
 
