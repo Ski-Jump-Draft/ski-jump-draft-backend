@@ -9,7 +9,8 @@ public static class HostedServices
     {
         if (isMocked)
         {
-            services.AddHostedService<MockedOnlineBotJoiner>();
+            // services.AddHostedService<MockedOnlineBotJoiner>();
+            services.AddHostedService<App.Web.HostedServices.InternalTest.BotJoiner>();
         }
         else
         {

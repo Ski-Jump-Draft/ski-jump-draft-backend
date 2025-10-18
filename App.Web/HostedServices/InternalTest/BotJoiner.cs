@@ -54,15 +54,18 @@ public class BotJoiner(
 
             bool MatchmakingIsEligibleForBots(Matchmaking m, DateTimeOffset nowDateTime)
             {
-                return !_botsJoined.ContainsKey(m.Id_.Item) && m.RemainingSlots > 0
-                                                            && m.RemainingToForceEnd(nowDateTime).TotalSeconds > 10;
+                var botsHaveNotJoined = !_botsJoined.ContainsKey(m.Id_.Item);
+                var remainingSlotsExist = m.RemainingSlots > 0;
+                var remainingTimeIsEnough = m.RemainingToForceEnd(nowDateTime).TotalSeconds > 10;
+                return botsHaveNotJoined && remainingSlotsExist
+                                         && remainingTimeIsEnough;
             }
         }
     }
 
     private async Task JoinBotsToMatchmaking(Matchmaking m, CancellationToken ct)
     {
-        var botsToJoin = Math.Max(1, m.RemainingSlots / 2);
+        var botsToJoin = Math.Max(1, (int)Math.Ceiling(m.RemainingSlots / 1.5));
         var success = false;
 
         var tasks = Enumerable.Range(0, botsToJoin).Select(async i =>

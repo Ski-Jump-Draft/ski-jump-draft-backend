@@ -95,8 +95,10 @@ public class Handler(
         await matchmakingUpdatedDtoStorage.Set(matchmakingId, matchmakingUpdatedDto);
 
         logger.Info("Is bot? (id= " + matchmakingId + "): " + command.IsBot + "");
+
         if (command.IsBot)
         {
+            logger.Info("Matchmaking players count after bot join: " + matchmakingAfterJoin.Players_.Count + "");
             botRegistry.RegisterMatchmakingBot(matchmakingId, player.Id.Item);
         }
 
