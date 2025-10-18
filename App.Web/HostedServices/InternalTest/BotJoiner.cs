@@ -56,7 +56,7 @@ public class BotJoiner(
             {
                 var botsHaveNotJoined = !_botsJoined.ContainsKey(m.Id_.Item);
                 var remainingSlotsExist = m.RemainingSlots > 0;
-                var remainingTimeIsEnough = m.RemainingToForceEnd(nowDateTime).TotalSeconds > 10;
+                var remainingTimeIsEnough = m.RemainingToForceEnd(nowDateTime).TotalSeconds <= 15;
                 return botsHaveNotJoined && remainingSlotsExist
                                          && remainingTimeIsEnough;
             }
