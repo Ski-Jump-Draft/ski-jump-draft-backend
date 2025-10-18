@@ -12,16 +12,16 @@ using Results = Microsoft.AspNetCore.Http.Results;
 
 var builder = WebApplication.CreateBuilder(args);
 
-if (!builder.Environment.IsDevelopment())
-{
-    Log.Logger = new LoggerConfiguration()
-        .Enrich.FromLogContext()
-        .WriteTo.Console(new RenderedCompactJsonFormatter()) // JSON per line
-        .CreateLogger();
-
-    builder.Logging.ClearProviders();
-    builder.Host.UseSerilog();
-}
+// if (!builder.Environment.IsDevelopment())
+// {
+//     Log.Logger = new LoggerConfiguration()
+//         .Enrich.FromLogContext()
+//         .WriteTo.Console(new RenderedCompactJsonFormatter()) // JSON per line
+//         .CreateLogger();
+//
+//     builder.Logging.ClearProviders();
+//     builder.Host.UseSerilog();
+// }
 
 if (builder.Environment.IsDevelopment())
 {
