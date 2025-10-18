@@ -1,21 +1,24 @@
 using App.Application.Extensions;
+using App.Application.Matchmaking;
 using App.Application.Utility;
 using App.Domain.Game;
 using Microsoft.FSharp.Collections;
 
 namespace App.Application.Game.Settings;
 
-public class Default(IRandom random) : IGameSettingsFactory
+public class Default(
+    IRandom random,
+    IPremiumMatchmakingGames premiumMatchmakingGames,
+    IPremiumMatchmakingConfigurationStorage premiumMatchmakingConfigurationStorage) : IGameSettingsFactory
 {
-    public Domain.Game.Settings Create()
+    public async Task<Domain.Game.Settings> Create(Guid? matchmakingId = null)
     {
- 
         var picksNumber = new Dictionary<int, double>
         {
-            { 3, 0.8 },
+            { 2, 0.1 }, { 3, 0.8 },
             { 4, 1 },
             { 5, 1 },
-            { 6, 0.5 },
+            { 6, 0.8 },
         }.WeightedRandomElement(random);
 
         var draftOrder = new Dictionary<Domain.Game.DraftModule.SettingsModule.Order, double>
@@ -63,7 +66,25 @@ public class Default(IRandom random) : IGameSettingsFactory
                 App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(20)),
                 App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(20)),
                 App.Domain.Game.PhaseDuration.Create(TimeSpan.FromSeconds(20)));
-        var jumpInterval = App.Domain.Game.PhaseDuration.Create(TimeSpan.FromMilliseconds(6000));
+
+
+        App.Domain.Game.PhaseDuration jumpInterval;
+        if (matchmakingId is null)
+        {
+            jumpInterval = App.Domain.Game.PhaseDuration.Create(TimeSpan.FromMilliseconds(6000));
+        }
+        else
+        {
+            var password = await premiumMatchmakingGames.GetPassword(matchmakingId.Value);
+            jumpInterval = password switch
+            {
+                "siekamy cebulkę" => App.Domain.Game.PhaseDuration.Create(TimeSpan.FromMilliseconds(8000)),
+                "sjdraft123" => App.Domain.Game.PhaseDuration.Create(TimeSpan.FromMilliseconds(5000)),
+                _ => App.Domain.Game.PhaseDuration.Create(TimeSpan.FromMilliseconds(6000))
+            };
+        }
+
+
         return new App.Domain.Game.Settings(breakSettings, preDraftSettings, draftSettings,
             mainCompetitionSettings,
             jumpInterval,

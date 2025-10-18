@@ -85,7 +85,7 @@ public class Handler(
         var gameJumpers = SetupGameJumpers(gameGuid, selectedGameWorldJumperDtos);
         var competitionHill = SetupCompetitionHill(gameWorldHill);
 
-        var gameSettings = gameSettingsFactory.Create();
+        var gameSettings = await gameSettingsFactory.Create(command.MatchmakingId);
 
         var gameResult =
             Domain.Game.Game.Create(gameId, gameSettings, gamePlayers, gameJumpers, competitionHill);

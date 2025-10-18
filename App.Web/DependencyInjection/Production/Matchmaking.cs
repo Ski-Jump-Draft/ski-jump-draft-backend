@@ -10,7 +10,7 @@ public static class Matchmaking
         {
             services.AddSingleton<App.Domain.Matchmaking.Settings>(sp =>
                 App.Domain.Matchmaking.Settings.Create(
-                    SettingsModule.Duration.NewDuration(TimeSpan.FromSeconds(60)),
+                    SettingsModule.Duration.NewDuration(TimeSpan.FromSeconds(5)),
                     // autoStartPolicy: SettingsModule.MatchmakingEndPolicy.NewAfterNoUpdate(
                     //     TimeSpan.FromSeconds(10)),
                     autoStartPolicy: SettingsModule.MatchmakingEndPolicy.AfterTimeout,

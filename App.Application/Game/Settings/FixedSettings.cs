@@ -2,8 +2,8 @@ namespace App.Application.Game.Settings;
 
 public class FixedSettings(Domain.Game.Settings settings) : IGameSettingsFactory
 {
-    public Domain.Game.Settings Create()
+    public Task<Domain.Game.Settings> Create(Guid? matchmakingId)
     {
-        return settings;
+        return Task.FromResult(settings);
     }
 }
