@@ -106,7 +106,7 @@ public class Handler(
         var (matchmakingAfterJoin, correctedNick) = joinResult.ResultValue;
         await matchmakings.Add(matchmakingAfterJoin, ct);
 
-        var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterJoin, false, now);
+        var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterJoin, now);
         myLogger.Info("Just created matchmaking? (id= " + matchmakingGuid + "): " + justCreated + "");
         if (justCreated)
         {
