@@ -84,8 +84,8 @@ public class Default(
                 _ => App.Domain.Game.PhaseDuration.Create(TimeSpan.FromMilliseconds(6000))
             };
 
-            myLogger.Info($"Jump interval for premium matchmaking game with id {matchmakingId} is {jumpInterval}");
-        }
+
+        }            myLogger.Info($"Jump interval for matchmaking game with id {matchmakingId} is {jumpInterval}");
 
 
         return new App.Domain.Game.Settings(breakSettings, preDraftSettings, draftSettings,

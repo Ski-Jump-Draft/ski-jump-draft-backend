@@ -66,7 +66,7 @@ public class InMemory : IPremiumMatchmakingGames
 
     public Task<string?> GetPassword(Guid matchmakingId)
     {
-        if (_ended.ContainsKey(matchmakingId)) return Task.FromResult<string?>(null);
+        // if (_ended.ContainsKey(matchmakingId)) return Task.FromResult<string?>(null);
         return Task.FromResult(_passwordById.TryGetValue(matchmakingId, out var pwd) ? pwd : null);
     }
 
