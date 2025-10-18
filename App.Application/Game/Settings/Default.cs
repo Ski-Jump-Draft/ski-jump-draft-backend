@@ -9,7 +9,8 @@ namespace App.Application.Game.Settings;
 public class Default(
     IRandom random,
     IPremiumMatchmakingGames premiumMatchmakingGames,
-    IPremiumMatchmakingConfigurationStorage premiumMatchmakingConfigurationStorage) : IGameSettingsFactory
+    IPremiumMatchmakingConfigurationStorage premiumMatchmakingConfigurationStorage,
+    IMyLogger myLogger) : IGameSettingsFactory
 {
     public async Task<Domain.Game.Settings> Create(Guid? matchmakingId = null)
     {
@@ -82,6 +83,8 @@ public class Default(
                 "sjdraft123" => App.Domain.Game.PhaseDuration.Create(TimeSpan.FromMilliseconds(5000)),
                 _ => App.Domain.Game.PhaseDuration.Create(TimeSpan.FromMilliseconds(6000))
             };
+
+            myLogger.Info($"Jump interval for premium matchmaking game with id {matchmakingId} is {jumpInterval}");
         }
 
 
