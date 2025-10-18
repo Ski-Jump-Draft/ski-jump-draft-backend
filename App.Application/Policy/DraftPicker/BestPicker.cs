@@ -30,8 +30,10 @@ public class BestPicker(
         var maxPosition = CalculateMaxPositionFromResults(preDraftCompetitionResults);
         logger.Debug("Max position: " + maxPosition);
         await UpdatePreDraftPositionsByJumper(game);
-        var averagePositionByJumper = CreateAveragePositions(preDraftCompetitionResults);
-        var ratingByGameJumper = CalculateGameJumperRatings(gameWorldJumpers, averagePositionByJumper, maxPosition);
+        var gameId = game.Id.Item;
+        var averagePositionByJumper = CreateAveragePositions(gameId, preDraftCompetitionResults);
+        var ratingByGameJumper =
+            CalculateGameJumperRatings(gameId, gameWorldJumpers, averagePositionByJumper, maxPosition);
         await LogRatingsWithNames(ratingByGameJumper, ct);
         return DrawJumper(ratingByGameJumper);
     }
@@ -41,7 +43,7 @@ public class BestPicker(
         var ratingsWithNames = new Dictionary<string, double>();
         foreach (var kvp in ratingByGameJumper)
         {
-            var gameWorldJumperId = gameJumperAcl.GetGameWorldJumper(kvp.Key).Id;
+            var gameWorldJumperId = gameJumperAcl.GetGameWorldJumper(kvp.Key).GameWorldJumperId;
             var gameWorldJumper = (await jumpers.GetById(JumperId.NewJumperId(gameWorldJumperId), ct)).Value;
             var nameAndSurname = $"{gameWorldJumper.Name.Item} {gameWorldJumper.Surname.Item}";
             ratingsWithNames[nameAndSurname] = kvp.Value;
@@ -92,14 +94,14 @@ public class BestPicker(
             (await preDraftPositionsService.GetPreDraftPositions(game.Id.Item)).PositionsByGameJumper;
     }
 
-    private Dictionary<Guid, double> CalculateGameJumperRatings(IEnumerable<Jumper> gameWorldJumpers,
+    private Dictionary<Guid, double> CalculateGameJumperRatings(Guid gameId, IEnumerable<Jumper> gameWorldJumpers,
         Dictionary<Guid, double> averagePositionByJumper,
         int maxPosition)
     {
         Dictionary<Guid, double> gameJumperRating = new();
         foreach (var gameWorldJumper in gameWorldJumpers)
         {
-            var gameJumperId = gameJumperAcl.GetGameJumper(gameWorldJumper.Id.Item).Id;
+            var gameJumperId = gameJumperAcl.GetGameJumper(gameId, gameWorldJumper.Id.Item).GameJumperId;
             var averagePosition = averagePositionByJumper[gameJumperId];
             gameJumperRating[gameJumperId] = CalculateRating(gameWorldJumper, maxPosition, averagePosition);
         }
@@ -107,7 +109,7 @@ public class BestPicker(
         return gameJumperRating;
     }
 
-    private Dictionary<Guid, double> CreateAveragePositions(
+    private Dictionary<Guid, double> CreateAveragePositions(Guid gameId,
         IEnumerable<ArchiveCompetitionResultsDto> competitionResults)
     {
         var averagePosition = new Dictionary<Guid, double>();
@@ -115,7 +117,7 @@ public class BestPicker(
         {
             foreach (var result in results.JumperResults)
             {
-                var gameJumperId = competitionJumperAcl.GetGameJumper(result.CompetitionJumperId).Id;
+                var gameJumperId = competitionJumperAcl.GetGameJumper(gameId, result.CompetitionJumperId).GameJumperId;
                 var positions = _preDraftPositionsByJumper[gameJumperId];
                 if (positions.Count == 0)
                 {

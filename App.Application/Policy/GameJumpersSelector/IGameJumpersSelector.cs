@@ -6,7 +6,7 @@ public interface IGameJumpersSelector
 }
 
 public record SelectedGameWorldJumperDto(
-    Guid Id,
+    Guid GameWorldJumperId,
     string CountryFisCode,
     string Name,
     string Surname,

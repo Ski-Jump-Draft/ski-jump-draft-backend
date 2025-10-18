@@ -5,6 +5,7 @@ using App.Application.Extensions;
 using App.Application.Matchmaking;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
+using App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking;
 using App.Application.Utility;
 using App.Domain.Matchmaking;
 
@@ -26,7 +27,7 @@ public class Handler(
     IBotRegistry botRegistry,
     MatchmakingUpdatedDtoMapper matchmakingUpdatedDtoMapper,
     IMatchmakingUpdatedDtoStorage matchmakingUpdatedDtoStorage,
-    IPremiumMatchmakings premiumMatchmakings)
+    IPremiumMatchmakingGames premiumMatchmakingGames)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -42,11 +43,21 @@ public class Handler(
         logger.Info($"Should end matchmaking? MatchmakingId: {command.MatchmakingId}, shouldEnd: {shouldEnd}");
         if (shouldEnd)
         {
-            var isPremium = await premiumMatchmakings.PremiumMatchmakingIsRunning(command.MatchmakingId);
-
-            if (isPremium)
+            if (matchmaking.IsPremium_)
             {
-                await premiumMatchmakings.Remove(command.MatchmakingId);
+                var premiumRoomPassword = await premiumMatchmakingGames.GetPassword(command.MatchmakingId);
+                if (premiumRoomPassword is null)
+                    throw new Exception("Password is null. Some conflict. It should not be reached.");
+
+                var gameRunsByPremiumMatchmaking =
+                    await premiumMatchmakingGames.GameRunsByPremiumMatchmaking(premiumRoomPassword);
+
+                if (gameRunsByPremiumMatchmaking)
+                {
+                    throw new PrivateServerInUse();
+                }
+
+                await premiumMatchmakingGames.EndMatchmaking(command.MatchmakingId);
                 logger.Debug($"Removed premium matchmaking. MatchmakingId: {command.MatchmakingId}");
             }
 
@@ -82,7 +93,7 @@ public class Handler(
 
             now = clock.Now();
 
-            var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(endedMatchmaking, isPremium, now);
+            var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(endedMatchmaking, now);
             await matchmakingUpdatedDtoStorage.Set(command.MatchmakingId, matchmakingUpdatedDto);
             await matchmakingNotifier.MatchmakingUpdated(matchmakingUpdatedDto);
 

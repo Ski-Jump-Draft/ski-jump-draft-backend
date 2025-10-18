@@ -102,7 +102,7 @@ public class Handler(
     {
         var gameJumpersStartlist = await gameCompetitionStartlist.Get(gameId, new MainCompetitionDto(), ct);
         var competitionJumpersStartlist =
-            gameJumpersStartlist.ToCompetitionJumpers(competitionJumperAcl).ToImmutableList();
+            gameJumpersStartlist.ToCompetitionJumpers(competitionJumperAcl, gameId).ToImmutableList();
         return competitionJumpersStartlist;
     }
 }

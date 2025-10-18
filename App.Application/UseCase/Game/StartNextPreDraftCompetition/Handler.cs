@@ -80,7 +80,8 @@ public class Handler(
         Domain.Game.Game game, CancellationToken ct)
     {
         var gateSelectionPack =
-            await gameGateSelectionPack.GetForCompetition(game.Id.Item, competitionJumpersStartlist, game.Hill.Value, ct);
+            await gameGateSelectionPack.GetForCompetition(game.Id.Item, competitionJumpersStartlist, game.Hill.Value,
+                ct);
         var startingGateSelector = gateSelectionPack.StartingGateSelector;
         var startingGateInt = startingGateSelector.Select();
         var startingGate = Domain.Competition.Gate.NewGate(startingGateInt);
@@ -107,7 +108,7 @@ public class Handler(
         var gameJumpersStartlist = await gameCompetitionStartlist.Get(gameId,
             new Policy.GameCompetitionStartlist.PreDraftDto(preDraftCompetitionIndex), ct);
         var competitionJumpersStartlist =
-            gameJumpersStartlist.ToCompetitionJumpers(competitionJumperAcl).ToImmutableList();
+            gameJumpersStartlist.ToCompetitionJumpers(competitionJumperAcl, gameId).ToImmutableList();
         return competitionJumpersStartlist;
     }
 }

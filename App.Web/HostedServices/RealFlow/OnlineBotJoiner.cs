@@ -18,7 +18,7 @@ public class OnlineBotJoiner(IMatchmakings matchmakings, ICommandBus bus, IRando
             var delayMilliseconds = random.Gaussian(4000, 500);
             await Task.Delay(TimeSpan.FromMilliseconds(delayMilliseconds), ct);
 
-            var all = await matchmakings.GetInProgress(ct);
+            var all = await matchmakings.GetInProgress(null, ct);
             var matchmaking = all.FirstOrDefault();
 
             if (matchmaking is null)

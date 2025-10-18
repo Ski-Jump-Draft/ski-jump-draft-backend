@@ -47,7 +47,8 @@ public class Redis(
         var gameDto = await GetGameDto(gameId, searchInArchive: true);
         if (gameDto?.PreDraft is null) return null;
         var endedCompetitions = gameDto.PreDraft.EndedCompetitions ?? [];
-        var archiveCompetitions = endedCompetitions.Select(ArchivedCompetitionResultsFromRedis);
+        var archiveCompetitions =
+            endedCompetitions.Select(endedCompetition => ArchivedCompetitionResultsFromRedis(gameId, endedCompetition));
 
         return archiveCompetitions.ToList();
     }
@@ -67,7 +68,7 @@ public class Redis(
     {
         var gameDto = await GetGameDto(gameId, searchInArchive: true);
         return gameDto?.EndedMainCompetition != null
-            ? ArchivedCompetitionResultsFromRedis(gameDto.EndedMainCompetition)
+            ? ArchivedCompetitionResultsFromRedis(gameId, gameDto.EndedMainCompetition)
             : null;
     }
 
@@ -110,13 +111,13 @@ public class Redis(
         return endedCompetitionResults;
     }
 
-    private ArchiveCompetitionResultsDto ArchivedCompetitionResultsFromRedis(
+    private ArchiveCompetitionResultsDto ArchivedCompetitionResultsFromRedis(Guid gameId,
         RedisRepository.EndedCompetitionDto endedCompetition)
     {
         var jumperResults = endedCompetition.Results.Select(endedCompetitionJumperResult =>
         {
             var (gameJumperId, gameWorldJumperId) =
-                GetGameJumperAndGameWorldJumper(endedCompetitionJumperResult.CompetitionJumperId);
+                GetGameJumperAndGameWorldJumper(gameId, endedCompetitionJumperResult.CompetitionJumperId);
             var jumpResults = endedCompetitionJumperResult.RoundResults.Select(endedCompetitionRoundResult =>
                     new ArchiveJumpResult(endedCompetitionRoundResult.JumpResultId,
                         endedCompetitionRoundResult.CompetitionJumperId, endedCompetitionRoundResult.Distance,
@@ -136,10 +137,10 @@ public class Redis(
         return new ArchiveCompetitionResultsDto(jumperResults);
     }
 
-    private (Guid, Guid) GetGameJumperAndGameWorldJumper(Guid competitionJumperId)
+    private (Guid, Guid) GetGameJumperAndGameWorldJumper(Guid gameId, Guid competitionJumperId)
     {
-        var gameJumperId = competitionJumperAcl.GetGameJumper(competitionJumperId).Id;
-        var gameWorldJumperId = gameJumperAcl.GetGameWorldJumper(gameJumperId).Id;
+        var gameJumperId = competitionJumperAcl.GetGameJumper(gameId, competitionJumperId).GameJumperId;
+        var gameWorldJumperId = gameJumperAcl.GetGameWorldJumper(gameJumperId).GameWorldJumperId;
         return (gameJumperId, gameWorldJumperId);
     }
 }

@@ -56,7 +56,7 @@ public class Handler(
     IGameSchedule gameSchedule,
     IBotRegistry botRegistry,
     IRandom random,
-    IPremiumMatchmakings premiumMatchmakings)
+    IPremiumMatchmakingGames premiumMatchmakingGames)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -82,7 +82,7 @@ public class Handler(
         Dictionary<Guid, Guid> gamePlayerByMatchmakingPlayer = new();
 
         var gamePlayers = BuildGamePlayersFromMatchmaking(matchmaking, gameGuid, gamePlayerByMatchmakingPlayer);
-        var gameJumpers = SetupGameJumpers(selectedGameWorldJumperDtos);
+        var gameJumpers = SetupGameJumpers(gameGuid, selectedGameWorldJumperDtos);
         var competitionHill = SetupCompetitionHill(gameWorldHill);
 
         var gameSettings = gameSettingsFactory.Create();
@@ -95,7 +95,7 @@ public class Handler(
         var timeToPreDraft = game.Settings.BreakSettings.BreakBeforePreDraft.Value;
         await games.Add(game, ct);
         var belongsToPremiumMatchmaking =
-            await premiumMatchmakings.StartGameIfBelongsToMatchmaking(command.MatchmakingId, gameGuid);
+            await premiumMatchmakingGames.StartGameIfBelongsToMatchmaking(command.MatchmakingId, gameGuid);
         logger.Info($"Game {gameGuid} belongs to premium matchmaking: {belongsToPremiumMatchmaking}");
         await SchedulePreDraftPhase(gameGuid, timeToPreDraft, ct);
         await NotifyGameStart(game, gameGuid, gamePlayerByMatchmakingPlayer, command.MatchmakingId, ct);
@@ -115,7 +115,7 @@ public class Handler(
         return competitionHill;
     }
 
-    private Jumpers SetupGameJumpers(ImmutableList<SelectedGameWorldJumperDto> selectedJumperDtos)
+    private Jumpers SetupGameJumpers(Guid gameId, ImmutableList<SelectedGameWorldJumperDto> selectedJumperDtos)
     {
         var jumperGameFormsPrintString = "Forma zawodników:\n";
         var gameJumpersEnumerable = new List<Domain.Game.Jumper>();
@@ -123,10 +123,10 @@ public class Handler(
         foreach (var selectedGameWorldJumperDto in selectedJumperDtos)
         {
             var gameJumperId = guid.NewGuid();
-            var gameJumperDto = new GameJumperDto(gameJumperId);
+            var gameJumperDto = new GameJumperDto(gameId, gameJumperId);
             SetupJumperAcl(selectedGameWorldJumperDto, gameJumperDto);
             jumperGameFormsPrintString =
-                CalculateAndStoreJumperForm(gameJumperId, selectedGameWorldJumperDto, jumperGameFormsPrintString);
+                SetUpAndLogJumperForm(gameJumperId, selectedGameWorldJumperDto, jumperGameFormsPrintString);
             gameJumpersEnumerable.Add(new Domain.Game.Jumper(Domain.Game.JumperId.NewJumperId(gameJumperId)));
         }
 
@@ -180,7 +180,7 @@ public class Handler(
                 .tryCreate(Domain.GameWorld.HillModule.WindPointsModule.value(gameWorldHill.TailwindPoints)).Value);
     }
 
-    private string? CalculateAndStoreJumperForm(Guid gameJumperId,
+    private string? SetUpAndLogJumperForm(Guid gameJumperId,
         SelectedGameWorldJumperDto selectedGameWorldJumperDto,
         string? jumperGameFormsPrintString)
     {
@@ -197,10 +197,15 @@ public class Handler(
 
     private void SetupJumperAcl(SelectedGameWorldJumperDto selectedGameWorldJumperDto, GameJumperDto gameJumperDto)
     {
-        var gameWorldJumperDto = new GameWorldJumperDto(selectedGameWorldJumperDto.Id);
+        var gameWorldJumperDto = new GameWorldJumperDto(selectedGameWorldJumperDto.GameWorldJumperId);
+        logger.Info($"[ACL] Mapping GameWorldJumper -> GameJumper | Game:{gameJumperDto.GameId} GWJ:{
+            gameWorldJumperDto.GameWorldJumperId} -> GJ:{gameJumperDto.GameJumperId}");
+
         gameJumperAcl.Map(gameWorldJumperDto, gameJumperDto);
 
         var competitionJumperId = guid.NewGuid();
+        logger.Info($"[ACL] Mapping GameJumper -> CompetitionJumper | GJ:{gameJumperDto.GameJumperId} -> CJ:{
+            competitionJumperId}");
         competitionJumperAcl.Map(gameJumperDto, new CompetitionJumperDto(competitionJumperId));
     }
 

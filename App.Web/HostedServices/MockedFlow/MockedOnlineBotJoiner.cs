@@ -14,7 +14,7 @@ public class MockedOnlineBotJoiner(
     IRandom random,
     IMyLogger log,
     IClock clock,
-    IPremiumMatchmakings premiumMatchmakings)
+    IPremiumMatchmakingGames premiumMatchmakingGames)
     : BackgroundService
 {
     private static readonly List<string> MaleNames =
@@ -40,7 +40,7 @@ public class MockedOnlineBotJoiner(
     {
         while (!ct.IsCancellationRequested)
         {
-            var all = (await repo.GetInProgress(ct)).ToImmutableArray();
+            var all = (await repo.GetInProgress(null, ct)).ToImmutableArray();
             var now = clock.Now();
 
             var tasks = all
@@ -61,13 +61,11 @@ public class MockedOnlineBotJoiner(
         _botsJoined[m.Id_.Item] = true;
         var botsToJoin = Math.Max(1, m.RemainingSlots / 2);
 
-        var isPremium = await premiumMatchmakings.PremiumMatchmakingIsRunning(m.Id_.Item);
-
         var tasks = Enumerable.Range(0, botsToJoin)
             .Select(async i =>
             {
-                await Task.Delay(250 * i, ct);
-                if (isPremium)
+                await Task.Delay(300 * i, ct);
+                if (m.IsPremium_)
                 {
                     await JoinSingleBotPremium(m.Id_.Item, ct);
                 }
@@ -110,7 +108,7 @@ public class MockedOnlineBotJoiner(
     private async Task JoinSingleBotPremium(Guid matchmakingId, CancellationToken ct)
     {
         var nick = GenerateBotName(matchmakingId);
-        var password = await premiumMatchmakings.GetPassword(matchmakingId);
+        var password = await premiumMatchmakingGames.GetPassword(matchmakingId);
         if (password is null)
         {
             throw new Exception("Password is null. Some conflict. It should not be reached.");

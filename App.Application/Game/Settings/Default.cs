@@ -20,8 +20,8 @@ public class Default(IRandom random) : IGameSettingsFactory
 
         var draftOrder = new Dictionary<Domain.Game.DraftModule.SettingsModule.Order, double>
         {
-            { Domain.Game.DraftModule.SettingsModule.Order.Snake, 50 },
-            { Domain.Game.DraftModule.SettingsModule.Order.Random, 0 },
+            { Domain.Game.DraftModule.SettingsModule.Order.Snake, 3 },
+            { Domain.Game.DraftModule.SettingsModule.Order.Random, 4 },
         }.WeightedRandomElement(random);
 
         var rankingPolicy = new Dictionary<Domain.Game.RankingPolicy, double>

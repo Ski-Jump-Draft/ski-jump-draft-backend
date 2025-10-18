@@ -24,7 +24,7 @@ public class Handler(
     IMyLogger logger,
     IGameRankingFactorySelector gameRankingFactorySelector,
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
-    IPremiumMatchmakings premiumMatchmakings)
+    IPremiumMatchmakingGames premiumMatchmakingGames)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -46,7 +46,7 @@ public class Handler(
 
         var endedGameResult = game.EndGame(gameRanking);
 
-        await premiumMatchmakings.EndGameIfRuns(command.GameId);
+        await premiumMatchmakingGames.EndGameIfRuns(command.GameId);
 
         if (!endedGameResult.IsOk) return new Result();
 

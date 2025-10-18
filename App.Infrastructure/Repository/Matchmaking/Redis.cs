@@ -15,6 +15,7 @@ public record PlayerDto(Guid Id, string Nick, DateTimeOffset JoinedAt);
 
 public record MatchmakingDto(
     Guid Id,
+    bool IsPremium,
     string Status,
     SettingsDto Settings,
     List<PlayerDto> Players,
@@ -37,7 +38,8 @@ public static class MatchmakingDtoMapper
         var settings = new SettingsDto(matchmaking.MaxDuration, matchmakingEndPolicy,
             SettingsModule.MinPlayersModule.value(matchmaking.MinPlayersCount),
             SettingsModule.MaxPlayersModule.value(matchmaking.MaxPlayersCount));
-        return new MatchmakingDto(matchmaking.Id_.Item, matchmaking.Status_.FormattedStatus(), settings, players,
+        return new MatchmakingDto(matchmaking.Id_.Item, matchmaking.IsPremium_, matchmaking.Status_.FormattedStatus(),
+            settings, players,
             matchmaking.StartedAt_, matchmaking.EndedAt_.ToNullable(), matchmaking.ReachedMaxPlayersAt_.ToNullable(),
             matchmaking.ReachedMinPlayersAt_.ToNullable(), matchmaking.LastUpdatedAt_.ToNullable());
     }
@@ -85,6 +87,7 @@ public static class MatchmakingDtoMapper
                 nick.Value, player.JoinedAt);
         }).ToList();
         var matchmaking = Domain.Matchmaking.Matchmaking.CreateFromState(MatchmakingId.NewMatchmakingId(dto.Id),
+            dto.IsPremium,
             settings.ResultValue, status, SetModule.OfSeq(players), dto.StartedAt, dto.EndedAt, dto.MaxReachedAt,
             dto.MinReachedAt, dto.LastUpdatedAt);
         return matchmaking;
@@ -119,6 +122,69 @@ public class Redis(IConnectionMultiplexer redis, IMyLogger logger) : IMatchmakin
     private static string ArchiveKey(Guid id) => $"{ArchivePattern}:{id}";
     private static string LiveSetKey => $"{LivePattern}:ids";
     private static string ArchiveSetKey => $"{ArchivePattern}:ids";
+
+    private async Task<IEnumerable<Domain.Matchmaking.Matchmaking>> GetMatchmakingsFromSetOptimized(
+        string cacheKey,
+        string setKey,
+        Func<Guid, string> keySelector,
+        Func<MatchmakingDto, bool> filter,
+        TimeSpan ttl,
+        CancellationToken ct)
+    {
+        if (_cache.TryGetValue(cacheKey, out IEnumerable<Domain.Matchmaking.Matchmaking>? cached))
+            return cached!;
+
+        var result = new List<Domain.Matchmaking.Matchmaking>();
+        var batch = new List<RedisValue>(500);
+
+        await foreach (var item in _db.SetScanAsync(setKey).WithCancellation(ct))
+        {
+            batch.Add(item);
+            if (batch.Count < 500) continue;
+            await ProcessBatch(batch, setKey, keySelector, filter, result);
+            batch.Clear();
+        }
+
+        if (batch.Count > 0)
+            await ProcessBatch(batch, setKey, keySelector, filter, result);
+
+        _cache.Set(cacheKey, result, ttl);
+        return result;
+    }
+
+    private async Task ProcessBatch(
+        List<RedisValue> batch,
+        string setKey,
+        Func<Guid, string> keySelector,
+        Func<MatchmakingDto, bool> filter,
+        List<Domain.Matchmaking.Matchmaking> result)
+    {
+        var keys = batch.Select(x => (RedisKey)keySelector(Guid.Parse(x.ToString()))).ToArray();
+        var values = await _db.StringGetAsync(keys);
+
+        for (int i = 0; i < batch.Count; i++)
+        {
+            var id = batch[i];
+            var json = values[i];
+
+            if (!json.HasValue)
+            {
+                await _db.SetRemoveAsync(setKey, id);
+                continue;
+            }
+
+            try
+            {
+                var dto = JsonSerializer.Deserialize<MatchmakingDto>(json!);
+                if (dto is not null && filter(dto))
+                    result.Add(dto.ToDomain());
+            }
+            catch
+            {
+                await _db.SetRemoveAsync(setKey, id);
+            }
+        }
+    }
 
     private async Task<IEnumerable<Domain.Matchmaking.Matchmaking>> GetMatchmakingsFromSet(
         string cacheKey,
@@ -243,21 +309,35 @@ public class Redis(IConnectionMultiplexer redis, IMyLogger logger) : IMatchmakin
         return domain;
     }
 
-    public Task<IEnumerable<Domain.Matchmaking.Matchmaking>> GetInProgress(CancellationToken ct) =>
-        GetMatchmakingsFromSet(
+    public Task<IEnumerable<Domain.Matchmaking.Matchmaking>>
+        GetInProgress(FSharpOption<MatchmakingType> type, CancellationToken ct) =>
+        GetMatchmakingsFromSetOptimized(
             "GetInProgress",
             LiveSetKey,
             LiveKey,
-            dto => dto.Status is "Running" or "Waiting",
+            dto => dto.Status is "Running" or "Waiting" && MatchmakingIsEligible(dto, type.ToNullable()),
             TimeSpan.FromMilliseconds(100),
             ct);
 
-    public Task<IEnumerable<Domain.Matchmaking.Matchmaking>> GetEnded(CancellationToken ct) =>
-        GetMatchmakingsFromSet(
+    public Task<IEnumerable<Domain.Matchmaking.Matchmaking>> GetEnded(FSharpOption<MatchmakingType> type,
+        CancellationToken ct) =>
+        GetMatchmakingsFromSetOptimized(
             "GetEnded",
             ArchiveSetKey,
             ArchiveKey,
-            dto => dto.Status != "Running" && dto.Status != "Waiting",
+            dto => dto.Status != "Running" && dto.Status != "Waiting" && MatchmakingIsEligible(dto, type.ToNullable()),
             TimeSpan.FromMilliseconds(100),
             ct);
-}
+
+    private static bool MatchmakingIsEligible(MatchmakingDto dto, MatchmakingType? type)
+    {
+        if (type is null) return true;
+        
+        if (type.IsPremium)
+        {
+            return dto.IsPremium;
+        }
+
+        return !dto.IsPremium;
+    }
+}   

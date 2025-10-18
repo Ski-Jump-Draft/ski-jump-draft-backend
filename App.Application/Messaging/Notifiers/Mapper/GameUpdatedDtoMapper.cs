@@ -86,7 +86,9 @@ public class GameUpdatedDtoMapper(
                 classification.Single(result =>
                     result.JumperId.Item == lastCompetitionJumperId!);
             var lastJumpResult = lastClassificationResult.JumpResults.Last();
-            lastCompetitionResultDto = CreateCompetitionRoundResultDto(lastJumpResult);
+            var gameJumperId = competitionJumperAcl.GetGameJumper(game.Id.Item, lastClassificationResult.JumperId.Item)
+                .GameJumperId;
+            lastCompetitionResultDto = CreateCompetitionRoundResultDto(lastJumpResult, gameJumperId);
         }
 
         var nextStatusStr = nextStatus != null ? $"{nextStatus.Status} IN {nextStatus.In.TotalSeconds}" : null;
@@ -144,8 +146,8 @@ public class GameUpdatedDtoMapper(
         var competitionJumperDtos = new List<CompetitionJumperDto>();
         foreach (var gameWorldJumper in gameWorldJumpersList)
         {
-            var gameJumperId = gameJumperAcl.GetGameJumper(gameWorldJumper.Id.Item).Id;
-            var competitionJumperId = competitionJumperAcl.GetCompetitionJumper(gameJumperId).Id;
+            var gameJumperId = gameJumperAcl.GetGameJumper(gameId, gameWorldJumper.Id.Item).GameJumperId;
+            var competitionJumperId = competitionJumperAcl.GetCompetitionJumper(gameId, gameJumperId).Id;
             var name = gameWorldJumper.Name.Item;
             var surname = gameWorldJumper.Surname.Item;
             var fisCountryCode = CountryFisCodeModule.value(gameWorldJumper.FisCountryCode);
@@ -259,7 +261,7 @@ public class GameUpdatedDtoMapper(
             var jumpRecords = archiveJumperResult.Jumps.Select(jumpRecord =>
             {
                 var competitionJumperId = archiveJumperResult.CompetitionJumperId;
-                var gameJumperId = competitionJumperAcl.GetGameJumper(competitionJumperId).Id;
+                var gameJumperId = competitionJumperAcl.GetGameJumper(gameId, competitionJumperId).GameJumperId;
                 return new CompetitionRoundResultDto(gameJumperId, competitionJumperId, jumpRecord.Distance,
                     jumpRecord.Points, jumpRecord.Judges, jumpRecord.JudgePoints, jumpRecord.WindCompensation,
                     jumpRecord.WindAverage, jumpRecord.Gate, jumpRecord.GateCompensation, jumpRecord.TotalCompensation);
@@ -296,7 +298,7 @@ public class GameUpdatedDtoMapper(
 
         var tasks = draft.AvailablePicks.Select(async gameJumperId =>
         {
-            var gameWorldJumperId = gameJumperAcl.GetGameWorldJumper(gameJumperId.Item).Id;
+            var gameWorldJumperId = gameJumperAcl.GetGameWorldJumper(gameJumperId.Item).GameWorldJumperId;
             var gameWorldJumper = await gameWorldJumpers
                 .GetById(Domain.GameWorld.JumperId.NewJumperId(gameWorldJumperId), ct)
                 .AwaitOrWrap(_ => new IdNotFoundException(gameWorldJumperId));
@@ -373,7 +375,7 @@ public class GameUpdatedDtoMapper(
             );
 
         var gate = MapGate(comp.GateState);
-        var results = await MapResults(comp.Jumpers_, comp.Classification, comp.Startlist_);
+        var results = await MapResults(gameId, comp.Jumpers_, comp.Classification, comp.Startlist_);
         var schedule = gameSchedule.GetGameSchedule(gameId);
         int? nextJumpIn = schedule switch
         {
@@ -390,9 +392,6 @@ public class GameUpdatedDtoMapper(
         [
             ..endedEntries, ..notEndedEntries
         ];
-
-        logger.Info($"Startlist: {
-            string.Join(", ", startlist.Select(startlistJumperDto => startlistJumperDto.ToString()))}");
 
         int? roundIndex = null;
         if (status == "RoundInProgress")
@@ -431,6 +430,7 @@ public class GameUpdatedDtoMapper(
     }
 
     private async Task<IEnumerable<CompetitionResultDto>> MapResults(
+        Guid gameId,
         IEnumerable<Jumper> competitionJumpers,
         IEnumerable<Classification.JumperClassificationResult> classificationResults,
         Startlist startlist,
@@ -453,7 +453,13 @@ public class GameUpdatedDtoMapper(
             if (competitionJumper is null)
                 throw new InvalidOperationException($"Missing jumper {competitionJumperId} in competition.");
 
-            var jumpResultDtos = classificationResult.JumpResults.Select(CreateCompetitionRoundResultDto);
+            var jumpResultDtos = classificationResult.JumpResults.Select(jumpResult =>
+            {
+                var gameJumperId = competitionJumperAcl.GetGameJumper(gameId, jumpResult.JumperId.Item)
+                    .GameJumperId;
+
+                return CreateCompetitionRoundResultDto(jumpResult, gameJumperId);
+            });
 
             return new CompetitionResultDto(
                 rank, bibValue, competitionJumperId, totalPoints,
@@ -466,7 +472,7 @@ public class GameUpdatedDtoMapper(
                 tasks);
     }
 
-    private CompetitionRoundResultDto CreateCompetitionRoundResultDto(JumpResult jumpResult)
+    private CompetitionRoundResultDto CreateCompetitionRoundResultDto(JumpResult jumpResult, Guid gameJumperId)
     {
         double? judgePoints = jumpResult.JudgePoints.IsSome()
             ? JumpResultModule.JudgePointsModule.value(jumpResult.JudgePoints.Value)
@@ -480,7 +486,7 @@ public class GameUpdatedDtoMapper(
         var totalCompetitionPoints = JumpResultModule.TotalCompensationModule.value(jumpResult.TotalCompensation);
         var windAverage = jumpResult.Jump.Wind.ToDouble();
         return new CompetitionRoundResultDto(
-            competitionJumperAcl.GetGameJumper(jumpResult.JumperId.Item).Id,
+            gameJumperId,
             jumpResult.JumperId.Item,
             JumpModule.DistanceModule.value(jumpResult.Jump.Distance),
             jumpResult.TotalPoints.Item,
