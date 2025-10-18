@@ -69,7 +69,7 @@ public class Handler(
         }
 
         var (matchmaking, justCreated) = await FindOrCreateMatchmakingAsync(command.Password, ct);
-        await matchmakings.Add(matchmaking, ct);
+        // await matchmakings.Add(matchmaking, ct);
         var matchmakingId = matchmaking.Id_.Item;
 
         DateTimeOffset now;
