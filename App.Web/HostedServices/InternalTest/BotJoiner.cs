@@ -39,7 +39,7 @@ public class BotJoiner(
     {
         while (!ct.IsCancellationRequested)
         {
-            var all = (await matchmakings.GetInProgress(ct)).ToImmutableArray();
+            var all = (await matchmakings.GetInProgress(null, ct)).ToImmutableArray();
             var now = clock.Now();
 
             var tasks = all

@@ -52,7 +52,7 @@ public static class JumperMapper
         return gameJumperIds.Select(gameJumperId =>
         {
             var gameWorldJumperDto = acl.GetGameWorldJumper(gameJumperId.Item);
-            return new GameWorldJumperDto(gameWorldJumperDto.Id);
+            return new GameWorldJumperDto(gameWorldJumperDto.GameWorldJumperId);
         });
     }
 
@@ -63,7 +63,7 @@ public static class JumperMapper
         return idsEnumerable.Select(gameJumperId =>
         {
             var gameWorldJumperDto = acl.GetGameWorldJumper(gameJumperId.Item);
-            return new GameWorldJumperDto(gameWorldJumperDto.Id);
+            return new GameWorldJumperDto(gameWorldJumperDto.GameWorldJumperId);
         });
     }
 
@@ -86,7 +86,8 @@ public static class JumperMapper
     {
         var gameWorldJumperDtos = gameJumpers.ToGameWorldJumperDtos(acl);
         var gameWorldJumpers = await
-            jumpers.GetFromIds(gameWorldJumperDtos.Select(dto => Domain.GameWorld.JumperId.NewJumperId(dto.Id)), ct);
+            jumpers.GetFromIds(
+                gameWorldJumperDtos.Select(dto => Domain.GameWorld.JumperId.NewJumperId(dto.GameWorldJumperId)), ct);
         return gameWorldJumpers;
     }
 
@@ -96,64 +97,65 @@ public static class JumperMapper
     {
         var gameWorldJumperDtos = gameJumperIds.ToGameWorldJumperDtos(acl);
         var gameWorldJumpers = await
-            jumpers.GetFromIds(gameWorldJumperDtos.Select(dto => Domain.GameWorld.JumperId.NewJumperId(dto.Id)), ct);
+            jumpers.GetFromIds(
+                gameWorldJumperDtos.Select(dto => Domain.GameWorld.JumperId.NewJumperId(dto.GameWorldJumperId)), ct);
         return gameWorldJumpers;
     }
 
     public static IEnumerable<Domain.Game.Jumper> ToGameJumpers(
-        this IEnumerable<Domain.Competition.Jumper> competitionJumpers, ICompetitionJumperAcl acl)
+        this IEnumerable<Domain.Competition.Jumper> competitionJumpers, ICompetitionJumperAcl acl, Guid gameId)
     {
         var idsEnumerable = competitionJumpers.Select(jumper => jumper.Id);
         return idsEnumerable.Select(competitionJumperId =>
         {
-            var gameJumperDto = acl.GetGameJumper(competitionJumperId.Item);
-            var gameJumperId = Domain.Game.JumperId.NewJumperId(gameJumperDto.Id);
+            var gameJumperDto = acl.GetGameJumper(gameId, competitionJumperId.Item);
+            var gameJumperId = Domain.Game.JumperId.NewJumperId(gameJumperDto.GameJumperId);
             return new Domain.Game.Jumper(gameJumperId);
         });
     }
 
     public static IEnumerable<Domain.Competition.Jumper> ToCompetitionJumpers(
-        this IEnumerable<Domain.Game.Jumper> gameJumpers, ICompetitionJumperAcl acl)
+        this IEnumerable<Domain.Game.Jumper> gameJumpers, ICompetitionJumperAcl acl, Guid gameId)
     {
         var idsEnumerable = gameJumpers.Select(jumper => jumper.Id);
         return idsEnumerable.Select(gameJumperId =>
         {
-            var competitionJumperDto = acl.GetCompetitionJumper(gameJumperId.Item);
+            var competitionJumperDto = acl.GetCompetitionJumper(gameId, gameJumperId.Item);
             var competitionJumperId = Domain.Competition.JumperId.NewJumperId(competitionJumperDto.Id);
             return new Domain.Competition.Jumper(competitionJumperId);
         });
     }
 
     public static IEnumerable<Domain.Competition.Jumper> ToCompetitionJumpers(
-        this Domain.Game.Jumpers gameJumpers, ICompetitionJumperAcl acl)
+        this Domain.Game.Jumpers gameJumpers, ICompetitionJumperAcl acl, Guid gameId)
     {
         var gameJumperIds = JumpersModule.toIdsList(gameJumpers);
         return gameJumperIds.Select(gameJumperId =>
         {
-            var competitionJumperDto = acl.GetCompetitionJumper(gameJumperId.Item);
+            var competitionJumperDto = acl.GetCompetitionJumper(gameId, gameJumperId.Item);
             var competitionJumperId = Domain.Competition.JumperId.NewJumperId(competitionJumperDto.Id);
             return new Domain.Competition.Jumper(competitionJumperId);
         });
     }
 
     public static IEnumerable<Domain.Competition.Jumper> ToCompetitionJumpers(
-        this IEnumerable<Domain.Game.JumperId> gameJumperIds, ICompetitionJumperAcl acl)
+        this IEnumerable<Domain.Game.JumperId> gameJumperIds, ICompetitionJumperAcl acl, Guid gameId)
     {
         return gameJumperIds.Select(gameJumperId =>
         {
-            var competitionJumperDto = acl.GetCompetitionJumper(gameJumperId.Item);
+            var competitionJumperDto = acl.GetCompetitionJumper(gameId, gameJumperId.Item);
             var competitionJumperId = Domain.Competition.JumperId.NewJumperId(competitionJumperDto.Id);
             return new Domain.Competition.Jumper(competitionJumperId);
         });
     }
 
     public static IEnumerable<Domain.Game.JumperId> ToGameJumperIds(
-        this IEnumerable<Domain.Competition.JumperId> competitionJumperIds, ICompetitionJumperAcl acl)
+        this IEnumerable<Domain.Competition.JumperId> competitionJumperIds, ICompetitionJumperAcl acl, Guid gameId)
     {
         return competitionJumperIds.Select(competitionJumperId =>
         {
-            var gameJumperDto = acl.GetGameJumper(competitionJumperId.Item);
-            return Domain.Game.JumperId.NewJumperId(gameJumperDto.Id);
+            var gameJumperDto = acl.GetGameJumper(gameId, competitionJumperId.Item);
+            return Domain.Game.JumperId.NewJumperId(gameJumperDto.GameJumperId);
             ;
         });
     }

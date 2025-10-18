@@ -22,9 +22,7 @@ public static class FSharpOptionExtensions
             ? (DateTimeOffset?)opt.Value
             : null;
     
-    public static T? ToNullable<T>(this Microsoft.FSharp.Core.FSharpOption<T> opt)
-        where T : struct
-        => Microsoft.FSharp.Core.FSharpOption<T>.get_IsSome(opt)
-            ? opt.Value
-            : null;
+    public static T? ToNullable<T>(this FSharpOption<T> opt)
+        => FSharpOption<T>.get_IsSome(opt) ? opt.Value : default;
+
 }

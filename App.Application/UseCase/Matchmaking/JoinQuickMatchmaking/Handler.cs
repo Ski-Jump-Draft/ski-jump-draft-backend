@@ -33,7 +33,8 @@ public class Handler(
     IGames games,
     IBotRegistry botRegistry,
     MatchmakingUpdatedDtoMapper matchmakingUpdatedDtoMapper,
-    IMatchmakingUpdatedDtoStorage matchmakingUpdatedDtoStorage)
+    IMatchmakingUpdatedDtoStorage matchmakingUpdatedDtoStorage,
+    IPremiumMatchmakingGames matchmakingGames)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -52,13 +53,16 @@ public class Handler(
 
     private async Task<MatchmakingDto> FindOrCreateMatchmakingAsync(CancellationToken ct)
     {
-        var matchmmakingsInProgress = (await matchmakings.GetInProgress(ct)).ToImmutableArray();
-        var gamesInProgressCount = await games.GetInProgressCount(ct);
+        var matchmmakingsInProgress = (await matchmakings.GetInProgress(MatchmakingType.Normal, ct)).ToImmutableArray();
+        var allGamesInProgressCount = await games.GetInProgressCount(ct);
+        var premiumMatchmakingGames = await matchmakingGames.GetGamesCount();
+        var normalGamesInProgressCount = allGamesInProgressCount - premiumMatchmakingGames;
+
         var now = clock.Now();
         var matchmakingsCount = matchmmakingsInProgress.Length;
         // TODO: Oddzielić matchmakingi/gry premium od zwykłych
 
-        switch (matchmakingsCount, gamesInProgressCount)
+        switch (matchmakingsCount, normalGamesInProgressCount)
         {
             case (> 1, _):
             case (_, >= 1):
@@ -66,13 +70,14 @@ public class Handler(
             case (0, 0):
                 var newMatchmaking =
                     Domain.Matchmaking.Matchmaking.CreateNew(MatchmakingId.NewMatchmakingId(guid.NewGuid()),
+                        premium: false,
                         globalMatchmakingSettings, now);
                 return new MatchmakingDto(newMatchmaking, JustCreated: true);
             case (1, 0):
                 return new MatchmakingDto(matchmmakingsInProgress.Single(), JustCreated: false);
             default:
                 throw new Exception($"Unknown error. Matchmaking count: {matchmakingsCount}, games in progress: {
-                    gamesInProgressCount}");
+                    allGamesInProgressCount}");
         }
     }
 
@@ -101,7 +106,7 @@ public class Handler(
         var (matchmakingAfterJoin, correctedNick) = joinResult.ResultValue;
         await matchmakings.Add(matchmakingAfterJoin, ct);
 
-        var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterJoin, false, now);
+        var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterJoin, now);
         myLogger.Info("Just created matchmaking? (id= " + matchmakingGuid + "): " + justCreated + "");
         if (justCreated)
         {

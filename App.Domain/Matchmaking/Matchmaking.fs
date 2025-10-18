@@ -25,6 +25,7 @@ type MatchmakingError =
 type Matchmaking =
     private
         { Id: MatchmakingId
+          IsPremium: bool
           Settings: Settings
           Status: Status
           Players: Set<Player>
@@ -34,8 +35,9 @@ type Matchmaking =
           ReachedMinPlayersAt: DateTimeOffset option
           LastUpdatedAt: DateTimeOffset option }
 
-    static member CreateNew id settings now =
+    static member CreateNew id premium settings now =
         { Id = id
+          IsPremium = premium
           Settings = settings
           Status = Running
           Players = Set.empty
@@ -47,6 +49,7 @@ type Matchmaking =
 
     static member CreateFromState
         id
+        isPremium
         settings
         status
         players
@@ -57,6 +60,7 @@ type Matchmaking =
         lastUpdatedAt
         =
         { Id = id
+          IsPremium = isPremium
           Settings = settings
           Status = status
           Players = players
@@ -69,6 +73,7 @@ type Matchmaking =
     member this.Id_: MatchmakingId = this.Id
     member this.Status_: Status = this.Status
     member this.Players_: IReadOnlyCollection<Player> = this.Players
+    member this.IsPremium_ : bool = this.IsPremium
     member this.PlayersCount = this.Players.Count
     member this.MinPlayersCount = this.Settings.MinPlayers
     member this.MaxPlayersCount = this.Settings.MaxPlayers

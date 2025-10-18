@@ -23,7 +23,7 @@ public class DefaultInMemory(
         CancellationToken ct)
     {
         var simulationPack = gameSimulationPack.GetFor(gameId);
-        var gameJumpers = jumpers.ToGameJumpers(competitionJumperAcl);
+        var gameJumpers = jumpers.ToGameJumpers(competitionJumperAcl, gameId);
         var gameWorldJumpers = await gameJumpers.ToGameWorldJumpers(gameJumperAcl, gameWorldJumpersRepository, ct);
         var simulationJumpers =
             gameWorldJumpers.ToSimulationJumpers(form: jumper => JumperModule.LiveFormModule.value(jumper.LiveForm))

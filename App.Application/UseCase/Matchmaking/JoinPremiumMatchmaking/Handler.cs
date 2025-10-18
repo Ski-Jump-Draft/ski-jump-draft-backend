@@ -6,7 +6,6 @@ using App.Application.Matchmaking;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
 using App.Application.Utility;
-using App.Domain.Game;
 using App.Domain.Matchmaking;
 using PlayerId = App.Domain.Matchmaking.PlayerId;
 using PlayerModule = App.Domain.Matchmaking.PlayerModule;
@@ -24,18 +23,18 @@ public record Result(Guid MatchmakingId, string Nick, Guid PlayerId);
 public class Handler(
     IGuid guid,
     IMatchmakings matchmakings,
-    IMyLogger myLogger,
+    IMyLogger logger,
     Domain.Matchmaking.Settings globalMatchmakingSettings,
     IScheduler scheduler,
     IJson json,
     IMatchmakingNotifier matchmakingNotifier,
-    IGames games,
     IBotRegistry botRegistry,
     MatchmakingUpdatedDtoMapper matchmakingUpdatedDtoMapper,
     IMatchmakingUpdatedDtoStorage matchmakingUpdatedDtoStorage,
-    IPremiumMatchmakings premiumMatchmakings,
+    IPremiumMatchmakingGames premiumMatchmakingGames,
     IPremiumMatchmakingConfigurationStorage premiumMatchmakingConfigurationStorage,
-    IClock clock)
+    IClock clock,
+    IPremiumMatchmakingGames matchmakingGames)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -59,7 +58,10 @@ public class Handler(
         }
 
         var gameAlreadyRunsByPremiumMatchmaking =
-            await premiumMatchmakings.GameRunsByPremiumMatchmaking(command.Password);
+            await premiumMatchmakingGames.GameRunsByPremiumMatchmaking(command.Password);
+
+        logger.Info($"Game already run by premium matchmaking? (password= {command.Password}): {
+            gameAlreadyRunsByPremiumMatchmaking}");
 
         if (gameAlreadyRunsByPremiumMatchmaking)
         {
@@ -73,7 +75,7 @@ public class Handler(
         DateTimeOffset now;
         if (justCreated)
         {
-            await premiumMatchmakings.Add(password: command.Password, matchmakingId: matchmakingId);
+            await premiumMatchmakingGames.Add(password: command.Password, matchmakingId: matchmakingId);
             now = clock.Now();
             await scheduler.ScheduleAsync(jobType: "TryEndMatchmaking",
                 json.Serialize(new { MatchmakingId = matchmakingId }),
@@ -87,12 +89,12 @@ public class Handler(
         await matchmakings.Add(matchmakingAfterJoin, ct);
 
         now = clock.Now();
-        var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterJoin, true, now);
-        myLogger.Info("Just created matchmaking? (id= " + matchmakingId + "): " + justCreated + "");
+        var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterJoin, now);
+        logger.Info("Just created matchmaking? (id= " + matchmakingId + "): " + justCreated + "");
 
         await matchmakingUpdatedDtoStorage.Set(matchmakingId, matchmakingUpdatedDto);
 
-        myLogger.Info("Is bot? (id= " + matchmakingId + "): " + command.IsBot + "");
+        logger.Info("Is bot? (id= " + matchmakingId + "): " + command.IsBot + "");
         if (command.IsBot)
         {
             botRegistry.RegisterMatchmakingBot(matchmakingId, player.Id.Item);
@@ -102,17 +104,19 @@ public class Handler(
         await matchmakingNotifier.PlayerJoined(
             matchmakingUpdatedDtoMapper.PlayerJoinedFromDomain(player, matchmakingAfterJoin));
 
-        myLogger.Info($"{correctedNick} joined the matchmaking ({matchmakingId})");
+        logger.Info($"{correctedNick} joined the matchmaking ({matchmakingId})");
 
         return new Result(matchmakingId, PlayerModule.NickModule.value(correctedNick), player.Id.Item);
     }
 
     private async Task<MatchmakingDto> FindOrCreateMatchmakingAsync(string password, CancellationToken ct)
     {
-        var matchmakingId = await premiumMatchmakings.GetPremiumMatchmakingId(password);
-        if (matchmakingId is not null)
+        var matchmakingId = await premiumMatchmakingGames.GetPremiumMatchmakingId(password);
+        var matchmakingIsRunning = matchmakingId is not null;
+
+        if (matchmakingIsRunning)
         {
-            var matchmaking = await matchmakings.GetById(MatchmakingId.NewMatchmakingId(matchmakingId.Value), ct);
+            var matchmaking = await matchmakings.GetById(MatchmakingId.NewMatchmakingId(matchmakingId!.Value), ct);
             return new MatchmakingDto(
                 matchmaking.OrThrow($"Matchmaking not found (id= {matchmakingId})"),
                 JustCreated: false);
@@ -120,7 +124,7 @@ public class Handler(
 
         var now = clock.Now();
         var newMatchmaking =
-            Domain.Matchmaking.Matchmaking.CreateNew(MatchmakingId.NewMatchmakingId(guid.NewGuid()),
+            Domain.Matchmaking.Matchmaking.CreateNew(MatchmakingId.NewMatchmakingId(guid.NewGuid()), premium: true,
                 globalMatchmakingSettings, now);
         return new MatchmakingDto(newMatchmaking, JustCreated: true);
     }

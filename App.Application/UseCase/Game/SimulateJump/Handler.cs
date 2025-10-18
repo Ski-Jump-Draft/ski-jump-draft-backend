@@ -69,21 +69,22 @@ public class Handler(
         var nextCompetitionJumper = game.NextCompetitionJumper.Value;
         var competitionHill = game.Hill.Value;
 
-        var gameJumperDto = competitionJumperAcl.GetGameJumper(nextCompetitionJumper.Id.Item);
-        var gameWorldJumperDto = gameJumperAcl.GetGameWorldJumper(gameJumperDto.Id);
+        var gameJumperDto = competitionJumperAcl.GetGameJumper(command.GameId, nextCompetitionJumper.Id.Item);
+        var gameWorldJumperDto = gameJumperAcl.GetGameWorldJumper(gameJumperDto.GameJumperId);
 
-        logger.Debug($"$Now jumps GameWorld Jumper with ID {gameWorldJumperDto.Id}. (GameJumper ID: {gameJumperDto.Id
+        logger.Debug($"$Now jumps GameWorld Jumper with ID {gameWorldJumperDto.GameWorldJumperId}. (GameJumper ID: {
+            gameJumperDto.GameJumperId
         }, CompetitionJumper ID: {nextCompetitionJumper.Id}");
 
         var gameWorldJumper =
-            await gameWorldJumpers.GetById(Domain.GameWorld.JumperId.NewJumperId(gameWorldJumperDto.Id), ct)
+            await gameWorldJumpers.GetById(Domain.GameWorld.JumperId.NewJumperId(gameWorldJumperDto.GameWorldJumperId), ct)
                 .AwaitOrWrap(_ =>
                 {
-                    logger.Error($"GameWorld Jumper with ID {gameWorldJumperDto.Id} not found.");
-                    return new IdNotFoundException(gameWorldJumperDto.Id);
+                    logger.Error($"GameWorld Jumper with ID {gameWorldJumperDto.GameWorldJumperId} not found.");
+                    return new IdNotFoundException(gameWorldJumperDto.GameWorldJumperId);
                 });
 
-        var gameForm = jumperGameFormStorage.GetGameForm(gameJumperDto.Id);
+        var gameForm = jumperGameFormStorage.GetGameForm(gameJumperDto.GameJumperId);
         var simulationJumper = gameWorldJumper.ToSimulationJumper(likesHill: null, form: gameForm);
         var simulationHill = competitionHill.ToSimulationHill(overridenMetersByGate: null);
 
@@ -142,7 +143,7 @@ public class Handler(
                     true => TimeSpan.FromSeconds(20),
                     false => gameAfterAddingJump.Settings.CompetitionJumpInterval.Value
                 };
-                
+
                 var now = clock.Now();
                 gameSchedule.ScheduleEvent(command.GameId, GameScheduleTarget.CompetitionJump, timeToJump);
                 await scheduler.ScheduleAsync(
@@ -242,7 +243,7 @@ public class Handler(
                 .ClassificationResultOf(nextCompetitionJumper.Id)
                 .OrThrow($"Missing classification result for competition jumper {nextCompetitionJumper.Id.Item}");
 
-            var simulatedJumpDto = new SimulatedJumpDto(nextCompetitionJumper.Id.Item, gameWorldJumperDto.Id,
+            var simulatedJumpDto = new SimulatedJumpDto(nextCompetitionJumper.Id.Item, gameWorldJumperDto.GameWorldJumperId,
                 gameWorldJumper.Name.Item, gameWorldJumper.Surname.Item,
                 Domain.GameWorld.CountryFisCodeModule.value(gameWorldJumper.FisCountryCode),
                 DistanceModule.value(simulatedJump.Distance),
@@ -277,7 +278,7 @@ public class Handler(
     private async Task ArchivePreDraftCompetitionResults(AddJumpOutcome addJumpOutcome, Guid gameId,
         CancellationToken ct)
     {
-        var archiveDto = addJumpOutcome.Classification.ToGameCompetitionResultsArchiveDto(gameJumperAcl,
+        var archiveDto = addJumpOutcome.Classification.ToGameCompetitionResultsArchiveDto(gameId, gameJumperAcl,
             competitionJumperAcl, competitionJumperId =>
                 GetCompetitionJumperJumperBibOrThrow(addJumpOutcome, competitionJumperId));
         await competitionResultsArchive.ArchivePreDraftAsync(gameId,
@@ -296,7 +297,7 @@ public class Handler(
 
     private async Task ArchiveMainCompetitionResults(AddJumpOutcome addJumpOutcome, Guid gameId, CancellationToken ct)
     {
-        var archiveDto = addJumpOutcome.Classification.ToGameCompetitionResultsArchiveDto(gameJumperAcl,
+        var archiveDto = addJumpOutcome.Classification.ToGameCompetitionResultsArchiveDto(gameId, gameJumperAcl,
             competitionJumperAcl, competitionJumperId =>
                 GetCompetitionJumperJumperBibOrThrow(addJumpOutcome, competitionJumperId));
         await competitionResultsArchive.ArchiveMainAsync(gameId,

@@ -84,7 +84,7 @@ public class Handler(
     {
         var gameJumpersStartlist = await gameCompetitionStartlist.Get(gameId, new PreDraftDto(0), ct);
         var competitionJumpersStartlist =
-            gameJumpersStartlist.ToCompetitionJumpers(competitionJumperAcl).ToImmutableList();
+            gameJumpersStartlist.ToCompetitionJumpers(competitionJumperAcl, gameId).ToImmutableList();
         return competitionJumpersStartlist;
     }
 

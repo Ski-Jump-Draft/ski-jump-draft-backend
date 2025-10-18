@@ -9,6 +9,7 @@ public static class CompetitionClassificationMappers
 {
     public static ArchiveCompetitionResultsDto ToGameCompetitionResultsArchiveDto(
         this IEnumerable<Classification.JumperClassificationResult> jumperClassificationResults,
+        Guid gameId,
         // Func<Guid, Guid> gameJumperByCompetitionJumper, Func<Guid, Guid> gameWorldJumperByGameJumper,
         IGameJumperAcl gameJumperAcl, ICompetitionJumperAcl competitionJumperAcl,
         Func<Guid, int> getBibByCompetitionJumperId)
@@ -41,8 +42,8 @@ public static class CompetitionClassificationMappers
                     JumpResultModule.TotalCompensationModule.value(jumpResult.TotalCompensation));
             });
             var competitionJumperGuid = jumperClassificationResult.JumperId.Item;
-            var gameJumperGuid = competitionJumperAcl.GetGameJumper(competitionJumperGuid).Id;
-            var gameWorldJumperGuid = gameJumperAcl.GetGameWorldJumper(gameJumperGuid).Id;
+            var gameJumperGuid = competitionJumperAcl.GetGameJumper(gameId, competitionJumperGuid).GameJumperId;
+            var gameWorldJumperGuid = gameJumperAcl.GetGameWorldJumper(gameJumperGuid).GameWorldJumperId;
             // var gameJumperGuid = gameJumperByCompetitionJumper.Invoke(competitionJumperGuid);
             // var gameWorldJumperGuid = gameWorldJumperByGameJumper.Invoke(gameJumperGuid);
 

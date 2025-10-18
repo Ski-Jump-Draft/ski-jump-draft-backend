@@ -10,15 +10,18 @@ using Serilog;
 using Serilog.Formatting.Compact;
 using Results = Microsoft.AspNetCore.Http.Results;
 
-Log.Logger = new LoggerConfiguration()
-    .Enrich.FromLogContext()
-    .WriteTo.Console(new RenderedCompactJsonFormatter()) // JSON per line
-    .CreateLogger();
-
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Logging.ClearProviders();
-builder.Host.UseSerilog();        
+if (!builder.Environment.IsDevelopment())
+{
+    Log.Logger = new LoggerConfiguration()
+        .Enrich.FromLogContext()
+        .WriteTo.Console(new RenderedCompactJsonFormatter()) // JSON per line
+        .CreateLogger();
+
+    builder.Logging.ClearProviders();
+    builder.Host.UseSerilog();
+}
 
 if (builder.Environment.IsDevelopment())
 {

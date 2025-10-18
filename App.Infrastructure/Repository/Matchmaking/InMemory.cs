@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using App.Application.Extensions;
 using App.Domain.Matchmaking;
 using Microsoft.FSharp.Core;
 
@@ -22,17 +23,27 @@ public class InMemory : IMatchmakings
         throw new KeyNotFoundException($"Matchmaking {matchmakingId} not found");
     }
 
-    public Task<IEnumerable<Domain.Matchmaking.Matchmaking>> GetInProgress(CancellationToken ct)
+    public Task<IEnumerable<Domain.Matchmaking.Matchmaking>> GetInProgress(FSharpOption<MatchmakingType> type,
+        CancellationToken ct)
     {
-        var result = _store.Values.Where(mm => mm.Status_.Equals(Status.Running));
+        var result =
+            _store.Values.Where(mm =>
+                mm.Status_.Equals(Status.Running) && MatchmakingIsEligible(mm, type.ToNullable()));
         return Task.FromResult(result.AsEnumerable());
     }
 
-    public Task<IEnumerable<Domain.Matchmaking.Matchmaking>> GetEnded(CancellationToken ct)
+    public Task<IEnumerable<Domain.Matchmaking.Matchmaking>> GetEnded(FSharpOption<MatchmakingType> type,
+        CancellationToken ct)
     {
         var result = _store.Values.Where(mm =>
-            mm.Status_ is Status.Ended or Status.Failed);
+            mm.Status_ is Status.Ended or Status.Failed && MatchmakingIsEligible(mm, type.ToNullable()));
         return Task.FromResult(result.AsEnumerable());
     }
-}
 
+    private bool MatchmakingIsEligible(Domain.Matchmaking.Matchmaking matchmaking, MatchmakingType? type)
+    {
+        if (type is null) return true;
+        if (type.IsPremium) return matchmaking.IsPremium_;
+        return !matchmaking.IsPremium_;
+    }
+}

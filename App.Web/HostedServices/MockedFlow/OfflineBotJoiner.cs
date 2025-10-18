@@ -19,7 +19,7 @@ public class OfflineBotJoiner(
             await Task.Delay(TimeSpan.FromSeconds(2), ct);
 
             // wybierz jakieś matchmaking in progress
-            var all = await repo.GetInProgress(ct);
+            var all = await repo.GetInProgress(null, ct);
             var matchmaking = all.FirstOrDefault();
 
             if (matchmaking is null)

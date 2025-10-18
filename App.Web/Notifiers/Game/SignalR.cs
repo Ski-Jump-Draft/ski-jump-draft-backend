@@ -1,3 +1,4 @@
+using System.Text.Json;
 using App.Application.Messaging.Notifiers;
 using App.Application.Utility;
 using App.Web.SignalR.Hub;
@@ -17,7 +18,8 @@ public class SignalRGameNotifier(IHubContext<GameHub> hub, IMyLogger logger) : I
 
     public async Task GameUpdated(GameUpdatedDto dto)
     {
-        logger.Info("GameUpdated to SignalR", dto);
+        // logger.Info("GameUpdated to SignalR", dto);
+        logger.Debug("GameUpdated to SignalR", JsonSerializer.Serialize(dto));
         await hub.Clients.Group(GameHub.GroupNameForGame(dto.GameId))
             .SendAsync("GameUpdated", dto);
     }
