@@ -608,6 +608,10 @@ public static class GameDtoMapper
         int? currentTurnIndex = null;
         List<PlayerPicksDto>? picksList = null;
         List<Guid>? nextPlayers = null;
+        // By default use provided playersOrder (roster order), but if draft is running and order is Random/Snake/Classic,
+        // prefer the actual full turn order from the domain to guarantee correct restoration.
+        var playersOrderForDto = playersOrder;
+
         if (game.StatusTag.IsDraftTag)
         {
             var draftStatus = ((Domain.Game.Status.Draft)game.Status).Item;
@@ -627,6 +631,9 @@ public static class GameDtoMapper
             }).ToList();
 
             nextPlayers = draftStatus.TurnQueueRemaining.Select(playerId => playerId.Item).ToList();
+
+            // Persist the full turn order to support Random order restoration.
+            playersOrderForDto = draftStatus.FullTurnOrder.Select(pid => pid.Item).ToList();
         }
         else
         {
@@ -642,7 +649,7 @@ public static class GameDtoMapper
 
         var draftIsRunning = game.StatusTag.IsDraftTag;
 
-        var draftDto = new DraftDto(draftIsRunning, currentTurnPlayerId, currentTurnIndex, jumperIds, playersOrder,
+        var draftDto = new DraftDto(draftIsRunning, currentTurnPlayerId, currentTurnIndex, jumperIds, playersOrderForDto,
             nextPlayers ?? [],
             picksList);
 
@@ -1000,7 +1007,8 @@ public static class GameDtoMapper
                     throw new Exception("DraftDto is not running even though GameDto is in draft");
                 }
 
-                var gameJumperIds = draftDto.PlayersOrder.Select(PlayerId.NewPlayerId);
+                // Players list (domain order is irrelevant here); actual restoration for Random uses the persisted full turn order.
+                var playerIds = draftDto.PlayersOrder.Select(PlayerId.NewPlayerId);
                 var picksMap = draftDto.Picks.ToDictionary(keySelector: playerPicksDto =>
                 {
                     var gamePlayerId = PlayerId.NewPlayerId(playerPicksDto.GamePlayerId);
@@ -1013,19 +1021,18 @@ public static class GameDtoMapper
                 var picksMapFSharp =
                     MapModule.OfSeq(picksMap.Select(kv => new Tuple<PlayerId, FSharpList<JumperId>>(kv.Key, kv.Value)));
 
-                FSharpList<PlayerId>? nextPlayerIds = null;
+                // For Random order, persist and restore with the full precomputed turn order; do not use remaining queue.
+                FSharpList<PlayerId>? fullTurnOrder = null;
                 if (gameDto.Settings.DraftOrderPolicy == "Random")
                 {
-                    if (draftDto.NextPlayersOrder is null)
-                        throw new Exception(
-                            "NextPlayersOrder is null even though GameDto is in draft and order policy is random");
-                    nextPlayerIds =
-                        ListModule.OfSeq(draftDto.NextPlayersOrder.Select(PlayerId.NewPlayerId));
+                    if (draftDto.PlayersOrder is null || draftDto.PlayersOrder.Count == 0)
+                        throw new Exception("PlayersOrder is empty for Random draft");
+                    fullTurnOrder = ListModule.OfSeq(draftDto.PlayersOrder.Select(PlayerId.NewPlayerId));
                 }
 
-                var draftResult = Domain.Game.Draft.Restore(draftSettings, ListModule.OfSeq(gameJumperIds), jumperIds,
+                var draftResult = Domain.Game.Draft.Restore(draftSettings, ListModule.OfSeq(playerIds), jumperIds,
                     picksMapFSharp,
-                    nextPlayerIds);
+                    fullTurnOrder);
                 if (draftResult.IsError)
                 {
                     throw new Exception(draftResult.ErrorValue.ToString());
