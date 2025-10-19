@@ -25,8 +25,8 @@ public class Default : ISseHub
 
     public void Subscribe(Guid matchmakingId, HttpResponse response, CancellationToken ct)
     {
-        response.ContentType = "text/event-stream";
-        response.Headers["Cache-Control"] = "no-cache";
+        response.ContentType = "text/event-stream; charset=utf-8";
+        response.Headers["Cache-Control"] = "no-store";
         response.Headers["Pragma"] = "no-cache";
         response.Headers["Expires"] = "0";
 
@@ -49,7 +49,7 @@ public class Default : ISseHub
                 {
                     try
                     {
-                        await Task.Delay(TimeSpan.FromSeconds(8), ct);
+                        await Task.Delay(TimeSpan.FromSeconds(5), ct);
                         if (ct.IsCancellationRequested) break;
                         await SafeWriteAsync(client, HeartbeatBytes);
                     }
