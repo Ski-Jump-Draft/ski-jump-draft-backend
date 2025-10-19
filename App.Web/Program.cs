@@ -170,124 +170,140 @@ app.Use(async (context, next) =>
     headers["Referrer-Policy"] = "no-referrer";
     headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()";
     // Minimal CSP suitable for API-only backend; adjust if serving pages
-    headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; upgrade-insecure-requests";
+    headers["Content-Security-Policy"] =
+        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; upgrade-insecure-requests";
     await next();
 });
 
 app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
-    async (Guid matchmakingId, HttpContext ctx, ISseHub hub) =>
-    {
-        ctx.Response.ContentType = "text/event-stream";
-        ctx.Response.Headers["Cache-Control"] = "no-store";
-        ctx.Response.Headers["X-Accel-Buffering"] = "no"; // disable buffering for some proxies
-        hub.Subscribe(matchmakingId, ctx.Response, ctx.RequestAborted);
-        await Task.Delay(-1, ctx.RequestAborted);
-    })
+        async (Guid matchmakingId, HttpContext ctx, ISseHub hub) =>
+        {
+            ctx.Response.ContentType = "text/event-stream";
+            ctx.Response.Headers["Cache-Control"] = "no-store";
+            ctx.Response.Headers["X-Accel-Buffering"] = "no";
+
+            hub.Subscribe(matchmakingId, ctx.Response, ctx.RequestAborted);
+
+            var hb = Task.Run(async () =>
+            {
+                while (!ctx.RequestAborted.IsCancellationRequested)
+                {
+                    await ctx.Response.WriteAsync(":\n\n"); // SSE comment = ping
+                    await ctx.Response.Body.FlushAsync();
+                    await Task.Delay(TimeSpan.FromSeconds(15), ctx.RequestAborted);
+                }
+            }, ctx.RequestAborted);
+
+            await Task.Delay(-1, ctx.RequestAborted);
+        })
     .DisableRequestTimeout()
     .RequireRateLimiting("sse-connect");
 
+
 app.MapPost("/matchmaking/join",
-    async (string nick, [FromServices] ICommandBus commandBus,
-        [FromServices] App.Application.Utility.IMyLogger myLogger,
-        CancellationToken ct) =>
-    {
-        if (string.IsNullOrWhiteSpace(nick) || nick.Length > 64)
+        async (string nick, [FromServices] ICommandBus commandBus,
+            [FromServices] App.Application.Utility.IMyLogger myLogger,
+            CancellationToken ct) =>
         {
-            return Results.BadRequest(new { error = "InvalidNick", message = "Nick must be 1-64 characters." });
-        }
-
-        var command = new App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command(nick, IsBot: false);
-        try
-        {
-            var (matchmakingId, correctedNick, playerId) = await commandBus
-                .SendAsync<App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command,
-                    App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Result>(command, ct);
-
-            return Results.Ok(new
-                { MatchmakingId = matchmakingId, CorrectedNick = correctedNick, PlayerId = playerId });
-        }
-        catch (App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.MultipleGamesNotSupportedException)
-        {
-            return Results.Conflict(new
+            if (string.IsNullOrWhiteSpace(nick) || nick.Length > 64)
             {
-                error = "MultipleGamesNotSupported",
-                message =
-                    "Nie udało się dołączyć do gry. Spróbuj ponownie za kilka minut. Pracujemy nad poprawą naszych serwerów, żeby utrzymywały wiele gier na raz."
-            });
-        }
-        catch (App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.PlayerAlreadyJoinedException)
-        {
-            return Results.Conflict(new { error = "AlreadyJoined", message = "Gracz już dołączył." });
-        }
-        catch (App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.RoomIsFullException)
-        {
-            return Results.Conflict(new { error = "RoomIsFull", message = "Pokój jest pełny." });
-        }
-        catch (Exception error)
-        {
-            myLogger.Error($"Error during joining a matchmaking: {nick}. Error: {error.Message}, StackTrace: {
-                error.StackTrace}");
-            return Results.InternalServerError();
-        }
-    })
+                return Results.BadRequest(new { error = "InvalidNick", message = "Nick must be 1-64 characters." });
+            }
+
+            var command = new App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command(nick, IsBot: false);
+            try
+            {
+                var (matchmakingId, correctedNick, playerId) = await commandBus
+                    .SendAsync<App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command,
+                        App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Result>(command, ct);
+
+                return Results.Ok(new
+                    { MatchmakingId = matchmakingId, CorrectedNick = correctedNick, PlayerId = playerId });
+            }
+            catch (App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.MultipleGamesNotSupportedException)
+            {
+                return Results.Conflict(new
+                {
+                    error = "MultipleGamesNotSupported",
+                    message =
+                        "Nie udało się dołączyć do gry. Spróbuj ponownie za kilka minut. Pracujemy nad poprawą naszych serwerów, żeby utrzymywały wiele gier na raz."
+                });
+            }
+            catch (App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.PlayerAlreadyJoinedException)
+            {
+                return Results.Conflict(new { error = "AlreadyJoined", message = "Gracz już dołączył." });
+            }
+            catch (App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.RoomIsFullException)
+            {
+                return Results.Conflict(new { error = "RoomIsFull", message = "Pokój jest pełny." });
+            }
+            catch (Exception error)
+            {
+                myLogger.Error($"Error during joining a matchmaking: {nick}. Error: {error.Message}, StackTrace: {
+                    error.StackTrace}");
+                return Results.InternalServerError();
+            }
+        })
     .RequireRateLimiting("join")
     .WithRequestTimeout(TimeSpan.FromSeconds(8));
 
 app.MapPost("/matchmaking/joinPremium",
-    async (string nick, string password, [FromServices] ICommandBus commandBus,
-        [FromServices] App.Application.Utility.IMyLogger myLogger,
-        CancellationToken ct) =>
-    {
-        if (string.IsNullOrWhiteSpace(nick) || nick.Length > 64)
+        async (string nick, string password, [FromServices] ICommandBus commandBus,
+            [FromServices] App.Application.Utility.IMyLogger myLogger,
+            CancellationToken ct) =>
         {
-            return Results.BadRequest(new { error = "InvalidNick", message = "Nick must be 1-64 characters." });
-        }
-        if (string.IsNullOrWhiteSpace(password) || password.Length > 64)
-        {
-            return Results.BadRequest(new { error = "InvalidPassword", message = "Password must be 1-64 characters." });
-        }
-
-        var command =
-            new App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Command(nick, Password: password,
-                IsBot: false);
-        try
-        {
-            var (matchmakingId, correctedNick, playerId) = await commandBus
-                .SendAsync<App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Command,
-                    App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Result>(command, ct);
-
-            return Results.Ok(new
-                { MatchmakingId = matchmakingId, CorrectedNick = correctedNick, PlayerId = playerId });
-        }
-        catch (App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.InvalidPasswordException)
-        {
-            return Results.Conflict(new
+            if (string.IsNullOrWhiteSpace(nick) || nick.Length > 64)
             {
-                error = "InvalidPasswordException",
-                message =
-                    "Wpisano niepoprawne hasło dostępu do prywatnego pokoju."
-            });
-        }
-        catch (App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.PlayerAlreadyJoinedException)
-        {
-            return Results.Conflict(new { error = "AlreadyJoined", message = "Gracz już dołączył." });
-        }
-        catch (App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.RoomIsFullException)
-        {
-            return Results.Conflict(new { error = "RoomIsFull", message = "Pokój jest pełny." });
-        }
-        catch (App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.PrivateServerInUse)
-        {
-            return Results.Conflict(new
-                { error = "PrivateServerInUse", message = "Gra na tym serwerze jest już rozgrywana." });
-        }
-        catch (Exception error)
-        {
-            myLogger.Error($"Error during joining a matchmaking: {nick}. Error: {error.Message}, StackTrace: {
-                error.StackTrace}");
-            return Results.InternalServerError();
-        }
-    })
+                return Results.BadRequest(new { error = "InvalidNick", message = "Nick must be 1-64 characters." });
+            }
+
+            if (string.IsNullOrWhiteSpace(password) || password.Length > 64)
+            {
+                return Results.BadRequest(new
+                    { error = "InvalidPassword", message = "Password must be 1-64 characters." });
+            }
+
+            var command =
+                new App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Command(nick, Password: password,
+                    IsBot: false);
+            try
+            {
+                var (matchmakingId, correctedNick, playerId) = await commandBus
+                    .SendAsync<App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Command,
+                        App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Result>(command, ct);
+
+                return Results.Ok(new
+                    { MatchmakingId = matchmakingId, CorrectedNick = correctedNick, PlayerId = playerId });
+            }
+            catch (App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.InvalidPasswordException)
+            {
+                return Results.Conflict(new
+                {
+                    error = "InvalidPasswordException",
+                    message =
+                        "Wpisano niepoprawne hasło dostępu do prywatnego pokoju."
+                });
+            }
+            catch (App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.PlayerAlreadyJoinedException)
+            {
+                return Results.Conflict(new { error = "AlreadyJoined", message = "Gracz już dołączył." });
+            }
+            catch (App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.RoomIsFullException)
+            {
+                return Results.Conflict(new { error = "RoomIsFull", message = "Pokój jest pełny." });
+            }
+            catch (App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.PrivateServerInUse)
+            {
+                return Results.Conflict(new
+                    { error = "PrivateServerInUse", message = "Gra na tym serwerze jest już rozgrywana." });
+            }
+            catch (Exception error)
+            {
+                myLogger.Error($"Error during joining a matchmaking: {nick}. Error: {error.Message}, StackTrace: {
+                    error.StackTrace}");
+                return Results.InternalServerError();
+            }
+        })
     .RequireRateLimiting("join")
     .WithRequestTimeout(TimeSpan.FromSeconds(8));
 
@@ -333,33 +349,33 @@ app.MapGet("/matchmaking",
     });
 
 app.MapPost("/game/{gameId:guid}/pick",
-    async (Guid gameId, Guid playerId, Guid jumperId, [FromServices] ICommandBus commandBus,
-        [FromServices] App.Domain.Game.IGames repo, [FromServices] App.Application.Utility.IMyLogger myLogger,
-        CancellationToken ct) =>
-    {
-        var command = new App.Application.UseCase.Game.PickJumper.Command(gameId, playerId, jumperId);
-        try
+        async (Guid gameId, Guid playerId, Guid jumperId, [FromServices] ICommandBus commandBus,
+            [FromServices] App.Domain.Game.IGames repo, [FromServices] App.Application.Utility.IMyLogger myLogger,
+            CancellationToken ct) =>
         {
-            var pickResult = await commandBus
-                .SendAsync<App.Application.UseCase.Game.PickJumper.Command,
-                    App.Application.UseCase.Game.PickJumper.Result>(command, ct);
-            return Results.Ok();
-        }
-        catch (App.Application.UseCase.Game.PickJumper.JumperTakenException)
-        {
-            return Results.Conflict();
-        }
-        catch (App.Application.UseCase.Game.PickJumper.NotYourTurnException)
-        {
-            return Results.Forbid();
-        }
-        catch (Exception e)
-        {
-            myLogger.Error($"Error during picking a jumper: {e.Message} (gameId: {gameId}, playerId: {playerId
-            }, jumperId: {jumperId})");
-            return Results.InternalServerError();
-        }
-    })
+            var command = new App.Application.UseCase.Game.PickJumper.Command(gameId, playerId, jumperId);
+            try
+            {
+                var pickResult = await commandBus
+                    .SendAsync<App.Application.UseCase.Game.PickJumper.Command,
+                        App.Application.UseCase.Game.PickJumper.Result>(command, ct);
+                return Results.Ok();
+            }
+            catch (App.Application.UseCase.Game.PickJumper.JumperTakenException)
+            {
+                return Results.Conflict();
+            }
+            catch (App.Application.UseCase.Game.PickJumper.NotYourTurnException)
+            {
+                return Results.Forbid();
+            }
+            catch (Exception e)
+            {
+                myLogger.Error($"Error during picking a jumper: {e.Message} (gameId: {gameId}, playerId: {playerId
+                }, jumperId: {jumperId})");
+                return Results.InternalServerError();
+            }
+        })
     .RequireRateLimiting("pick")
     .WithRequestTimeout(TimeSpan.FromSeconds(8));
 
