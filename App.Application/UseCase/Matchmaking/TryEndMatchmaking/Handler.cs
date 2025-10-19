@@ -95,7 +95,7 @@ public class Handler(
 
             now = clock.Now();
 
-            var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(endedMatchmaking, now);
+            var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(endedMatchmaking, botRegistry, now);
             await matchmakingUpdatedDtoStorage.Set(command.MatchmakingId, matchmakingUpdatedDto);
             await matchmakingNotifier.MatchmakingUpdated(matchmakingUpdatedDto);
 

@@ -106,7 +106,7 @@ public class Handler(
         var (matchmakingAfterJoin, correctedNick) = joinResult.ResultValue;
         await matchmakings.Add(matchmakingAfterJoin, ct);
 
-        var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterJoin, now);
+        var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterJoin, botRegistry, now);
         logger.Info("Just created matchmaking? (id= " + matchmakingGuid + "): " + justCreated + "");
         if (justCreated)
         {
@@ -130,7 +130,7 @@ public class Handler(
 
         await matchmakingNotifier.MatchmakingUpdated(matchmakingUpdatedDto);
         await matchmakingNotifier.PlayerJoined(
-            matchmakingUpdatedDtoMapper.PlayerJoinedFromDomain(player, matchmakingAfterJoin));
+            matchmakingUpdatedDtoMapper.PlayerJoinedFromDomain(player, isBot, matchmakingAfterJoin));
 
         logger.Info($"{correctedNick} joined the matchmaking ({matchmakingGuid})");
 

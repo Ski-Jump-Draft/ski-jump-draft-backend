@@ -10,7 +10,7 @@ public class MatchmakingUpdatedDtoMapper(
     IBotRegistry botRegistry
 )
 {
-    public MatchmakingUpdatedDto FromDomain(Domain.Matchmaking.Matchmaking matchmaking,
+    public MatchmakingUpdatedDto FromDomain(Domain.Matchmaking.Matchmaking matchmaking, IBotRegistry botRegistry,
         DateTimeOffset now)
     {
         var statusString = matchmaking.Status_.FormattedStatus();
@@ -21,6 +21,7 @@ public class MatchmakingUpdatedDtoMapper(
             statusString,
             matchmaking.Players_
                 .Select(player => CreatePlayerDto(player,
+                    botRegistry.IsMatchmakingBot(matchmaking.Id_.Item, player.Id.Item),
                     matchmaking))
                 .ToImmutableList(),
             matchmaking.PlayersCount,
@@ -35,30 +36,29 @@ public class MatchmakingUpdatedDtoMapper(
         );
     }
 
-    public PlayerJoinedDto PlayerJoinedFromDomain(Domain.Matchmaking.Player player,
+    public PlayerJoinedDto PlayerJoinedFromDomain(Domain.Matchmaking.Player player, bool isBot,
         Domain.Matchmaking.Matchmaking matchmaking)
         => new(
             matchmaking.Id_.Item,
-            CreatePlayerDto(player, matchmaking),
+            CreatePlayerDto(player, isBot, matchmaking),
             matchmaking.PlayersCount,
             SettingsModule.MaxPlayersModule.value(matchmaking.MaxPlayersCount),
             OptionModule.ToNullable(matchmaking.MinRequiredPlayers)
         );
 
-    public PlayerLeftDto PlayerLeftFromDomain(Domain.Matchmaking.Player player,
+    public PlayerLeftDto PlayerLeftFromDomain(Domain.Matchmaking.Player player, bool isBot,
         Domain.Matchmaking.Matchmaking matchmaking)
         => new(
             matchmaking.Id_.Item,
-            CreatePlayerDto(player, matchmaking),
+            CreatePlayerDto(player, isBot, matchmaking),
             matchmaking.PlayersCount,
             SettingsModule.MaxPlayersModule.value(matchmaking.MaxPlayersCount),
             OptionModule.ToNullable(matchmaking.MinRequiredPlayers)
         );
 
-    private MatchmakingPlayerDto CreatePlayerDto(Domain.Matchmaking.Player player,
+    private MatchmakingPlayerDto CreatePlayerDto(Domain.Matchmaking.Player player, bool isBot,
         Domain.Matchmaking.Matchmaking matchmaking)
     {
-        var isBot = botRegistry.IsMatchmakingBot(matchmaking.Id_.Item, player.Id.Item);
         return new MatchmakingPlayerDto(player.Id.Item, PlayerModule.NickModule.value(player.Nick), isBot,
             player.JoinedAt);
     }

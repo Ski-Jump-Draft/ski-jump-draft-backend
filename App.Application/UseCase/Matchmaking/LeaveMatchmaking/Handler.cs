@@ -1,3 +1,4 @@
+using App.Application.Bot;
 using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
@@ -19,7 +20,8 @@ public class Handler(
     IMatchmakingNotifier notifier,
     MatchmakingUpdatedDtoMapper matchmakingUpdatedDtoMapper,
     IClock clock,
-    IMatchmakingUpdatedDtoStorage matchmakingUpdatedDtoStorage)
+    IMatchmakingUpdatedDtoStorage matchmakingUpdatedDtoStorage,
+    IBotRegistry botRegistry)
     : ICommandHandler<Command>
 {
     public async Task HandleAsync(Command command, CancellationToken ct)
@@ -35,12 +37,15 @@ public class Handler(
             await matchmakings.Add(matchmakingAfterLeave, ct);
             now = clock.Now();
 
+
             var matchmakingUpdatedDto =
-                matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterLeave, now);
+                matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterLeave, botRegistry, now);
             await matchmakingUpdatedDtoStorage.Set(command.MatchmakingId, matchmakingUpdatedDto);
             await notifier.MatchmakingUpdated(matchmakingUpdatedDto);
             var player = matchmaking.Players_.Single(p => p.Id.Item == command.PlayerId);
-            await notifier.PlayerLeft(matchmakingUpdatedDtoMapper.PlayerLeftFromDomain(player, matchmakingAfterLeave));
+            var isBot = botRegistry.IsMatchmakingBot(command.MatchmakingId, command.PlayerId);
+            await notifier.PlayerLeft(
+                matchmakingUpdatedDtoMapper.PlayerLeftFromDomain(player, isBot, matchmakingAfterLeave));
         }
         else
         {
