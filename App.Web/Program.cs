@@ -52,7 +52,7 @@ builder.Services.InjectDependencies(builder.Configuration, mode);
 var app = builder.Build();
 app.UseCors("AllowFrontend");
 
-// app.UseHttpsRedirection();
+app.UseHttpsRedirection();
 
 app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
     async (Guid matchmakingId, HttpContext ctx, ISseHub hub) =>
