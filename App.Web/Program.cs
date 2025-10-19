@@ -47,7 +47,7 @@ builder.Services.AddCors(options =>
             else
             {
                 // Production: only allow the public frontend origin
-                policy.WithOrigins("https://ski-jump-draft.netlify.app")
+                policy.WithOrigins("https://ski-jump-draft.netlify.app", "https://staging--ski-jump-draft.netlify.app")
                     .AllowAnyHeader()
                     .AllowAnyMethod()
                     .AllowCredentials();
