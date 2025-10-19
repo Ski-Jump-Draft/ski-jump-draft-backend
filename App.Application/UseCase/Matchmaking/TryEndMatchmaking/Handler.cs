@@ -37,6 +37,8 @@ public class Handler(
 
         var matchmakingBots = botRegistry.MatchmakingBots(command.MatchmakingId);
         var onlyBotsExist = matchmakingBots.Count > 0 && matchmakingBots.Count == matchmaking.PlayersCount;
+        logger.Info($"Only bots exist? MatchmakingId: {command.MatchmakingId}, onlyBotsExist: {onlyBotsExist
+        } (bots count: {matchmakingBots.Count}, players count: {matchmaking.PlayersCount}). Bots: {matchmakingBots}");
         var now = clock.Now();
 
         var shouldEnd = matchmaking.ShouldEnd(now);
