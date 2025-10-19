@@ -153,18 +153,13 @@ const Mode mode = Mode.Online;
 builder.Services.InjectDependencies(builder.Configuration, mode);
 
 var app = builder.Build();
+
+app.UseRouting();
 app.UseCors("AllowFrontend");
-
 app.UseHttpsRedirection();
-
-if (!app.Environment.IsDevelopment())
-{
-    app.UseHsts();
-}
-
-// Apply request timeouts and rate limiting early in the pipeline
-app.UseRequestTimeouts();
+if (!app.Environment.IsDevelopment()) app.UseHsts();
 app.UseRateLimiter();
+app.UseRequestTimeouts();
 
 // Basic security headers
 app.Use(async (context, next) =>
