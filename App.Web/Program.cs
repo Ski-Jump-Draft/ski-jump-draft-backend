@@ -100,7 +100,27 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    static string GetIp(HttpContext ctx) => ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    static string GetIp(HttpContext ctx)
+    {
+        try
+        {
+            var ip = ctx.Connection.RemoteIpAddress?.ToString();
+            if (string.IsNullOrWhiteSpace(ip) || ip == "::1")
+            {
+                if (ctx.Request.Headers.TryGetValue("Fly-Client-IP", out var flyIp) && !string.IsNullOrWhiteSpace(flyIp))
+                    return flyIp.ToString();
+                if (ctx.Request.Headers.TryGetValue("X-Forwarded-For", out var xff) && !string.IsNullOrWhiteSpace(xff))
+                    return xff.ToString().Split(',')[0].Trim();
+                if (ctx.Request.Headers.TryGetValue("X-Real-IP", out var xrip) && !string.IsNullOrWhiteSpace(xrip))
+                    return xrip.ToString();
+            }
+            return ip ?? "unknown";
+        }
+        catch
+        {
+            return "unknown";
+        }
+    }
 
     // Global token bucket: ~60 requests/minute per IP, steady 1 rps
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
