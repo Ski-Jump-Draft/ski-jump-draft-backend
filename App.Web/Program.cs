@@ -6,11 +6,25 @@ using App.Web.DependencyInjection;
 using App.Web.Notifiers.SseHub;
 using App.Web.SignalR.Hub;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http.Timeouts;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 using Serilog;
 using Serilog.Formatting.Compact;
 using Results = Microsoft.AspNetCore.Http.Results;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Kestrel server limits to reduce DoS surface
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.AddServerHeader = false; // Hide server type
+    options.Limits.MaxRequestBodySize = 256 * 1024; // 256 KB per request (sufficient for this API)
+    options.Limits.MaxRequestHeadersTotalSize = 32 * 1024; // 32 KB total headers
+    options.Limits.MaxRequestLineSize = 8 * 1024; // 8 KB request line
+    options.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(10);
+    options.Limits.KeepAliveTimeout = TimeSpan.FromSeconds(120);
+});
 
 // if (!builder.Environment.IsDevelopment())
 // {
@@ -57,7 +71,77 @@ builder.Services.AddCors(options =>
 
 DotNetEnv.Env.Load(".env");
 
-builder.Services.AddSignalR();
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = false;
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(60);
+});
+
+// Add request timeouts (global default) and specific policies
+builder.Services.AddRequestTimeouts(options =>
+{
+    options.DefaultPolicy = new RequestTimeoutPolicy
+    {
+        Timeout = TimeSpan.FromSeconds(10)
+    };
+    options.AddPolicy("short", TimeSpan.FromSeconds(5));
+    options.AddPolicy("long", TimeSpan.FromMinutes(30));
+});
+
+// Add rate limiting with per-IP partitioning
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    static string GetIp(HttpContext ctx) => ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+    // Global token bucket: ~60 requests/minute per IP, steady 1 rps
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
+        RateLimitPartition.GetTokenBucketLimiter(
+            GetIp(ctx), _ => new TokenBucketRateLimiterOptions
+            {
+                TokenLimit = 60,
+                TokensPerPeriod = 1,
+                ReplenishmentPeriod = TimeSpan.FromSeconds(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    // Tighter limits for join endpoints to avoid abuse
+    options.AddPolicy("join", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: GetIp(ctx),
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromSeconds(10),
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 0
+        }));
+
+    // Limit picks to reduce spamming
+    options.AddPolicy("pick", ctx => RateLimitPartition.GetSlidingWindowLimiter(
+        partitionKey: GetIp(ctx),
+        factory: _ => new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = 20,
+            Window = TimeSpan.FromSeconds(10),
+            SegmentsPerWindow = 5,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 0
+        }));
+
+    // Concurrency limit for SSE/SignalR connections per IP
+    options.AddPolicy("sse-connect", ctx => RateLimitPartition.GetConcurrencyLimiter(
+        partitionKey: GetIp(ctx),
+        factory: _ => new ConcurrencyLimiterOptions
+        {
+            PermitLimit = 3,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 0
+        }));
+});
 
 const Mode mode = Mode.Online;
 
@@ -72,6 +156,10 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseHsts();
 }
+
+// Apply request timeouts and rate limiting early in the pipeline
+app.UseRequestTimeouts();
+app.UseRateLimiter();
 
 // Basic security headers
 app.Use(async (context, next) =>
@@ -94,13 +182,20 @@ app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
         ctx.Response.Headers["X-Accel-Buffering"] = "no"; // disable buffering for some proxies
         hub.Subscribe(matchmakingId, ctx.Response, ctx.RequestAborted);
         await Task.Delay(-1, ctx.RequestAborted);
-    });
+    })
+    .DisableRequestTimeout()
+    .RequireRateLimiting("sse-connect");
 
 app.MapPost("/matchmaking/join",
     async (string nick, [FromServices] ICommandBus commandBus,
         [FromServices] App.Application.Utility.IMyLogger myLogger,
         CancellationToken ct) =>
     {
+        if (string.IsNullOrWhiteSpace(nick) || nick.Length > 64)
+        {
+            return Results.BadRequest(new { error = "InvalidNick", message = "Nick must be 1-64 characters." });
+        }
+
         var command = new App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command(nick, IsBot: false);
         try
         {
@@ -134,13 +229,24 @@ app.MapPost("/matchmaking/join",
                 error.StackTrace}");
             return Results.InternalServerError();
         }
-    });
+    })
+    .RequireRateLimiting("join")
+    .WithRequestTimeout(TimeSpan.FromSeconds(8));
 
 app.MapPost("/matchmaking/joinPremium",
     async (string nick, string password, [FromServices] ICommandBus commandBus,
         [FromServices] App.Application.Utility.IMyLogger myLogger,
         CancellationToken ct) =>
     {
+        if (string.IsNullOrWhiteSpace(nick) || nick.Length > 64)
+        {
+            return Results.BadRequest(new { error = "InvalidNick", message = "Nick must be 1-64 characters." });
+        }
+        if (string.IsNullOrWhiteSpace(password) || password.Length > 64)
+        {
+            return Results.BadRequest(new { error = "InvalidPassword", message = "Password must be 1-64 characters." });
+        }
+
         var command =
             new App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Command(nick, Password: password,
                 IsBot: false);
@@ -181,7 +287,9 @@ app.MapPost("/matchmaking/joinPremium",
                 error.StackTrace}");
             return Results.InternalServerError();
         }
-    });
+    })
+    .RequireRateLimiting("join")
+    .WithRequestTimeout(TimeSpan.FromSeconds(8));
 
 app.MapDelete("/matchmaking/leave",
     async (Guid matchmakingId, Guid playerId, [FromServices] ICommandBus commandBus, [FromServices] IMyLogger logger,
@@ -251,9 +359,13 @@ app.MapPost("/game/{gameId:guid}/pick",
             }, jumperId: {jumperId})");
             return Results.InternalServerError();
         }
-    });
+    })
+    .RequireRateLimiting("pick")
+    .WithRequestTimeout(TimeSpan.FromSeconds(8));
 
-app.MapHub<GameHub>("/game/hub");
+app.MapHub<GameHub>("/game/hub")
+    .DisableRequestTimeout()
+    .RequireRateLimiting("sse-connect");
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
