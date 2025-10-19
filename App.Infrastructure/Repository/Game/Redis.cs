@@ -1007,8 +1007,9 @@ public static class GameDtoMapper
                     throw new Exception("DraftDto is not running even though GameDto is in draft");
                 }
 
-                // Players list (domain order is irrelevant here); actual restoration for Random uses the persisted full turn order.
-                var playerIds = draftDto.PlayersOrder.Select(PlayerId.NewPlayerId);
+                // Build roster from GameDto.Players (unique players), not from DraftDto.PlayersOrder,
+                // because for Random order PlayersOrder may represent the full turn sequence with duplicates.
+                var playerIds = gameDto.Players.Select(p => PlayerId.NewPlayerId(p.Id));
                 var picksMap = draftDto.Picks.ToDictionary(keySelector: playerPicksDto =>
                 {
                     var gamePlayerId = PlayerId.NewPlayerId(playerPicksDto.GamePlayerId);
