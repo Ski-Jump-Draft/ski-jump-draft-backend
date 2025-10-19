@@ -177,13 +177,31 @@ app.Use(async (context, next) =>
 });
 
 app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
-        async (Guid matchmakingId, Guid playerId, HttpContext ctx, ISseHub hub, ICommandBus commandBus, IMyLogger logger) =>
+        async (Guid matchmakingId, Guid? playerId, HttpContext ctx, ISseHub hub, ICommandBus commandBus, IMyLogger logger) =>
         {
             ctx.Response.ContentType = "text/event-stream; charset=utf-8";
             ctx.Response.Headers["Cache-Control"] = "no-store, no-transform";
             ctx.Response.Headers["X-Accel-Buffering"] = "no"; // disable buffering for some proxies
             ctx.Response.Headers["Content-Encoding"] = "identity"; // prevent proxy compression of SSE
             ctx.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
+
+            // Resolve effective playerId: prefer query, fallback to cookie set on join
+            Guid effectivePlayerId = playerId ?? Guid.Empty;
+            if (effectivePlayerId == Guid.Empty)
+            {
+                try
+                {
+                    if (ctx.Request.Cookies.TryGetValue("mm_player", out var val) && !string.IsNullOrWhiteSpace(val))
+                    {
+                        var parts = val.Split(':', 2);
+                        if (parts.Length == 2 && Guid.TryParse(parts[0], out var mm) && mm == matchmakingId && Guid.TryParse(parts[1], out var pid))
+                            effectivePlayerId = pid;
+                        else if (parts.Length == 1 && Guid.TryParse(parts[0], out var onlyPid))
+                            effectivePlayerId = onlyPid;
+                    }
+                }
+                catch { }
+            }
 
             hub.Subscribe(matchmakingId, ctx.Response, ctx.RequestAborted);
 
@@ -192,12 +210,17 @@ app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
             {
                 try
                 {
-                    var cmd = new App.Application.UseCase.Matchmaking.LeaveMatchmaking.Command(matchmakingId, playerId);
+                    if (effectivePlayerId == Guid.Empty)
+                    {
+                        try { logger.Warn($"Auto-leave skipped: missing playerId (matchmakingId: {matchmakingId}). Provide ?playerId=... or ensure join cookie is present."); } catch { }
+                        return;
+                    }
+                    var cmd = new App.Application.UseCase.Matchmaking.LeaveMatchmaking.Command(matchmakingId, effectivePlayerId);
                     commandBus.SendAsync(cmd, CancellationToken.None).FireAndForget(logger);
                 }
                 catch (Exception e)
                 {
-                    try { logger.Warn($"Auto-leave on SSE disconnect failed during scheduling: {e.Message} (matchmakingId: {matchmakingId}, playerId: {playerId})"); } catch { /* swallow logging issues */ }
+                    try { logger.Warn($"Auto-leave on SSE disconnect failed during scheduling: {e.Message} (matchmakingId: {matchmakingId}, playerId: {effectivePlayerId})"); } catch { /* swallow logging issues */ }
                 }
             });
 
@@ -208,7 +231,7 @@ app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
 
 
 app.MapPost("/matchmaking/join",
-        async (string nick, [FromServices] ICommandBus commandBus,
+        async (string nick, HttpContext ctx, [FromServices] ICommandBus commandBus,
             [FromServices] App.Application.Utility.IMyLogger myLogger,
             CancellationToken ct) =>
         {
@@ -223,6 +246,18 @@ app.MapPost("/matchmaking/join",
                 var (matchmakingId, correctedNick, playerId) = await commandBus
                     .SendAsync<App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Command,
                         App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.Result>(command, ct);
+
+                // Set cookie for SSE auto-leave fallback
+                var isHttps = ctx.Request.IsHttps;
+                var cookieOptions = new Microsoft.AspNetCore.Http.CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = isHttps,
+                    SameSite = isHttps ? Microsoft.AspNetCore.Http.SameSiteMode.None : Microsoft.AspNetCore.Http.SameSiteMode.Lax,
+                    Expires = DateTimeOffset.UtcNow.AddHours(6),
+                    Path = "/"
+                };
+                ctx.Response.Cookies.Append("mm_player", $"{matchmakingId}:{playerId}", cookieOptions);
 
                 return Results.Ok(new
                     { MatchmakingId = matchmakingId, CorrectedNick = correctedNick, PlayerId = playerId });
@@ -255,7 +290,7 @@ app.MapPost("/matchmaking/join",
     .WithRequestTimeout(TimeSpan.FromSeconds(8));
 
 app.MapPost("/matchmaking/joinPremium",
-        async (string nick, string password, [FromServices] ICommandBus commandBus,
+        async (string nick, string password, HttpContext ctx, [FromServices] ICommandBus commandBus,
             [FromServices] App.Application.Utility.IMyLogger myLogger,
             CancellationToken ct) =>
         {
@@ -278,6 +313,18 @@ app.MapPost("/matchmaking/joinPremium",
                 var (matchmakingId, correctedNick, playerId) = await commandBus
                     .SendAsync<App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Command,
                         App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Result>(command, ct);
+
+                // Set cookie for SSE auto-leave fallback
+                var isHttps = ctx.Request.IsHttps;
+                var cookieOptions = new Microsoft.AspNetCore.Http.CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = isHttps,
+                    SameSite = isHttps ? Microsoft.AspNetCore.Http.SameSiteMode.None : Microsoft.AspNetCore.Http.SameSiteMode.Lax,
+                    Expires = DateTimeOffset.UtcNow.AddHours(6),
+                    Path = "/"
+                };
+                ctx.Response.Cookies.Append("mm_player", $"{matchmakingId}:{playerId}", cookieOptions);
 
                 return Results.Ok(new
                     { MatchmakingId = matchmakingId, CorrectedNick = correctedNick, PlayerId = playerId });
