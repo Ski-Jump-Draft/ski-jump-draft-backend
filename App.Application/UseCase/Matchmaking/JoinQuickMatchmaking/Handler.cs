@@ -122,6 +122,7 @@ public class Handler(
         logger.Info("Is bot? (id= " + matchmakingGuid + "): " + isBot + "");
         if (isBot)
         {
+            logger.Info($"Player {PlayerModule.NickModule.value(player.Nick)}, is it bot? {isBot}");
             botRegistry.RegisterMatchmakingBot(matchmakingGuid, player.Id.Item);
         }
 
