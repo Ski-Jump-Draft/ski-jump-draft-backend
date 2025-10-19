@@ -10,7 +10,7 @@ public static class Storages
         services.AddSingleton<App.Application.Matchmaking.IMatchmakingUpdatedDtoStorage, App.Infrastructure.Storage.MatchmakingUpdated.InMemory>();
         services
             .AddSingleton<App.Application.Matchmaking.IPremiumMatchmakingConfigurationStorage,
-                App.Infrastructure.Storage.PremiumMatchmakingConfigs.Hardcoded>();
+                App.Infrastructure.Storage.PremiumMatchmakingConfigs.Environment>();
         services.AddSingleton<App.Application.Matchmaking.IPremiumMatchmakingGames, App.Infrastructure.PremiumMatchmakings.InMemory>();
         return services;
     }

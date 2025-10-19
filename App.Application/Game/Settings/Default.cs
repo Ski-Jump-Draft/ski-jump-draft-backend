@@ -14,26 +14,40 @@ public class Default(
 {
     public async Task<Domain.Game.Settings> Create(Guid? matchmakingId = null)
     {
-        var picksNumber = new Dictionary<int, double>
-        {
-            { 2, 0.1 }, { 3, 0.8 },
-            { 4, 1 },
-            { 5, 1 },
-            { 6, 0.8 },
-        }.WeightedRandomElement(random);
+        string? premiumMatchmakingPassword = null;
+        if (matchmakingId is not null)
+            premiumMatchmakingPassword = await premiumMatchmakingGames.GetPassword(matchmakingId.Value);
 
-        var draftOrder = new Dictionary<Domain.Game.DraftModule.SettingsModule.Order, double>
-        {
-            { Domain.Game.DraftModule.SettingsModule.Order.Snake, 3 },
-            { Domain.Game.DraftModule.SettingsModule.Order.Random, 4 },
-        }.WeightedRandomElement(random);
+        int picksNumber;
+        Domain.Game.DraftModule.SettingsModule.Order draftOrder;
+        Domain.Game.RankingPolicy rankingPolicy;
 
-        var rankingPolicy = new Dictionary<Domain.Game.RankingPolicy, double>
+        if (premiumMatchmakingPassword?.StartsWith("duets_") is true)
         {
-            { Domain.Game.RankingPolicy.Classic, 70 },
-            { Domain.Game.RankingPolicy.PodiumAtAllCosts, 30 },
-        }.WeightedRandomElement(random);
-
+            picksNumber = 2;
+            draftOrder = Domain.Game.DraftModule.SettingsModule.Order.Snake;
+            rankingPolicy = Domain.Game.RankingPolicy.Classic;
+        }
+        else
+        {
+            picksNumber = new Dictionary<int, double>
+            {
+                { 2, 0.1 }, { 3, 0.8 },
+                { 4, 1 },
+                { 5, 1 },
+                { 6, 0.8 },
+            }.WeightedRandomElement(random);
+            draftOrder = new Dictionary<Domain.Game.DraftModule.SettingsModule.Order, double>
+            {
+                { Domain.Game.DraftModule.SettingsModule.Order.Snake, 3 },
+                { Domain.Game.DraftModule.SettingsModule.Order.Random, 4 },
+            }.WeightedRandomElement(random);
+            rankingPolicy = new Dictionary<Domain.Game.RankingPolicy, double>
+            {
+                { Domain.Game.RankingPolicy.Classic, 70 },
+                { Domain.Game.RankingPolicy.PodiumAtAllCosts, 30 },
+            }.WeightedRandomElement(random);
+        }
 
         var preDraftCompetitionSettings = App.Domain.Competition.Settings.Create(ListModule.OfSeq([
                 new App.Domain.Competition.RoundSettings(App.Domain.Competition.RoundLimit.NoneLimit, false,
@@ -76,17 +90,17 @@ public class Default(
         }
         else
         {
-            var password = await premiumMatchmakingGames.GetPassword(matchmakingId.Value);
-            jumpInterval = password switch
+            jumpInterval = premiumMatchmakingPassword switch
             {
-                "siekamy cebulkę" => App.Domain.Game.PhaseDuration.Create(TimeSpan.FromMilliseconds(8000)),
-                "sjdraft123" => App.Domain.Game.PhaseDuration.Create(TimeSpan.FromMilliseconds(5000)),
+                not null when premiumMatchmakingPassword.StartsWith("long_") => App.Domain.Game.PhaseDuration.Create(
+                    TimeSpan.FromMilliseconds(9000)),
+                not null when premiumMatchmakingPassword.StartsWith("short_") => App.Domain.Game.PhaseDuration.Create(
+                    TimeSpan.FromMilliseconds(4000)),
                 _ => App.Domain.Game.PhaseDuration.Create(TimeSpan.FromMilliseconds(6000))
             };
+        }
 
-
-        }            myLogger.Info($"Jump interval for matchmaking game with id {matchmakingId} is {jumpInterval}");
-
+        myLogger.Info($"Jump interval for matchmaking game with id {matchmakingId} is {jumpInterval}");
 
         return new App.Domain.Game.Settings(breakSettings, preDraftSettings, draftSettings,
             mainCompetitionSettings,

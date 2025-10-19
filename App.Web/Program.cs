@@ -33,11 +33,25 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowFrontend",
         policy =>
         {
-            policy.WithOrigins("http://localhost:3000", "https://ski-jump-draft.netlify.app",
-                    "https://staging--ski-jump-draft.netlify.app")
-                .AllowAnyHeader()
-                .AllowAnyMethod()
-                .AllowCredentials(); // jeśli będziesz używał cookies/sse
+            var env = builder.Environment;
+            if (env.IsDevelopment())
+            {
+                policy.WithOrigins(
+                        "http://localhost:3000",
+                        "https://ski-jump-draft.netlify.app",
+                        "https://staging--ski-jump-draft.netlify.app")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
+            }
+            else
+            {
+                // Production: only allow the public frontend origin
+                policy.WithOrigins("https://ski-jump-draft.netlify.app")
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
+            }
         });
 });
 
@@ -54,9 +68,30 @@ app.UseCors("AllowFrontend");
 
 app.UseHttpsRedirection();
 
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+}
+
+// Basic security headers
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+    headers["X-Content-Type-Options"] = "nosniff";
+    headers["X-Frame-Options"] = "DENY";
+    headers["Referrer-Policy"] = "no-referrer";
+    headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()";
+    // Minimal CSP suitable for API-only backend; adjust if serving pages
+    headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; upgrade-insecure-requests";
+    await next();
+});
+
 app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
     async (Guid matchmakingId, HttpContext ctx, ISseHub hub) =>
     {
+        ctx.Response.ContentType = "text/event-stream";
+        ctx.Response.Headers["Cache-Control"] = "no-store";
+        ctx.Response.Headers["X-Accel-Buffering"] = "no"; // disable buffering for some proxies
         hub.Subscribe(matchmakingId, ctx.Response, ctx.RequestAborted);
         await Task.Delay(-1, ctx.RequestAborted);
     });
