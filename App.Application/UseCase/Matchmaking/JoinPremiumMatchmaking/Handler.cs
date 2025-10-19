@@ -50,6 +50,9 @@ public class Handler(
         var joinDateTime = clock.Now();
         var player = new Domain.Matchmaking.Player(PlayerId.NewPlayerId(guid.NewGuid()), nick, joinDateTime);
 
+        var configs = await premiumMatchmakingConfigurationStorage.PremiumMatchmakingConfigs;
+        logger.Info("Premium matchmaking configs: " + string.Join("  |  ", configs) + "");
+
         var passwordIsValid =
             await premiumMatchmakingConfigurationStorage.PremiumMatchmakingPasswordIsValid(command.Password);
         if (!passwordIsValid)

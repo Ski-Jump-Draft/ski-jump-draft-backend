@@ -15,7 +15,7 @@ public static class DependencyInjection
     public static IServiceCollection InjectDependencies(this IServiceCollection services, IConfiguration config,
         Mode mode)
     {
-        services.AddAcl().AddApplication().AddCommanding().AddMappers().AddStorages()
+        services.AddAcl().AddApplication().AddCommanding().AddMappers().AddStorages(config)
             .AddUtilities().AddBot().AddJson();
         services.AddMemoryCache();
 

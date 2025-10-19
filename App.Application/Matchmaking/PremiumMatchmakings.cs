@@ -16,7 +16,7 @@ public interface IPremiumMatchmakingGames
 
 public interface IPremiumMatchmakingConfigurationStorage
 {
-    Task<ISet<PremiumMatchmakingConfig>> PremiumMatchmakingConfigs { get; }
+    Task<HashSet<PremiumMatchmakingConfig>> PremiumMatchmakingConfigs { get; }
 
     Task<PremiumMatchmakingConfig?> GetByPassword(string password);
 

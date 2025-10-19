@@ -4,52 +4,43 @@ using App.Application.Matchmaking;
 
 namespace App.Infrastructure.Storage.PremiumMatchmakingConfigs;
 
-public class Environment : IPremiumMatchmakingConfigurationStorage
+public class Environment(string? premiumPasswordsString) : IPremiumMatchmakingConfigurationStorage
 {
-    public Task<ISet<PremiumMatchmakingConfig>> PremiumMatchmakingConfigs => Task.FromResult(LoadFromEnvironment());
+    public Task<HashSet<PremiumMatchmakingConfig>> PremiumMatchmakingConfigs => Task.FromResult(SetUp());
 
-    private static ISet<PremiumMatchmakingConfig> LoadFromEnvironment()
+    private HashSet<PremiumMatchmakingConfig> SetUp()
     {
-        // Read from environment variable to avoid hardcoding secrets
-        var raw = System.Environment.GetEnvironmentVariable("PREMIUM_PASSWORDS");
         var set = new HashSet<PremiumMatchmakingConfig>();
-        if (string.IsNullOrWhiteSpace(raw))
+        if (string.IsNullOrWhiteSpace(premiumPasswordsString))
         {
             return set;
         }
 
-        foreach (var item in raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach (var item in premiumPasswordsString.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             set.Add(new PremiumMatchmakingConfig(item));
         }
+
         return set;
     }
 
     public async Task<PremiumMatchmakingConfig?> GetByPassword(string password)
     {
         var configs = await PremiumMatchmakingConfigs;
-        foreach (var config in configs)
-        {
-            if (SecureEquals(config.Password, password))
-            {
-                return config;
-            }
-        }
-        return null;
+        return configs.FirstOrDefault(config => SecureEquals(config.Password, password));
     }
 
     private static bool SecureEquals(string a, string b)
     {
-        // Fixed-time comparison to mitigate timing attacks
         var ba = Encoding.UTF8.GetBytes(a);
         var bb = Encoding.UTF8.GetBytes(b);
         if (ba.Length != bb.Length)
         {
-            // Compare anyway to keep timing similar
             var max = Math.Max(ba.Length, bb.Length);
             Array.Resize(ref ba, max);
             Array.Resize(ref bb, max);
         }
+
         return CryptographicOperations.FixedTimeEquals(ba, bb);
     }
 }
