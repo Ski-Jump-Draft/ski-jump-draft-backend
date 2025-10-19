@@ -1,27 +1,79 @@
 using System.Collections.Concurrent;
 using System.Text;
+using System.Threading;
 using Microsoft.AspNetCore.Http;
 
 namespace App.Web.Notifiers.SseHub;
 
 public class Default : ISseHub
 {
-    private readonly ConcurrentDictionary<Guid, ConcurrentBag<HttpResponse>> _streams = new();
+    private sealed class Client
+    {
+        public HttpResponse Response { get; }
+        public SemaphoreSlim WriteLock { get; } = new(1, 1);
+        public CancellationToken Ct { get; }
+        public Client(HttpResponse response, CancellationToken ct)
+        {
+            Response = response;
+            Ct = ct;
+        }
+    }
+
+    private static readonly byte[] HeartbeatBytes = Encoding.UTF8.GetBytes(new[] { ':', '\n', '\n' });
+
+    private readonly ConcurrentDictionary<Guid, ConcurrentBag<Client>> _streams = new();
 
     public void Subscribe(Guid matchmakingId, HttpResponse response, CancellationToken ct)
     {
-        response.ContentType = "text/event-stream";
-        response.Headers["Cache-Control"] = "no-cache";
+        response.ContentType = "text/event-stream; charset=utf-8";
+        response.Headers["Cache-Control"] = "no-store, no-transform";
         response.Headers["Pragma"] = "no-cache";
         response.Headers["Expires"] = "0";
+        response.Headers["Content-Encoding"] = "identity";
 
-        var bag = _streams.GetOrAdd(matchmakingId, _ => new ConcurrentBag<HttpResponse>());
-        bag.Add(response);
+        var client = new Client(response, ct);
+        var bag = _streams.GetOrAdd(matchmakingId, _ => new ConcurrentBag<Client>());
+        bag.Add(client);
+
+        // Immediately send a prelude comment to flush headers and keep the connection open
+        _ = Task.Run(async () =>
+        {
+            try { await SafeWriteAsync(client, HeartbeatBytes); } catch { /* ignore */ }
+        }, ct);
+
+        // Heartbeat to prevent idle intermediaries (CDN/proxy) from closing the connection (e.g., ~10s idle)
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(5), ct);
+                        if (ct.IsCancellationRequested) break;
+                        await SafeWriteAsync(client, HeartbeatBytes);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
+                    catch
+                    {
+                        // ignore transient write errors; client will likely drop
+                    }
+                }
+            }
+            catch
+            {
+                // swallow background task exceptions
+            }
+        }, ct);
 
         ct.Register(() =>
         {
-            // usuwanie klienta — uproszczone, bo ConcurrentBag nie ma Remove
-            // w realnym kodzie raczej Channel albo ConcurrentDictionary z markerem
+            // Removal from ConcurrentBag is not supported; we accept stale entries.
+            // In production, consider a better structure to allow cleanup.
         });
     }
 
@@ -35,12 +87,29 @@ public class Default : ISseHub
 
         foreach (var client in clients)
         {
+            if (client.Ct.IsCancellationRequested) continue;
             try
             {
-                await client.Body.WriteAsync(buffer, ct);
-                await client.Body.FlushAsync(ct);
+                await SafeWriteAsync(client, buffer);
             }
-            catch { /* klient padł */ }
+            catch
+            {
+                // client likely disconnected
+            }
+        }
+    }
+
+    private static async Task SafeWriteAsync(Client client, byte[] buffer)
+    {
+        await client.WriteLock.WaitAsync(CancellationToken.None);
+        try
+        {
+            await client.Response.Body.WriteAsync(buffer, CancellationToken.None);
+            await client.Response.Body.FlushAsync(CancellationToken.None);
+        }
+        finally
+        {
+            client.WriteLock.Release();
         }
     }
 }
