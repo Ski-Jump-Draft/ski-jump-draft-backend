@@ -1,5 +1,6 @@
 using App.Application.Commanding;
 using App.Application.Utility;
+using App.Application.Extensions;
 using App.Domain.Game;
 using App.Web;
 using App.Web.DependencyInjection;
@@ -176,7 +177,7 @@ app.Use(async (context, next) =>
 });
 
 app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
-        async (Guid matchmakingId, HttpContext ctx, ISseHub hub) =>
+        async (Guid matchmakingId, Guid playerId, HttpContext ctx, ISseHub hub, ICommandBus commandBus, IMyLogger logger) =>
         {
             ctx.Response.ContentType = "text/event-stream; charset=utf-8";
             ctx.Response.Headers["Cache-Control"] = "no-store, no-transform";
@@ -185,6 +186,20 @@ app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
             ctx.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
 
             hub.Subscribe(matchmakingId, ctx.Response, ctx.RequestAborted);
+
+            // When the SSE connection is aborted (client disconnects), auto-leave the matchmaking
+            ctx.RequestAborted.Register(() =>
+            {
+                try
+                {
+                    var cmd = new App.Application.UseCase.Matchmaking.LeaveMatchmaking.Command(matchmakingId, playerId);
+                    commandBus.SendAsync(cmd, CancellationToken.None).FireAndForget(logger);
+                }
+                catch (Exception e)
+                {
+                    try { logger.Warn($"Auto-leave on SSE disconnect failed during scheduling: {e.Message} (matchmakingId: {matchmakingId}, playerId: {playerId})"); } catch { /* swallow logging issues */ }
+                }
+            });
 
             await Task.Delay(-1, ctx.RequestAborted);
         })
