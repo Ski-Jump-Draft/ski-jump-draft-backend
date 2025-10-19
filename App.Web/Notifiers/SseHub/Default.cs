@@ -26,9 +26,10 @@ public class Default : ISseHub
     public void Subscribe(Guid matchmakingId, HttpResponse response, CancellationToken ct)
     {
         response.ContentType = "text/event-stream; charset=utf-8";
-        response.Headers["Cache-Control"] = "no-store";
+        response.Headers["Cache-Control"] = "no-store, no-transform";
         response.Headers["Pragma"] = "no-cache";
         response.Headers["Expires"] = "0";
+        response.Headers["Content-Encoding"] = "identity";
 
         var client = new Client(response, ct);
         var bag = _streams.GetOrAdd(matchmakingId, _ => new ConcurrentBag<Client>());

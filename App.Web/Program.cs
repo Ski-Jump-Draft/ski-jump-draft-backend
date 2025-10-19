@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http.Timeouts;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Http.Features;
 using Serilog;
 using Serilog.Formatting.Compact;
 using Results = Microsoft.AspNetCore.Http.Results;
@@ -24,6 +25,10 @@ builder.WebHost.ConfigureKestrel(options =>
     options.Limits.MaxRequestLineSize = 8 * 1024; // 8 KB request line
     options.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(10);
     options.Limits.KeepAliveTimeout = TimeSpan.FromSeconds(120);
+
+    // HTTP/2 keepalive pings to keep intermediaries from closing idle connections
+    options.Limits.Http2.KeepAlivePingDelay = TimeSpan.FromSeconds(10);
+    options.Limits.Http2.KeepAlivePingTimeout = TimeSpan.FromSeconds(30);
 });
 
 // if (!builder.Environment.IsDevelopment())
@@ -178,12 +183,13 @@ app.Use(async (context, next) =>
 app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
         async (Guid matchmakingId, HttpContext ctx, ISseHub hub) =>
         {
-            ctx.Response.ContentType = "text/event-stream";
-            ctx.Response.Headers["Cache-Control"] = "no-store";
-            ctx.Response.Headers["X-Accel-Buffering"] = "no";
+            ctx.Response.ContentType = "text/event-stream; charset=utf-8";
+            ctx.Response.Headers["Cache-Control"] = "no-store, no-transform";
+            ctx.Response.Headers["X-Accel-Buffering"] = "no"; // disable buffering for some proxies
+            ctx.Response.Headers["Content-Encoding"] = "identity"; // prevent proxy compression of SSE
+            ctx.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
 
             hub.Subscribe(matchmakingId, ctx.Response, ctx.RequestAborted);
-
 
             await Task.Delay(-1, ctx.RequestAborted);
         })
