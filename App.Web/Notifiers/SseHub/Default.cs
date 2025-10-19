@@ -34,6 +34,12 @@ public class Default : ISseHub
         var bag = _streams.GetOrAdd(matchmakingId, _ => new ConcurrentBag<Client>());
         bag.Add(client);
 
+        // Immediately send a prelude comment to flush headers and keep the connection open
+        _ = Task.Run(async () =>
+        {
+            try { await SafeWriteAsync(client, HeartbeatBytes); } catch { /* ignore */ }
+        }, ct);
+
         // Heartbeat to prevent idle intermediaries (CDN/proxy) from closing the connection (e.g., ~10s idle)
         _ = Task.Run(async () =>
         {
@@ -75,7 +81,7 @@ public class Default : ISseHub
         if (!_streams.TryGetValue(matchmakingId, out var clients))
             return;
 
-        var data = $"event: {eventName}\\ndata: {json}\\n\\n";
+        var data = $"event: {eventName}\ndata: {json}\n\n";
         var buffer = Encoding.UTF8.GetBytes(data);
 
         foreach (var client in clients)
