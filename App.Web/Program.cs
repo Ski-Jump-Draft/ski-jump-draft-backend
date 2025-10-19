@@ -184,15 +184,6 @@ app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
 
             hub.Subscribe(matchmakingId, ctx.Response, ctx.RequestAborted);
 
-            var hb = Task.Run(async () =>
-            {
-                while (!ctx.RequestAborted.IsCancellationRequested)
-                {
-                    await ctx.Response.WriteAsync(":\n\n"); // SSE comment = ping
-                    await ctx.Response.Body.FlushAsync();
-                    await Task.Delay(TimeSpan.FromSeconds(15), ctx.RequestAborted);
-                }
-            }, ctx.RequestAborted);
 
             await Task.Delay(-1, ctx.RequestAborted);
         })
