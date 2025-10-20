@@ -92,10 +92,6 @@ public class Handler(
         await matchmakings.Add(matchmakingAfterJoin, ct);
 
         now = clock.Now();
-        var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterJoin, botRegistry, now);
-        logger.Info("Just created matchmaking? (id= " + matchmakingId + "): " + justCreated + "");
-
-        await matchmakingUpdatedDtoStorage.Set(matchmakingId, matchmakingUpdatedDto);
 
         logger.Info("Is bot? (id= " + matchmakingId + "): " + command.IsBot + "");
 
@@ -104,6 +100,11 @@ public class Handler(
             logger.Info("Matchmaking players count after bot join: " + matchmakingAfterJoin.Players_.Count + "");
             botRegistry.RegisterMatchmakingBot(matchmakingId, player.Id.Item);
         }
+
+        var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterJoin, botRegistry, now);
+        logger.Info("Just created matchmaking? (id= " + matchmakingId + "): " + justCreated + "");
+
+        await matchmakingUpdatedDtoStorage.Set(matchmakingId, matchmakingUpdatedDto);
 
         await matchmakingNotifier.MatchmakingUpdated(matchmakingUpdatedDto);
         await matchmakingNotifier.PlayerJoined(

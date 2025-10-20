@@ -106,6 +106,13 @@ public class Handler(
         var (matchmakingAfterJoin, correctedNick) = joinResult.ResultValue;
         await matchmakings.Add(matchmakingAfterJoin, ct);
 
+        logger.Info("Is bot? (id= " + matchmakingGuid + "): " + isBot + "");
+        if (isBot)
+        {
+            logger.Info($"Player {PlayerModule.NickModule.value(player.Nick)}, is it bot? {isBot}");
+            botRegistry.RegisterMatchmakingBot(matchmakingGuid, player.Id.Item);
+        }
+
         var matchmakingUpdatedDto = matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterJoin, botRegistry, now);
         logger.Info("Just created matchmaking? (id= " + matchmakingGuid + "): " + justCreated + "");
         if (justCreated)
@@ -118,13 +125,6 @@ public class Handler(
         }
 
         await matchmakingUpdatedDtoStorage.Set(matchmakingGuid, matchmakingUpdatedDto);
-
-        logger.Info("Is bot? (id= " + matchmakingGuid + "): " + isBot + "");
-        if (isBot)
-        {
-            logger.Info($"Player {PlayerModule.NickModule.value(player.Nick)}, is it bot? {isBot}");
-            botRegistry.RegisterMatchmakingBot(matchmakingGuid, player.Id.Item);
-        }
 
         now = clock.Now();
 
