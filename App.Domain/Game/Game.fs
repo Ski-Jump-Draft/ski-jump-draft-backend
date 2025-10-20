@@ -197,9 +197,11 @@ type Game =
     member this.DraftPicks = this.Draft.Value.AllPicks
 
     member this.PicksOf playerId = this.Draft.Value.PicksOf playerId
-    
-    member this.NextDraftPickIndex =
-        this.DraftPicks.Count
+
+    member this.DraftCurrentPickIndex: int option =
+        match this.Draft with
+        | Some draft -> Some (Draft.TurnIndex.value this.Draft.Value.CurrentTurnIndex)
+        | None -> None
 
     member this.AvailableDraftPicks: IEnumerable<JumperId> =
         this.Draft.Value.AvailablePicks

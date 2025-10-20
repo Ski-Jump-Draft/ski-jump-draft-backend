@@ -62,7 +62,7 @@ public class Handler(
             now.Add(pickTime),
             $"PickJumper:{command.GameId}_{pickedGameJumperId}", ct);
 
-        await RecordTelemetry(command, gameWorldJumperId, pickedGameJumperId, game.NextDraftPickIndex, pickTime,
+        await RecordTelemetry(command, gameWorldJumperId, pickedGameJumperId, game.DraftCurrentPickIndex.Value, pickTime,
             timeoutSeconds,
             pickedGameJumperRankInAlgorithm);
 
