@@ -17,11 +17,7 @@ public static class Telemetry
         }
         else
         {
-            var redisConnectionString = configuration["Redis:ConnectionString"];
-            if (redisConnectionString is null)
-                throw new InvalidOperationException("Redis connection string not configured");
-            var connectionMultiplexer = ConnectionMultiplexer.Connect(redisConnectionString);
-            services.AddSingleton<ITelemetry>(new RedisTelemetry(connectionMultiplexer));
+            services.AddSingleton<ITelemetry, RedisTelemetry>();
         }
 
         return services;
