@@ -10,3 +10,8 @@ public interface IDraftPicker
 public interface IDraftPassPicker : IDraftPicker
 {
 }
+
+public interface IDraftPickerWithJumpersRanking : IDraftPicker
+{
+    public int? JumperRank(Guid gameJumperId);
+}

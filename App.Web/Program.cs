@@ -107,13 +107,15 @@ builder.Services.AddRateLimiter(options =>
             var ip = ctx.Connection.RemoteIpAddress?.ToString();
             if (string.IsNullOrWhiteSpace(ip) || ip == "::1")
             {
-                if (ctx.Request.Headers.TryGetValue("Fly-Client-IP", out var flyIp) && !string.IsNullOrWhiteSpace(flyIp))
+                if (ctx.Request.Headers.TryGetValue("Fly-Client-IP", out var flyIp) &&
+                    !string.IsNullOrWhiteSpace(flyIp))
                     return flyIp.ToString();
                 if (ctx.Request.Headers.TryGetValue("X-Forwarded-For", out var xff) && !string.IsNullOrWhiteSpace(xff))
                     return xff.ToString().Split(',')[0].Trim();
                 if (ctx.Request.Headers.TryGetValue("X-Real-IP", out var xrip) && !string.IsNullOrWhiteSpace(xrip))
                     return xrip.ToString();
             }
+
             return ip ?? "unknown";
         }
         catch
@@ -171,7 +173,7 @@ builder.Services.AddRateLimiter(options =>
 
 const Mode mode = Mode.Online;
 
-builder.Services.InjectDependencies(builder.Configuration, mode);
+builder.Services.InjectDependencies(builder.Configuration, mode, builder.Environment);
 
 var app = builder.Build();
 
@@ -197,7 +199,8 @@ app.Use(async (context, next) =>
 });
 
 app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
-        async (Guid matchmakingId, Guid? playerId, HttpContext ctx, ISseHub hub, ICommandBus commandBus, IMyLogger logger) =>
+        async (Guid matchmakingId, Guid? playerId, HttpContext ctx, ISseHub hub, ICommandBus commandBus,
+            IMyLogger logger) =>
         {
             ctx.Response.ContentType = "text/event-stream; charset=utf-8";
             ctx.Response.Headers["Cache-Control"] = "no-store, no-transform";
@@ -214,13 +217,16 @@ app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
                     if (ctx.Request.Cookies.TryGetValue("mm_player", out var val) && !string.IsNullOrWhiteSpace(val))
                     {
                         var parts = val.Split(':', 2);
-                        if (parts.Length == 2 && Guid.TryParse(parts[0], out var mm) && mm == matchmakingId && Guid.TryParse(parts[1], out var pid))
+                        if (parts.Length == 2 && Guid.TryParse(parts[0], out var mm) && mm == matchmakingId &&
+                            Guid.TryParse(parts[1], out var pid))
                             effectivePlayerId = pid;
                         else if (parts.Length == 1 && Guid.TryParse(parts[0], out var onlyPid))
                             effectivePlayerId = onlyPid;
                     }
                 }
-                catch { }
+                catch
+                {
+                }
             }
 
             hub.Subscribe(matchmakingId, ctx.Response, ctx.RequestAborted);
@@ -232,15 +238,33 @@ app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
                 {
                     if (effectivePlayerId == Guid.Empty)
                     {
-                        try { logger.Warn($"Auto-leave skipped: missing playerId (matchmakingId: {matchmakingId}). Provide ?playerId=... or ensure join cookie is present."); } catch { }
+                        try
+                        {
+                            logger.Warn($"Auto-leave skipped: missing playerId (matchmakingId: {matchmakingId
+                            }). Provide ?playerId=... or ensure join cookie is present.");
+                        }
+                        catch
+                        {
+                        }
+
                         return;
                     }
-                    var cmd = new App.Application.UseCase.Matchmaking.LeaveMatchmaking.Command(matchmakingId, effectivePlayerId);
+
+                    var cmd = new App.Application.UseCase.Matchmaking.LeaveMatchmaking.Command(matchmakingId,
+                        effectivePlayerId);
                     commandBus.SendAsync(cmd, CancellationToken.None).FireAndForget(logger);
                 }
                 catch (Exception e)
                 {
-                    try { logger.Warn($"Auto-leave on SSE disconnect failed during scheduling: {e.Message} (matchmakingId: {matchmakingId}, playerId: {effectivePlayerId})"); } catch { /* swallow logging issues */ }
+                    try
+                    {
+                        logger.Warn($"Auto-leave on SSE disconnect failed during scheduling: {e.Message
+                        } (matchmakingId: {matchmakingId}, playerId: {effectivePlayerId})");
+                    }
+                    catch
+                    {
+                        /* swallow logging issues */
+                    }
                 }
             });
 
@@ -273,7 +297,9 @@ app.MapPost("/matchmaking/join",
                 {
                     HttpOnly = true,
                     Secure = isHttps,
-                    SameSite = isHttps ? Microsoft.AspNetCore.Http.SameSiteMode.None : Microsoft.AspNetCore.Http.SameSiteMode.Lax,
+                    SameSite = isHttps
+                        ? Microsoft.AspNetCore.Http.SameSiteMode.None
+                        : Microsoft.AspNetCore.Http.SameSiteMode.Lax,
                     Expires = DateTimeOffset.UtcNow.AddHours(6),
                     Path = "/"
                 };
@@ -340,7 +366,9 @@ app.MapPost("/matchmaking/joinPremium",
                 {
                     HttpOnly = true,
                     Secure = isHttps,
-                    SameSite = isHttps ? Microsoft.AspNetCore.Http.SameSiteMode.None : Microsoft.AspNetCore.Http.SameSiteMode.Lax,
+                    SameSite = isHttps
+                        ? Microsoft.AspNetCore.Http.SameSiteMode.None
+                        : Microsoft.AspNetCore.Http.SameSiteMode.Lax,
                     Expires = DateTimeOffset.UtcNow.AddHours(6),
                     Path = "/"
                 };

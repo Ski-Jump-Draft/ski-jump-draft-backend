@@ -18,9 +18,26 @@ public class BestPicker(
     IRandom random,
     IMyLogger logger,
     IJumpers jumpers)
-    : IDraftPicker, IDraftPassPicker
+    : IDraftPicker, IDraftPassPicker, IDraftPickerWithJumpersRanking
 {
     private Dictionary<Guid, List<int>> _preDraftPositionsByJumper = new();
+    private Dictionary<Guid, double>? _lastRatings;
+
+    public int? JumperRank(Guid gameJumperId)
+    {
+        if (_lastRatings is null || _lastRatings.Count == 0)
+            return null;
+
+        if (!_lastRatings.ContainsKey(gameJumperId))
+            return null;
+
+        var ordered = _lastRatings
+            .OrderByDescending(kv => kv.Value)
+            .Select((kv, idx) => new { kv.Key, Rank = idx + 1 })
+            .ToDictionary(x => x.Key, x => x.Rank);
+
+        return ordered[gameJumperId];
+    }
 
     public async Task<Guid> Pick(Domain.Game.Game game, CancellationToken ct = default)
     {
@@ -34,6 +51,7 @@ public class BestPicker(
         var averagePositionByJumper = CreateAveragePositions(gameId, preDraftCompetitionResults);
         var ratingByGameJumper =
             CalculateGameJumperRatings(gameId, gameWorldJumpers, averagePositionByJumper, maxPosition);
+        _lastRatings = ratingByGameJumper;
         await LogRatingsWithNames(ratingByGameJumper, ct);
         return DrawJumper(ratingByGameJumper);
     }

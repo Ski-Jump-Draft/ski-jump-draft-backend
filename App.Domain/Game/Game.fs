@@ -197,6 +197,9 @@ type Game =
     member this.DraftPicks = this.Draft.Value.AllPicks
 
     member this.PicksOf playerId = this.Draft.Value.PicksOf playerId
+    
+    member this.NextDraftPickIndex =
+        this.DraftPicks.Count
 
     member this.AvailableDraftPicks: IEnumerable<JumperId> =
         this.Draft.Value.AvailablePicks

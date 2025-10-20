@@ -13,10 +13,10 @@ public enum Mode
 public static class DependencyInjection
 {
     public static IServiceCollection InjectDependencies(this IServiceCollection services, IConfiguration config,
-        Mode mode)
+        Mode mode, IHostEnvironment env)
     {
         services.AddAcl().AddApplication().AddCommanding().AddMappers().AddStorages(config)
-            .AddUtilities().AddBot().AddJson();
+            .AddUtilities().AddBot().AddJson().AddTelemetry(config, env);
         services.AddMemoryCache();
 
         switch (mode)
