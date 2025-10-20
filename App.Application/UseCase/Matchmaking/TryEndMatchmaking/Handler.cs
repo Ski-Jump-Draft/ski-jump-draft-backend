@@ -8,6 +8,7 @@ using App.Application.Messaging.Notifiers.Mapper;
 using App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking;
 using App.Application.Utility;
 using App.Domain.Matchmaking;
+using System.Linq;
 
 namespace App.Application.UseCase.Matchmaking.TryEndMatchmaking;
 
@@ -36,9 +37,13 @@ public class Handler(
             .AwaitOrWrap(_ => new IdNotFoundException(command.MatchmakingId));
 
         var matchmakingBots = botRegistry.MatchmakingBots(command.MatchmakingId);
-        var onlyBotsExist = matchmakingBots.Count > 0 && matchmakingBots.Count == matchmaking.PlayersCount;
-        logger.Info($"Only bots exist? MatchmakingId: {command.MatchmakingId}, onlyBotsExist: {onlyBotsExist
-        } (bots count: {matchmakingBots.Count}, players count: {matchmaking.PlayersCount}). Bots: {matchmakingBots}");
+        var players = matchmaking.Players_;
+        var perPlayerFlags = players.Select(p => new { p.Id, IsBot = botRegistry.IsMatchmakingBot(command.MatchmakingId, p.Id.Item) }).ToList();
+        var onlyBotsExist = perPlayerFlags.Count > 0 && perPlayerFlags.All(x => x.IsBot);
+        var botsCount = matchmakingBots.Count;
+        var playersCount = matchmaking.PlayersCount;
+        var flagsStr = string.Join(", ", perPlayerFlags.Select(x => $"{x.Id.Item}:{(x.IsBot ? "BOT" : "HUMAN")}"));
+        logger.Info($"Only bots exist? MatchmakingId: {command.MatchmakingId}, onlyBotsExist: {onlyBotsExist} (bots count: {botsCount}, players count: {playersCount}). PerPlayer: [{flagsStr}]");
         var now = clock.Now();
 
         var shouldEnd = matchmaking.ShouldEnd(now);
