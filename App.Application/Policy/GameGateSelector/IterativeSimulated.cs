@@ -76,6 +76,8 @@ public class IterativeSimulated(
         if (kPoint >= 180)
             currentGate--;
 
+        currentGate--;
+
         return currentGate;
 
         int CountOvershoots(int gate)
