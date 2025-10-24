@@ -12,6 +12,9 @@ public static class Archives
                 Archive.
                 GameCompetitionResults.
                 InMemory>();
+        services
+            .AddSingleton<App.Application.Game.DraftTurnIndexes.IDraftTurnIndexesArchive,
+                App.Infrastructure.Archive.DraftTurnIndexes.InMemoryDraftTurnIndexesArchive>();
         return services;
     }
 }

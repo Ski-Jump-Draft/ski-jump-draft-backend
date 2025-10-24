@@ -123,17 +123,17 @@ public class JumpSimulator(SimulatorConfiguration configuration, IRandom random,
 
     private double CalculateGoodScenarioFlightRatingRandom(SimulationContext context)
     {
-        return random.Gaussian(8, 7);
+        return random.Gaussian(5, 5);
     }
 
     private double CalculateBadScenarioFlightRatingRandom(SimulationContext context)
     {
-        return random.Gaussian(-18, 10);
+        return random.Gaussian(-15, 5);
     }
 
     private double CalculateMediumFlightRatingRandom(SimulationContext context)
     {
-        return random.Gaussian(0, 8);
+        return random.Gaussian(0, 6);
     }
     //
     // private static double DynamicFlightToTakeoffRatio(double k)

@@ -184,6 +184,8 @@ type Game =
         | Break(StatusTag.EndedTag) -> true
         | _ -> false
 
+    member this.PlayersCount = Players.count this.Players
+
     member this.CurrentCompetitionGate =
         this.CurrentCompetition.Value.GateState.Value.CurrentReal
 
@@ -198,9 +200,12 @@ type Game =
 
     member this.PicksOf playerId = this.Draft.Value.PicksOf playerId
 
+    member this.PicksCountOf playerId =
+        this.PicksOf playerId |> Option.defaultValue List.empty |> List.length
+
     member this.DraftCurrentPickIndex: int option =
         match this.Draft with
-        | Some draft -> Some (Draft.TurnIndex.value this.Draft.Value.CurrentTurnIndex)
+        | Some draft -> Some(Draft.TurnIndex.value this.Draft.Value.CurrentTurnIndex)
         | None -> None
 
     member this.AvailableDraftPicks: IEnumerable<JumperId> =

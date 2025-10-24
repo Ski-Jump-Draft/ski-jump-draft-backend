@@ -32,6 +32,9 @@ public static class Application
             .AddSingleton<App.Application.JumpersForm.IJumperGameFormAlgorithm,
                 App.Application.Policy.GameFormAlgorithm.FullyRandom>();
 
+        services.AddSingleton<App.Application.UseCase.Rankings.WeeklyTopJumps.IWeeklyTopJumpsQuery,
+            App.Infrastructure.ReadModels.Rankings.WeeklyTopJumps.InMemoryWeeklyTopJumpsQuery>();
+
         return services;
     }
 }

@@ -5,6 +5,7 @@ using App.Application.Extensions;
 using App.Application.Matchmaking;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
+using App.Application.Telemetry;
 using App.Application.Utility;
 using App.Domain.Matchmaking;
 
@@ -21,7 +22,8 @@ public class Handler(
     MatchmakingUpdatedDtoMapper matchmakingUpdatedDtoMapper,
     IClock clock,
     IMatchmakingUpdatedDtoStorage matchmakingUpdatedDtoStorage,
-    IBotRegistry botRegistry)
+    IBotRegistry botRegistry,
+    ITelemetry telemetry)
     : ICommandHandler<Command>
 {
     public async Task HandleAsync(Command command, CancellationToken ct)
@@ -29,23 +31,33 @@ public class Handler(
         var matchmaking = await matchmakings.GetById(MatchmakingId.NewMatchmakingId(command.MatchmakingId), ct)
             .AwaitOrWrap(_ => new IdNotFoundException(command.MatchmakingId));
         var playerId = PlayerId.NewPlayerId(command.PlayerId);
-        var now = clock.Now();
-        var matchmakingAfterLeaveResult = matchmaking.Leave(playerId, now);
+        var leaveTime = clock.Now();
+        var matchmakingAfterLeaveResult = matchmaking.Leave(playerId, leaveTime);
         if (matchmakingAfterLeaveResult.IsOk)
         {
             var matchmakingAfterLeave = matchmakingAfterLeaveResult.ResultValue;
             await matchmakings.Add(matchmakingAfterLeave, ct);
-            now = clock.Now();
-
 
             var matchmakingUpdatedDto =
-                matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterLeave, botRegistry, now);
+                matchmakingUpdatedDtoMapper.FromDomain(matchmakingAfterLeave, botRegistry, leaveTime);
             await matchmakingUpdatedDtoStorage.Set(command.MatchmakingId, matchmakingUpdatedDto);
             await notifier.MatchmakingUpdated(matchmakingUpdatedDto);
             var player = matchmaking.Players_.Single(p => p.Id.Item == command.PlayerId);
             var isBot = botRegistry.IsMatchmakingBot(command.MatchmakingId, command.PlayerId);
             await notifier.PlayerLeft(
                 matchmakingUpdatedDtoMapper.PlayerLeftFromDomain(player, isBot, matchmakingAfterLeave));
+
+            await telemetry.Record(new GameTelemetryEvent("PlayerLeftMatchmaking", null, command.MatchmakingId, null,
+                leaveTime, new Dictionary<string, object>()
+                {
+                    ["PlayerId"] = command.PlayerId,
+                    ["IsBot"] = isBot,
+                    ["JoinedAt"] = player.JoinedAt,
+                    ["LeftAt"] = leaveTime,
+                    ["WaitTimeSeconds"] = (leaveTime - player.JoinedAt).TotalSeconds,
+                    ["MaximumRemainingTimeSeconds"] =
+                        (matchmakingAfterLeave.ForceEndAt(leaveTime) - leaveTime).TotalSeconds
+                }));
         }
         else
         {

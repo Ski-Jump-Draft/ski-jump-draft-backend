@@ -1,6 +1,7 @@
 using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
+using App.Application.Game.DraftTurnIndexes;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
 using App.Application.Service;
@@ -23,7 +24,8 @@ public class Handler(
     IMyLogger logger,
     IRandom random,
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
-    DraftSystemSchedulerService draftSystemSchedulerService)
+    DraftSystemSchedulerService draftSystemSchedulerService,
+    IDraftTurnIndexesArchive draftTurnIndexesArchive)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -33,9 +35,11 @@ public class Handler(
 
         logger.Info($"Starting draft for game {game.Id_.Item}");
 
+
         var shuffleFunOption =
             FSharpOption<FSharpFunc<Tuple<FSharpList<PlayerId>, int>, FSharpList<PlayerId>>>.Some(
                 CreateShufflePlayersFunction(random));
+
         var gameAfterStartDraftResult = game.StartDraft(shuffleFunOption);
 
         if (!gameAfterStartDraftResult.IsOk) return new Result();
@@ -44,12 +48,24 @@ public class Handler(
 
         await games.Add(gameAfterStartDraft, ct);
 
+        await ArchiveDraftTurnIndexesIfNeeded(command, game);
+
         await draftSystemSchedulerService.ScheduleSystemDraftEvents(gameAfterStartDraft, ct);
 
         await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(gameAfterStartDraft, ct: ct));
 
-
         return new Result();
+    }
+
+    private async Task ArchiveDraftTurnIndexesIfNeeded(Command command, Domain.Game.Game game)
+    {
+        if (!game.Settings.DraftSettings.Order.IsRandom)
+        {
+            var players = PlayersModule.toIdsList(game.Players);
+            var fixedTurnIndexesDtos =
+                players.Select((playerId, index) => new DraftFixedTurnIndexDto(playerId.Item, index)).ToList();
+            await draftTurnIndexesArchive.SetFixedAsync(command.GameId, fixedTurnIndexesDtos);
+        }
     }
 
     private static FSharpFunc<Tuple<FSharpList<PlayerId>, int>, FSharpList<PlayerId>> CreateShufflePlayersFunction(

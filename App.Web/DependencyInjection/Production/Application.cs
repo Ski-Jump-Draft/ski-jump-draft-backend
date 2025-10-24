@@ -1,4 +1,5 @@
 using App.Application.Acl;
+using App.Application.Game.DraftPicks;
 using App.Application.Game.Gate;
 using App.Application.JumpersForm;
 using App.Application.Matchmaking;
@@ -8,6 +9,10 @@ using App.Application.Policy.GameJumpersSelector;
 using App.Application.Utility;
 using App.Domain.GameWorld;
 using App.Domain.Simulation;
+using App.Infrastructure.ReadModels.Rankings.WeeklyTopJumps;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
+using StackExchange.Redis;
 
 namespace App.Web.DependencyInjection.Production;
 
@@ -58,6 +63,32 @@ public static class Application
         services
             .AddSingleton<App.Application.JumpersForm.IJumperGameFormAlgorithm,
                 App.Application.Policy.GameFormAlgorithm.FullyRandom>();
+
+        if (isMocked)
+        {
+            // services.AddSingleton<App.Application.UseCase.Rankings.WeeklyTopJumps.IWeeklyTopJumpsQuery,
+            //     App.Infrastructure.ReadModels.Rankings.WeeklyTopJumps.InMemoryWeeklyTopJumpsQuery>();
+            services.AddSingleton<App.Application.UseCase.Rankings.WeeklyTopJumps.IWeeklyTopJumpsQuery,
+                App.Infrastructure.ReadModels.Rankings.WeeklyTopJumps.MockWeeklyTopJumpsQuery>();
+        }
+        else
+        {
+            services.Configure<WeeklyTopJumpsCacheOptions>(opts =>
+            {
+                opts.CacheKey = "weeklytopjumps:redis:top20:last7days";
+                opts.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10);
+                opts.Size = 1;
+            });
+
+            services.AddSingleton<RedisWeeklyTopJumpsQuery, RedisWeeklyTopJumpsQuery>();
+            services.AddSingleton<App.Application.UseCase.Rankings.WeeklyTopJumps.IWeeklyTopJumpsQuery>(sp =>
+            {
+                var options = sp.GetRequiredService<IOptions<WeeklyTopJumpsCacheOptions>>();
+                return new CachedWeeklyTopJumpsQuery(sp.GetRequiredService<RedisWeeklyTopJumpsQuery>(),
+                    sp.GetRequiredService<IMemoryCache>(),
+                    options);
+            });
+        }
 
         return services;
     }

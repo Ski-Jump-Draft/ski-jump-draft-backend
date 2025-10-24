@@ -485,6 +485,13 @@ app.MapHub<GameHub>("/game/hub")
     .DisableRequestTimeout()
     .RequireRateLimiting("sse-connect");
 
+app.MapGet("/rankings/weekly-top-jumps",
+    async ([FromServices] App.Application.UseCase.Rankings.WeeklyTopJumps.IWeeklyTopJumpsQuery query, CancellationToken ct) =>
+    {
+        var data = await query.GetTop20Last7Days(ct);
+        return Results.Ok(data);
+    });
+
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 
 app.UseRouting();

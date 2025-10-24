@@ -28,7 +28,7 @@ public class IterativeSimulated(
 
         var allowedOvershootsPercent = juryBravery switch
         {
-            JuryBravery.VeryHigh => Math.Round((decimal)6 / 50, 2),
+            JuryBravery.VeryHigh => Math.Round((decimal)5 / 50, 2),
             JuryBravery.High => Math.Round((decimal)3 / 50, 2),
             JuryBravery.Medium => Math.Round((decimal)1 / 50, 2),
             JuryBravery.Low => Math.Round((decimal)0 / 50, 2),
@@ -69,12 +69,6 @@ public class IterativeSimulated(
         {
             JuryBravery.VeryLow => -2,
             JuryBravery.Low => -1,
-            _ => 0
-        };
-
-        currentGate += hsPoint switch
-        {
-            >= 200 => -1,
             _ => 0
         };
 

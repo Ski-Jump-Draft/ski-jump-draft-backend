@@ -14,6 +14,9 @@ public static class Archives
                     Archive.
                     GameCompetitionResults.
                     InMemory>();
+            services
+                .AddSingleton<App.Application.Game.DraftTurnIndexes.IDraftTurnIndexesArchive,
+                    App.Infrastructure.Archive.DraftTurnIndexes.InMemoryDraftTurnIndexesArchive>();
         }
         else
         {
@@ -25,6 +28,10 @@ public static class Archives
                     Archive.
                     GameCompetitionResults.
                     Redis>();
+            // No Redis implementation yet for DraftTurnIndexes; use in-memory for now.
+            services
+                .AddSingleton<App.Application.Game.DraftTurnIndexes.IDraftTurnIndexesArchive,
+                    App.Infrastructure.Archive.DraftTurnIndexes.InMemoryDraftTurnIndexesArchive>();
         }
 
         services.AddSingleton<App.Application.Game.GameWind.IGameWind, App.Infrastructure.GameWind.InMemory>();

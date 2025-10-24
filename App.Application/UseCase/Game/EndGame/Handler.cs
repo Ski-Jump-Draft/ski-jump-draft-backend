@@ -1,10 +1,13 @@
+using System.Text.Json;
 using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
+using App.Application.Game.DraftTurnIndexes;
 using App.Application.Game.Ranking;
 using App.Application.Matchmaking;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
+using App.Application.Telemetry;
 using App.Application.Utility;
 using App.Domain.Game;
 using Microsoft.FSharp.Collections;
@@ -24,7 +27,10 @@ public class Handler(
     IMyLogger logger,
     IGameRankingFactorySelector gameRankingFactorySelector,
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
-    IPremiumMatchmakingGames premiumMatchmakingGames)
+    IPremiumMatchmakingGames premiumMatchmakingGames,
+    ITelemetry telemetry,
+    IClock clock,
+    IDraftTurnIndexesArchive draftTurnIndexesArchive)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -54,6 +60,47 @@ public class Handler(
         await games.Add(endedGame, ct);
         await gameNotifier.GameUpdated(await gameUpdatedDtoMapper.FromDomain(endedGame, ct: ct));
 
+        var telemetryGameRanking = await CreateEndedGamePlayersForTelemetry(command.GameId, gameRanking);
+
+        await telemetry.Record(new GameTelemetryEvent("GameEnded", command.GameId,
+            null, null, clock.Now(),
+            new Dictionary<string, object>()
+            {
+                ["Ranking"] = JsonSerializer.Serialize(telemetryGameRanking),
+                ["DraftOrderPolicy"] = game.Settings.DraftSettings.Order.ToString(),
+                ["RankingPolicy"] = game.Settings.RankingPolicy.ToString(),
+                ["PlayersCount"] = game.PlayersCount
+            }));
+
         return new Result();
     }
+
+    private async Task<List<TelemetryEndedGamePlayerDto>> CreateEndedGamePlayersForTelemetry(Guid gameId,
+        Domain.Game.Ranking ranking)
+    {
+        var turnIndexesDtos = await draftTurnIndexesArchive.GetAsync(gameId);
+        var dtoByPlayerId = turnIndexesDtos.ToDictionary(dto => dto.gamePlayerId, dto => dto);
+
+        var dtosList = ranking.PositionsAndPoints.Select(keyValuePair =>
+        {
+            var playerId = keyValuePair.Key;
+            var (position, points) = keyValuePair.Value;
+
+            var turnIndexesDto = dtoByPlayerId[playerId.Item];
+
+            return new TelemetryEndedGamePlayerDto(playerId.Item, RankingModule.PointsModule.value(points),
+                RankingModule.PositionModule.value(position), turnIndexesDto.FixedTurnIndex,
+                turnIndexesDto.RandomTurnIndexes);
+        }).ToList();
+
+        return dtosList;
+    }
+
+    private record TelemetryEndedGamePlayerDto(
+        Guid GamePlayerId,
+        int Points,
+        int Position,
+        int? DraftFixedTurnIndex, // If the draft order policy is not random
+        List<int>? DraftRandomTurnIndexes // If the draft order policy is random
+    );
 }

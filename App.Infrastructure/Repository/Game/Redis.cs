@@ -1,17 +1,21 @@
 using System.Text.Json;
+using App.Application.Acl;
 using App.Application.Extensions;
 using App.Application.Game;
 using App.Application.Game.DraftPicks;
 using App.Application.Game.GameCompetitions;
+using App.Application.Mapping;
 using App.Application.Utility;
 using App.Domain.Competition;
 using App.Domain.Game;
+using App.Domain.GameWorld;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.FSharp.Collections;
 using Microsoft.FSharp.Core;
 using StackExchange.Redis;
 using DraftModule = App.Domain.Game.DraftModule;
 using HillId = App.Domain.Competition.HillId;
+using HillModule = App.Domain.Competition.HillModule;
 using JumperId = App.Domain.Game.JumperId;
 using RankingModule = App.Domain.Game.RankingModule;
 using StartlistModule = App.Domain.Competition.StartlistModule;
@@ -24,7 +28,11 @@ public class Redis(
     IClock clock,
     IMyLogger logger,
     IGameCompetitionResultsArchive gameCompetitionResultsArchive,
-    IDraftPicksArchive draftPicksArchive) : IGames
+    IDraftPicksArchive draftPicksArchive,
+    ICompetitionJumperAcl competitionJumperAcl,
+    IGameJumperAcl gameJumperAcl,
+    ICompetitionHillAcl competitionHillAcl,
+    IHills hills) : IGames
 {
     private readonly IMemoryCache _cache = new MemoryCache(new MemoryCacheOptions());
     private readonly IDatabase _db = redis.GetDatabase();
@@ -121,7 +129,7 @@ public class Redis(
     public async Task Add(Domain.Game.Game game, CancellationToken ct)
     {
         var gameId = game.Id_.Item;
-        var dto = GameDtoMapper.Create(await CreateMapperInput(game, ct), clock.Now());
+        var dto = await GameDtoMapper.Create(await CreateMapperInput(game, ct), clock.Now());
         var json = JsonSerializer.Serialize(dto);
 
         if (game.StatusTag.IsEndedTag)
@@ -241,7 +249,7 @@ public class Redis(
             preDraftEndedCompetitions,
             GetNextCompetitionJumpInMs(gameGuid),
             draftPicksList,
-            endedMainCompetition
+            endedMainCompetition, competitionJumperAcl, gameJumperAcl, competitionHillAcl, hills
         );
     }
 
@@ -261,7 +269,8 @@ public class Redis(
     {
         var jumperResults = archiveCompetitionResultsDto.JumperResults.Select(result =>
         {
-            return new CompetitionResultDto(result.CompetitionJumperId, result.Bib, result.Points, result.Rank,
+            return new CompetitionResultDto(result.CompetitionJumperId, result.GameJumperId, result.GameWorldJumperId,
+                result.Bib, result.Points, result.Rank,
                 result.Jumps.Select((archiveJumpResult, index) => new CompetitionRoundResultDto(archiveJumpResult.Id,
                     archiveJumpResult.CompetitionJumperId, index,
                     archiveJumpResult.Distance, archiveJumpResult.Points, archiveJumpResult.Judges,
@@ -329,11 +338,15 @@ public record GameDtoMapperInput(
     List<EndedCompetitionDto>? PreDraftEndedCompetitions,
     int? NextCompetitionJumpInMs,
     List<PlayerPicksDto>? EndedDraftPicks,
-    EndedCompetitionDto? EndedMainCompetition);
+    EndedCompetitionDto? EndedMainCompetition,
+    ICompetitionJumperAcl CompetitionJumperAcl,
+    IGameJumperAcl GameJumperAcl,
+    ICompetitionHillAcl CompetitionHillAcl,
+    IHills Hills);
 
 public static class GameDtoMapper
 {
-    public static GameDto Create(GameDtoMapperInput input, DateTimeOffset now)
+    public static async Task<GameDto> Create(GameDtoMapperInput input, DateTimeOffset now)
     {
         var game = input.Game;
 
@@ -347,9 +360,10 @@ public static class GameDtoMapper
         var dto = new GameDto(
             gameId,
             now,
+            game.StatusTag.IsEndedTag ? now : (DateTimeOffset?)null,
             game.StatusTag.ToString().RemoveFromEndInWordsIfPresent("Tag"),
             CreateSettings(input),
-            CreateCompetitionHill(input),
+            await CreateCompetitionHill(input),
             players,
             jumpers,
             CreatePreDraft(input),
@@ -361,7 +375,7 @@ public static class GameDtoMapper
         return dto;
     }
 
-    private static CompetitionHillDto CreateCompetitionHill(GameDtoMapperInput input)
+    private static async Task<CompetitionHillDto> CreateCompetitionHill(GameDtoMapperInput input)
     {
         var game = input.Game;
         if (game.Hill.IsNone())
@@ -371,7 +385,9 @@ public static class GameDtoMapper
 
         var hill = game.Hill.Value;
 
-        return new CompetitionHillDto(hill.Id.Item, HillModule.KPointModule.value(hill.KPoint),
+        var gameWorldHill = await hill.ToGameWorldHill(input.Hills, input.CompetitionHillAcl);
+
+        return new CompetitionHillDto(hill.Id.Item, gameWorldHill.Id.Item, HillModule.KPointModule.value(hill.KPoint),
             HillModule.HsPointModule.value(hill.HsPoint), HillModule.GatePointsModule.value(hill.GatePoints),
             HillModule.WindPointsModule.value(hill.HeadwindPoints),
             HillModule.WindPointsModule.value(hill.TailwindPoints));
@@ -563,7 +579,11 @@ public static class GameDtoMapper
                 throw new Exception("Bib not found for jumper");
             }
 
-            var result = new CompetitionResultDto(jumperClassificationResult.JumperId.Item,
+            var competitionJumperId = jumperClassificationResult.JumperId.Item;
+            var gameJumperId = input.CompetitionJumperAcl.GetGameJumper(input.Game.Id.Item, competitionJumperId)
+                .GameJumperId;
+            var gameWorldJumperId = input.GameJumperAcl.GetGameWorldJumper(gameJumperId).GameWorldJumperId;
+            var result = new CompetitionResultDto(competitionJumperId, gameJumperId, gameWorldJumperId,
                 StartlistModule.BibModule.value(bib), TotalPointsModule.value(jumperClassificationResult.Points),
                 Classification.PositionModule.value(jumperClassificationResult.Position), rounds);
 
@@ -649,7 +669,8 @@ public static class GameDtoMapper
 
         var draftIsRunning = game.StatusTag.IsDraftTag;
 
-        var draftDto = new DraftDto(draftIsRunning, currentTurnPlayerId, currentTurnIndex, jumperIds, playersOrderForDto,
+        var draftDto = new DraftDto(draftIsRunning, currentTurnPlayerId, currentTurnIndex, jumperIds,
+            playersOrderForDto,
             nextPlayers ?? [],
             picksList);
 
@@ -1126,6 +1147,8 @@ public sealed record StartlistJumperDto(
 
 public sealed record CompetitionResultDto(
     Guid CompetitionJumperId,
+    Guid GameJumperId,
+    Guid GameWorldJumperId,
     int Bib,
     double Total,
     int Rank,
@@ -1191,6 +1214,7 @@ public record JumperDto(Guid GameJumperId);
 
 public record CompetitionHillDto(
     Guid Id,
+    Guid GameWorldHillId,
     // string FisCountryCode,
     double KPoint,
     double HsPoint,
@@ -1211,6 +1235,7 @@ public record GameRankingDto(
 public record GameDto(
     Guid Id,
     DateTimeOffset CreatedAt,
+    DateTimeOffset? EndedAt,
     string Status,
     // string? NextStatus,
     SettingsDto Settings,

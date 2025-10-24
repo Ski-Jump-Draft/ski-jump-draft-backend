@@ -105,6 +105,7 @@ public class Redis(
                 }).ToList();
 
                 return new RedisRepository.CompetitionResultDto(archiveJumperResult.CompetitionJumperId,
+                    archiveJumperResult.GameJumperId, archiveJumperResult.GameWorldJumperId,
                     archiveJumperResult.Bib,
                     archiveJumperResult.Points, archiveJumperResult.Rank, jumperResults);
             }).ToList());
@@ -114,10 +115,26 @@ public class Redis(
     private ArchiveCompetitionResultsDto ArchivedCompetitionResultsFromRedis(Guid gameId,
         RedisRepository.EndedCompetitionDto endedCompetition)
     {
-        var jumperResults = endedCompetition.Results.Select(endedCompetitionJumperResult =>
+        var jumperResults = new List<ArchiveJumperResult>();
+        foreach (var endedCompetitionJumperResult in endedCompetition.Results)
         {
-            var (gameJumperId, gameWorldJumperId) =
-                GetGameJumperAndGameWorldJumper(gameId, endedCompetitionJumperResult.CompetitionJumperId);
+            var gjId = endedCompetitionJumperResult.GameJumperId;
+            var gwjId = endedCompetitionJumperResult.GameWorldJumperId;
+
+            if (gjId == Guid.Empty || gwjId == Guid.Empty)
+            {
+                try
+                {
+                    var tuple = GetGameJumperAndGameWorldJumper(gameId, endedCompetitionJumperResult.CompetitionJumperId);
+                    gjId = tuple.Item1;
+                    gwjId = tuple.Item2;
+                }
+                catch (KeyNotFoundException)
+                {
+                    // Leave IDs as empty if ACL mapping is unavailable; return entry for best-effort consumers.
+                }
+            }
+
             var jumpResults = endedCompetitionJumperResult.RoundResults.Select(endedCompetitionRoundResult =>
                     new ArchiveJumpResult(endedCompetitionRoundResult.JumpResultId,
                         endedCompetitionRoundResult.CompetitionJumperId, endedCompetitionRoundResult.Distance,
@@ -129,11 +146,11 @@ public class Redis(
                         endedCompetitionRoundResult.TotalCompensation))
                 .ToList();
             var bib = endedCompetitionJumperResult.Bib;
-            var jumperResult = new ArchiveJumperResult(gameWorldJumperId, gameJumperId,
+            var jumperResult = new ArchiveJumperResult(gwjId, gjId,
                 endedCompetitionJumperResult.CompetitionJumperId, endedCompetitionJumperResult.Rank, bib,
                 endedCompetitionJumperResult.Total, jumpResults);
-            return jumperResult;
-        }).ToList();
+            jumperResults.Add(jumperResult);
+        }
         return new ArchiveCompetitionResultsDto(jumperResults);
     }
 

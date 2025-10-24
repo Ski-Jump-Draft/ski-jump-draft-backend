@@ -4,6 +4,7 @@ using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Game;
 using App.Application.Game.DraftPicks;
+using App.Application.Game.DraftTurnIndexes;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
 using App.Application.Service;
@@ -32,7 +33,8 @@ public class Handler(
     IDraftPicksArchive draftPicksArchive,
     GameUpdatedDtoMapper gameUpdatedDtoMapper,
     IGameSchedule gameSchedule,
-    DraftSystemSchedulerService draftSystemSchedulerService)
+    DraftSystemSchedulerService draftSystemSchedulerService,
+    IDraftTurnIndexesArchive draftTurnIndexesArchive)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -60,10 +62,19 @@ public class Handler(
 
             await draftSystemSchedulerService.ScheduleSystemDraftEvents(gameAfterPick, ct);
 
+            var oldDraftTurnIndex = game.DraftCurrentPickIndex;
+            if (oldDraftTurnIndex.IsNone())
+                throw new Exception("Draft turn index should be null");
+            var oldDraftPicksOfPlayer = game.PicksCountOf(PlayerId.NewPlayerId(command.PlayerId));
+
+            await draftTurnIndexesArchive.AddRandomAsync(command.GameId, command.PlayerId, oldDraftTurnIndex.Value,
+                oldDraftPicksOfPlayer);
+
             if (phaseChangedTo.IsSome() && phaseChangedTo.Value.IsBreak)
             {
-                draftPicksArchive.Archive(command.GameId,
+                await draftPicksArchive.Archive(command.GameId,
                     pickOutcome.Picks.ToDictionary().ToEnumerableValues());
+
                 var timeToMainCompetition = gameAfterPick.Settings.BreakSettings.BreakBeforeMainCompetition.Value;
                 gameSchedule.ScheduleEvent(command.GameId, GameScheduleTarget.MainCompetition, timeToMainCompetition);
                 logger.Info($"Scheduled Main Competition in {timeToMainCompetition}");

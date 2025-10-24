@@ -10,11 +10,11 @@ public class RandomBravery(IRandom rng) : IJuryBraveryFactory
     {
         var probabilityByJuryBravery = new Dictionary<JuryBravery, double>
         {
-            { JuryBravery.VeryLow, 4 },
-            { JuryBravery.Low, 10 },
-            { JuryBravery.Medium, 6 },
-            { JuryBravery.High, 1 },
-            { JuryBravery.VeryHigh, 0.2 }
+            { JuryBravery.VeryLow, 0.5 },
+            { JuryBravery.Low, 7 },
+            { JuryBravery.Medium, 12 },
+            { JuryBravery.High, 3 },
+            { JuryBravery.VeryHigh, 0.05 }
         };
         return probabilityByJuryBravery.WeightedRandomElement(rng);
     }

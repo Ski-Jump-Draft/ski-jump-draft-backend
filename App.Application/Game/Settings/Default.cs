@@ -96,6 +96,8 @@ public class Default(
                     TimeSpan.FromMilliseconds(9000)),
                 not null when premiumMatchmakingPassword.StartsWith("short_") => App.Domain.Game.PhaseDuration.Create(
                     TimeSpan.FromMilliseconds(4000)),
+                not null when premiumMatchmakingPassword.StartsWith("onesecond_") => App.Domain.Game.PhaseDuration
+                    .Create(TimeSpan.FromMilliseconds(1000)),
                 _ => App.Domain.Game.PhaseDuration.Create(TimeSpan.FromMilliseconds(6000))
             };
         }
