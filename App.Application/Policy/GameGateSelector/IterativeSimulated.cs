@@ -17,6 +17,7 @@ public class IterativeSimulated(
     {
         var simulationHill = hill;
         var simulationJumpers = jumpers.ToImmutableArray();
+        var kPoint = Domain.Simulation.HillModule.KPointModule.value(simulationHill.KPoint);
         var hsPoint = Domain.Simulation.HillModule.HsPointModule.value(simulationHill.HsPoint);
 
         const int maxTries = 50;
@@ -71,6 +72,9 @@ public class IterativeSimulated(
             JuryBravery.Low => -1,
             _ => 0
         };
+
+        if (kPoint >= 180)
+            currentGate--;
 
         return currentGate;
 
