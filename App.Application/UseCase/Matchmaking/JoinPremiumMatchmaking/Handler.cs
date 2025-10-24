@@ -122,10 +122,18 @@ public class Handler(
 
         if (matchmakingIsRunning)
         {
-            var matchmaking = await matchmakings.GetById(MatchmakingId.NewMatchmakingId(matchmakingId!.Value), ct);
-            return new MatchmakingDto(
-                matchmaking.OrThrow($"Matchmaking not found (id= {matchmakingId})"),
-                JustCreated: false);
+            try
+            {
+                var matchmaking = await matchmakings.GetById(MatchmakingId.NewMatchmakingId(matchmakingId!.Value), ct);
+                return new MatchmakingDto(
+                    matchmaking.OrThrow($"Matchmaking not found (id= {matchmakingId})"),
+                    JustCreated: false);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                logger.Warn($"Premium registry had stale matchmaking id {matchmakingId} for password '{password}'. Cleaning up and creating a new one. Reason: {ex.Message}");
+                await premiumMatchmakingGames.EndMatchmaking(matchmakingId!.Value);
+            }
         }
 
         var now = clock.Now();
