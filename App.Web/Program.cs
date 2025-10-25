@@ -24,7 +24,7 @@ builder.WebHost.ConfigureKestrel(options =>
     options.Limits.MaxRequestBodySize = 256 * 1024; // 256 KB per request (sufficient for this API)
     options.Limits.MaxRequestHeadersTotalSize = 32 * 1024; // 32 KB total headers
     options.Limits.MaxRequestLineSize = 8 * 1024; // 8 KB request line
-    options.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(10);
+    options.Limits.RequestHeadersTimeout = TimeSpan.FromSeconds(20);
     options.Limits.KeepAliveTimeout = TimeSpan.FromSeconds(120);
 
     // HTTP/2 keepalive pings to keep intermediaries from closing idle connections
@@ -47,6 +47,12 @@ if (builder.Environment.IsDevelopment())
 {
     builder.Configuration.AddUserSecrets<Program>();
 }
+
+builder.Services.Configure<HostOptions>(o =>
+{
+    o.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
+});
+
 
 builder.Services.AddCors(options =>
 {

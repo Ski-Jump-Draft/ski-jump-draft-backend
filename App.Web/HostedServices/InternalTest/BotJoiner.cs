@@ -90,9 +90,10 @@ public class BotJoiner(
         {
             var password = await premiumMatchmakingGames.GetPassword(matchmakingId);
 
-            if (password is null)
+            if (string.IsNullOrEmpty(password))
             {
-                throw new Exception("Password is null. Some conflict. It should not be reached.");
+                log.Warn($"Premium matchmaking {matchmakingId}: missing password, skipping bot join.");
+                return;
             }
 
             var cmd = new App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Command(nick, true, password);
