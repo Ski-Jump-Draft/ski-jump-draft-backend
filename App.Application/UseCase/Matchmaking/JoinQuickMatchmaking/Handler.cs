@@ -57,7 +57,7 @@ public class Handler(
         var allGamesInProgressCount = await games.GetInProgressCount(ct);
         var premiumMatchmakingGamesCount = await matchmakingGames.GetGamesCount();
         logger.Info("Premium matchmaking games: " + premiumMatchmakingGamesCount + "");
-        var normalGamesInProgressCount = allGamesInProgressCount - premiumMatchmakingGamesCount;
+        var normalGamesInProgressCount = Math.Max(allGamesInProgressCount - premiumMatchmakingGamesCount, 0);
 
         var now = clock.Now();
         var matchmakingsCount = matchmmakingsInProgress.Length;
