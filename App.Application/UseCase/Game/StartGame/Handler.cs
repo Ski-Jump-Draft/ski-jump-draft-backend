@@ -12,6 +12,7 @@ using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
 using App.Application.Policy.GameHillSelector;
 using App.Application.Policy.GameJumpersSelector;
+using App.Application.Telemetry;
 using App.Application.Utility;
 using App.Domain.Game;
 using App.Domain.GameWorld;
@@ -56,7 +57,8 @@ public class Handler(
     IGameSchedule gameSchedule,
     IBotRegistry botRegistry,
     IRandom random,
-    IPremiumMatchmakingGames premiumMatchmakingGames)
+    IPremiumMatchmakingGames premiumMatchmakingGames,
+    ITelemetry telemetry)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -99,6 +101,34 @@ public class Handler(
         logger.Info($"Game {gameGuid} belongs to premium matchmaking: {belongsToPremiumMatchmaking}");
         await SchedulePreDraftPhase(gameGuid, timeToPreDraft, ct);
         await NotifyGameStart(game, gameGuid, gamePlayerByMatchmakingPlayer, command.MatchmakingId, ct);
+        try
+        {
+            var playersCount = game.PlayersCount;
+            var botsCount = botRegistry.GameBotsCount(gameGuid);
+            var realPlayersCount = playersCount - botsCount;
+            var telemetryData = new Dictionary<string, object>()
+            {
+                ["PlayersCount"] = game.PlayersCount,
+                ["BotsCount"] = botsCount,
+                ["RealPlayersCount"] = realPlayersCount,
+            };
+            if (belongsToPremiumMatchmaking)
+            {
+                var premiumMatchmakingPassword = premiumMatchmakingGames.GetPassword(command.MatchmakingId);
+                if (premiumMatchmakingPassword is null)
+                    throw new Exception("Password is null. Some conflict. It should not be reached.");
+                telemetryData.Add("PremiumMatchmakingPassword", premiumMatchmakingPassword);
+            }
+
+            await telemetry.Record(new GameTelemetryEvent("GameStarted", gameGuid, command.MatchmakingId, null,
+                clock.Now(), telemetryData)
+            );
+        }
+        catch (Exception e)
+        {
+            // ignored
+        }
+
         return new Result(gameGuid);
     }
 

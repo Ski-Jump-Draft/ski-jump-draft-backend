@@ -39,6 +39,18 @@ public class InMemory : IBotRegistry
             ? set.Select(playerId => new GameBotDto(playerId)).ToList()
             : Array.Empty<GameBotDto>();
 
+    public int MatchmakingBotsCount(Guid matchmakingId)
+    {
+        _matchmakingBots.TryGetValue(matchmakingId, out var set);
+        return set?.Count ?? 0;
+    }
+
+    public int GameBotsCount(Guid gameId)
+    {
+        _gameBots.TryGetValue(gameId, out var set);
+        return set?.Count ?? 0;   
+    }
+
     public bool IsMatchmakingBot(Guid matchmakingId, Guid playerId) =>
         _matchmakingBots.TryGetValue(matchmakingId, out var set) && set.Contains(playerId);
 

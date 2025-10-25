@@ -6,6 +6,8 @@ public interface IBotRegistry
     void RegisterGameBot(Guid gameId, Guid playerId);
     IReadOnlyList<MatchmakingBotDto> MatchmakingBots(Guid matchmakingId);
     IReadOnlyList<GameBotDto> GameBots(Guid matchmakingId);
+    int MatchmakingBotsCount(Guid matchmakingId);
+    int GameBotsCount(Guid gameId);
     bool IsMatchmakingBot(Guid matchmakingId, Guid playerId);
     bool IsGameBot(Guid gameId, Guid playerId);
 }
