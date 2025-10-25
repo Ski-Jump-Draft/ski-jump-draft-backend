@@ -23,10 +23,6 @@ public static class Repositories
                 var redisConnectionString = configuration["Redis:ConnectionString"]
                                             ?? throw new InvalidOperationException(
                                                 "Redis connection string not configured");
-                // Console.WriteLine("Redis connection string: " + redisConnectionString);
-
-                // logger.Info("Redis connection string: " + redisConnectionString);
-
                 var uri = new Uri(redisConnectionString);
                 var options = new ConfigurationOptions
                 {
@@ -35,10 +31,16 @@ public static class Repositories
                     Password = uri.UserInfo.Split(':')[1],
                     Ssl = true,
                     AbortOnConnectFail = false,
-                    ConnectTimeout = 10000,
-                    SyncTimeout = 10000,
-                    KeepAlive = 60
+                    ConnectRetry = 5,
+                    ConnectTimeout = 20000,
+                    SyncTimeout = 20000,
+                    KeepAlive = 30,
+                    DefaultDatabase = 0,
+                    AllowAdmin = false,
+                    ClientName = "ski-jump-draft-backend",
+                    ReconnectRetryPolicy = new ExponentialRetry(5000) // <---- kluczowe dla Upstash
                 };
+                options.CommandMap = CommandMap.Create(["SUBSCRIBE", "UNSUBSCRIBE"], available: false);
                 
                 var connectionMultiplexer = ConnectionMultiplexer.Connect(options);
                 
