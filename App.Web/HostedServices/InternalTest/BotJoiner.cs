@@ -54,6 +54,7 @@ public class BotJoiner(
 
             bool MatchmakingIsEligibleForBots(Matchmaking m, DateTimeOffset nowDateTime)
             {
+                log.Info($"[{DateTimeOffset.UtcNow}] Checking {all.Length} matchmakings. Eligible: {all.Count(m => MatchmakingIsEligibleForBots(m, now))}");
                 var botsHaveNotJoined = !_botsJoined.ContainsKey(m.Id_.Item);
                 var remainingSlotsExist = m.RemainingSlots > 0;
                 var remainingTimeIsEnough = m.RemainingToForceEnd(nowDateTime).TotalSeconds <= 15;
