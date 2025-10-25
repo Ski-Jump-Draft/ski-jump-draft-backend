@@ -39,8 +39,8 @@ public class Default(
             }.WeightedRandomElement(random);
             draftOrder = new Dictionary<Domain.Game.DraftModule.SettingsModule.Order, double>
             {
-                { Domain.Game.DraftModule.SettingsModule.Order.Snake, 3 },
-                { Domain.Game.DraftModule.SettingsModule.Order.Random, 4 },
+                { Domain.Game.DraftModule.SettingsModule.Order.Snake, 7 },
+                { Domain.Game.DraftModule.SettingsModule.Order.Random, 3 },
             }.WeightedRandomElement(random);
             rankingPolicy = new Dictionary<Domain.Game.RankingPolicy, double>
             {

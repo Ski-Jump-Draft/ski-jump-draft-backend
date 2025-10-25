@@ -9,52 +9,64 @@ public class Random(IRandom random, IMyLogger logger) : IWeatherEngineFactory
 {
     public IWeatherEngine Create()
     {
-        var startingWind = random.RandomInt(0, 10) switch
-        {
-            <= 1 => random.Gaussian(0, 1.25),
-            _ => random.Gaussian(0, 0.65),
-        };
+        var startingWind = SampleStartingWind(random);
 
-        // --- stableWindChangeStdDev ---
-        // 80% w [0, 0.05] ~ Beta(2,6) (gęsto przy 0)
-        // 20% w [0.05, 0.3], silne skupienie blisko 0.05;
-        // w tej 20% gałęzi ~1/400 szansa na okolice [0.28, 0.30].
-        var stableWindChangeStdDev = SampleStableStdDev(random);
+        var stableWindChangeStdDev = SampleStableStdDevTargeted(random);      // mean ~ 0.05
+        var windAdditionStdDev     = SampleWindAdditionStdDev_Mixture(random); // częściej duże, ale nadal spoko
 
-        // --- windAdditionStdDev ---
-        // Beta(2,6) przeskalowana do [0, 1.5] -> moda dokładnie przy 0.25
-        var windAdditionStdDev = SampleWindAdditionStdDev(random);
-
-        // minimalne >0, żeby spełnić wymaganie
         stableWindChangeStdDev = Math.Max(stableWindChangeStdDev, 1e-6);
-        windAdditionStdDev = Math.Max(windAdditionStdDev, 1e-6);
+        windAdditionStdDev     = Math.Max(windAdditionStdDev, 1e-6);
 
         var configuration = new Configuration(startingWind, stableWindChangeStdDev, windAdditionStdDev);
-        
         logger.Info($"Creating a weather engine with configuration: {configuration}");
         return new WeatherEngine(random, logger, configuration);
     }
 
-    private static double SampleStableStdDev(IRandom random)
+    // --- STARTING WIND: mieszanka 4N(0,σ), jeden komponent lekko "ucięty" ---
+    private static double SampleStartingWind(IRandom random)
     {
-        // Zwiększyć b/zmniejszyć a dla mniejszych wartości
-        var x = SampleBetaInt(random, 2, 15);
-        return 0.26 * x;
+        // Wagi: low=0.245 (σ=0.65), mid1=0.285 (σ=0.80), mid2=0.29 (σ=0.95, trunc |w|<=1.9), high=0.18 (σ=1.25)
+        var u = random.NextDouble();
+        if (u < 0.18)
+        {
+            // high
+            return random.Gaussian(0, 1.25);
+        }
+        u -= 0.18;
+        if (u < 0.29)
+        {
+            // mid2 (σ=0.95) - truncation |w| <= 1.9 (akceptacja ~97–98%, więc pętla szybka)
+            double x;
+            do { x = random.Gaussian(0, 0.95); } while (Math.Abs(x) > 1.9);
+            return x;
+        }
+        u -= 0.29;
+        if (u < 0.285)
+        {
+            // mid1
+            return random.Gaussian(0, 0.80);
+        }
+        // low
+        return random.Gaussian(0, 0.65);
     }
 
-    private static double SampleWindAdditionStdDev(IRandom random)
+    // --- STABLE: Beta(2,12) ze skalą 0.35 => mean ≈ 0.35 * 2/14 = 0.05 ---
+    private static double SampleStableStdDevTargeted(IRandom random)
     {
-        // Beta(2,6) na [0,1] ma modę (2-1)/(2+6-2) = 1/6
-        // Skalujemy do [0,1.5] -> moda = 1.5 * 1/6 = 0.25 (idealnie jak chcemy)
-        
-        // Zwiększyć b/zmniejszyć a dla mniejszych wartości
-        var x = SampleBetaInt(random, 2, 10);
+        var x = SampleBetaInt(random, 2, 12);
+        return 0.35 * x;
+    }
+
+    // --- ADDITION: mieszanka "starego" kształtu i grubszego ogona ---
+    private static double SampleWindAdditionStdDev_Mixture(IRandom random)
+    {
+        var heavy = random.NextDouble() < 0.15;
+        var x = heavy ? SampleBetaInt(random, 2, 4)
+                      : SampleBetaInt(random, 2, 10);
         return 1.2 * x;
     }
 
-    // --- Narzędzia ---
-
-    // Beta(k, m) dla CAŁKOWITYCH k, m: X=sum_{i=1..k}Exp(1), Y=sum_{j=1..m}Exp(1), X/(X+Y)
+    // --- Narzędzia Beta/Exp (jak miałeś) ---
     private static double SampleBetaInt(IRandom random, int a, int b)
     {
         double x = 0.0, y = 0.0;
@@ -65,13 +77,8 @@ public class Random(IRandom random, IMyLogger logger) : IWeatherEngineFactory
 
     private static double SampleExp1(IRandom random)
     {
-        // Exp(1): -ln(U), z U ~ Unif(0,1)
         double u;
-        do
-        {
-            u = random.NextDouble();
-        } while (u <= 0.0); // uniknij ln(0)
-
+        do u = random.NextDouble(); while (u <= 0.0);
         return -Math.Log(u);
     }
 }

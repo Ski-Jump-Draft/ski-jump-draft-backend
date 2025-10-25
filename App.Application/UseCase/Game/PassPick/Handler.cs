@@ -5,6 +5,7 @@ using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Game;
 using App.Application.Game.DraftPicks;
+using App.Application.Game.PassPicksCount;
 using App.Application.Messaging.Notifiers;
 using App.Application.Messaging.Notifiers.Mapper;
 using App.Application.Policy.DraftPicker;
@@ -29,7 +30,8 @@ public class Handler(
     IMyLogger logger,
     IDraftPassPicker passPicker,
     ICommandBus commandBus,
-    IBotPickLock botPickLock)
+    IBotPickLock botPickLock,
+    IDraftPassPicksCountArchive draftPassPicksCountArchive)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -44,7 +46,7 @@ public class Handler(
 
         var game = await games.GetById(GameId.NewGameId(command.GameId), ct)
             .AwaitOrWrap(_ => new IdNotFoundException(command.GameId));
-        
+
         var isAppropriateTurn = game.CurrentTurnInDraft.IsSome() &&
                                 (DraftModule.TurnIndexModule.value(game.CurrentTurnInDraft.Value.Index) ==
                                  command.TurnIndex);
@@ -58,6 +60,8 @@ public class Handler(
 
         await commandBus.SendAsync<PickJumper.Command, PickJumper.Result>(new PickJumper.Command(command.GameId,
             command.PlayerId, pickedGameJumperId), ct);
+
+        await draftPassPicksCountArchive.Add(command.GameId, command.PlayerId);
 
         return new Result(pickedGameJumperId);
     }
