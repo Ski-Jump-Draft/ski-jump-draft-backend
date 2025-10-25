@@ -9,4 +9,4 @@ public interface IDraftTurnIndexesArchive
 
 public record DraftFixedTurnIndexDto(Guid gamePlayerId, int FixedTurnIndex);
 
-public record DraftTurnIndexesDto(Guid gamePlayerId, int? FixedTurnIndex, List<int>? RandomTurnIndexes);
+public record DraftTurnIndexesDto(Guid gamePlayerId, int? FixedTurnIndex, List<int>? TurnIndexes);

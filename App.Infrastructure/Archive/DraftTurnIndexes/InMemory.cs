@@ -38,9 +38,9 @@ public class InMemoryDraftTurnIndexesArchive : IDraftTurnIndexesArchive
         }
         else
         {
-            var newIndexes = (dto.RandomTurnIndexes ?? new List<int>()).ToList();
+            var newIndexes = (dto.TurnIndexes ?? new List<int>()).ToList();
             newIndexes.Add(turnIndex);
-            var updated = dto with { RandomTurnIndexes = newIndexes };
+            var updated = dto with { TurnIndexes = newIndexes };
             list[list.IndexOf(dto)] = updated;
         }
 

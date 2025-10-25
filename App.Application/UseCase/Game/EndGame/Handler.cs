@@ -94,7 +94,7 @@ public class Handler(
 
             return new TelemetryEndedGamePlayerDto(playerId.Item, RankingModule.PointsModule.value(points),
                 RankingModule.PositionModule.value(position), turnIndexesDto.FixedTurnIndex,
-                turnIndexesDto.RandomTurnIndexes, passPicksCount);
+                turnIndexesDto.TurnIndexes, passPicksCount);
         }).ToList();
 
         return dtosList;
