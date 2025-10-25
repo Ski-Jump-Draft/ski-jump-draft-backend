@@ -232,42 +232,47 @@ app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
             hub.Subscribe(matchmakingId, ctx.Response, ctx.RequestAborted);
 
             // When the SSE connection is aborted (client disconnects), auto-leave the matchmaking
+            // ctx.RequestAborted.Register(() =>
+            // {
+            //     try
+            //     {
+            //         if (effectivePlayerId == Guid.Empty)
+            //         {
+            //             try
+            //             {
+            //                 logger.Warn($"Auto-leave skipped: missing playerId (matchmakingId: {matchmakingId
+            //                 }). Provide ?playerId=... or ensure join cookie is present.");
+            //             }
+            //             catch
+            //             {
+            //             }
+            //
+            //             return;
+            //         }
+            //
+            //         var cmd = new App.Application.UseCase.Matchmaking.LeaveMatchmaking.Command(matchmakingId,
+            //             effectivePlayerId);
+            //         commandBus.SendAsync(cmd, CancellationToken.None).FireAndForget(logger);
+            //     }
+            //     catch (Exception e)
+            //     {
+            //         try
+            //         {
+            //             logger.Warn($"Auto-leave on SSE disconnect failed during scheduling: {e.Message
+            //             } (matchmakingId: {matchmakingId}, playerId: {effectivePlayerId})");
+            //         }
+            //         catch
+            //         {
+            //             /* swallow logging issues */
+            //         }
+            //     }
+            // });
             ctx.RequestAborted.Register(() =>
             {
-                try
-                {
-                    if (effectivePlayerId == Guid.Empty)
-                    {
-                        try
-                        {
-                            logger.Warn($"Auto-leave skipped: missing playerId (matchmakingId: {matchmakingId
-                            }). Provide ?playerId=... or ensure join cookie is present.");
-                        }
-                        catch
-                        {
-                        }
-
-                        return;
-                    }
-
-                    var cmd = new App.Application.UseCase.Matchmaking.LeaveMatchmaking.Command(matchmakingId,
-                        effectivePlayerId);
-                    commandBus.SendAsync(cmd, CancellationToken.None).FireAndForget(logger);
-                }
-                catch (Exception e)
-                {
-                    try
-                    {
-                        logger.Warn($"Auto-leave on SSE disconnect failed during scheduling: {e.Message
-                        } (matchmakingId: {matchmakingId}, playerId: {effectivePlayerId})");
-                    }
-                    catch
-                    {
-                        /* swallow logging issues */
-                    }
-                }
+                // Auto-leave disabled for now – reconnects were kicking players out
+                logger.Info($"SSE closed for matchmaking {matchmakingId}, player {effectivePlayerId}. Keeping player in pool.");
             });
-
+            
             await Task.Delay(-1, ctx.RequestAborted);
         })
     .DisableRequestTimeout()
