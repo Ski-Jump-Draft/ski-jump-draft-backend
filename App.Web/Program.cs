@@ -133,7 +133,7 @@ builder.Services.AddRateLimiter(options =>
                 TokensPerPeriod = 1,
                 ReplenishmentPeriod = TimeSpan.FromSeconds(1),
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = 0,
+                QueueLimit = 6,
                 AutoReplenishment = true
             }));
 
@@ -142,10 +142,10 @@ builder.Services.AddRateLimiter(options =>
         partitionKey: GetIp(ctx),
         factory: _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 5,
+            PermitLimit = 50,
             Window = TimeSpan.FromSeconds(10),
             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-            QueueLimit = 0
+            QueueLimit = 6
         }));
 
     // Limit picks to reduce spamming
@@ -153,11 +153,11 @@ builder.Services.AddRateLimiter(options =>
         partitionKey: GetIp(ctx),
         factory: _ => new SlidingWindowRateLimiterOptions
         {
-            PermitLimit = 20,
+            PermitLimit = 50,
             Window = TimeSpan.FromSeconds(10),
             SegmentsPerWindow = 5,
             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-            QueueLimit = 0
+            QueueLimit = 6
         }));
 
     // Concurrency limit for SSE/SignalR connections per IP
@@ -165,9 +165,9 @@ builder.Services.AddRateLimiter(options =>
         partitionKey: GetIp(ctx),
         factory: _ => new ConcurrencyLimiterOptions
         {
-            PermitLimit = 3,
+            PermitLimit = 50,
             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-            QueueLimit = 0
+            QueueLimit = 6
         }));
 });
 
