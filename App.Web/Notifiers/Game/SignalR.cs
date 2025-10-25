@@ -6,11 +6,13 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace App.Web.Notifiers.Game;
 
-public class SignalRGameNotifier(IHubContext<GameHub> hub, IMyLogger logger) : IGameNotifier
+public class SignalRGameNotifier(IHubContext<GameHub> hub, IMyLogger logger, App.Web.Security.IGamePlayerMappingStore mappingStore) : IGameNotifier
 {
     public Task GameStartedAfterMatchmaking(Guid matchmakingId, Guid gameId,
         Dictionary<Guid, Guid> playersMapping)
     {
+        // store mapping so web layer can validate tokens against either game or matchmaking tokens
+        mappingStore.Store(matchmakingId, gameId, playersMapping);
         return hub.Clients.Group(GameHub.GroupNameForMatchmaking(matchmakingId))
             .SendAsync("GameStartedAfterMatchmaking",
                 new { MatchmakingId = matchmakingId, GameId = gameId, PlayersMapping = playersMapping });

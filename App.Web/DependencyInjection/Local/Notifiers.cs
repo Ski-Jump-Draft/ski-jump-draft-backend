@@ -20,7 +20,10 @@ public static class Notifiers
             var logger = sp.GetRequiredService<IMyLogger>();
             var myPlayer = sp.GetRequiredService<IMyPlayer>();
             IGameNotifier signalRNotifier =
-                new Web.Notifiers.Game.SignalRGameNotifier(sp.GetRequiredService<IHubContext<GameHub>>(), logger);
+                new Web.Notifiers.Game.SignalRGameNotifier(
+                    sp.GetRequiredService<IHubContext<GameHub>>(),
+                    logger,
+                    sp.GetRequiredService<App.Web.Security.IGamePlayerMappingStore>());
 
             IGameNotifier actionNotifier = new ActionGameNotifier(gameStartedAfterMatchmakingAction:
                 (matchmakingId, gameId, playersMapping) =>

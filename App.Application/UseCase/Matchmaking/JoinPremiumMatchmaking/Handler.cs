@@ -51,7 +51,7 @@ public class Handler(
         var player = new Domain.Matchmaking.Player(PlayerId.NewPlayerId(guid.NewGuid()), nick, joinDateTime);
 
         var configs = await premiumMatchmakingConfigurationStorage.PremiumMatchmakingConfigs;
-        logger.Info("Premium matchmaking configs: " + string.Join("  |  ", configs) + "");
+        logger.Info($"Premium matchmaking configs loaded: {configs.Count}");
 
         var passwordIsValid =
             await premiumMatchmakingConfigurationStorage.PremiumMatchmakingPasswordIsValid(command.Password);
@@ -63,8 +63,7 @@ public class Handler(
         var gameAlreadyRunsByPremiumMatchmaking =
             await premiumMatchmakingGames.GameRunsByPremiumMatchmaking(command.Password);
 
-        logger.Info($"Game already run by premium matchmaking? (password= {command.Password}): {
-            gameAlreadyRunsByPremiumMatchmaking}");
+        logger.Info($"Game already running for premium room? {gameAlreadyRunsByPremiumMatchmaking}");
 
         if (gameAlreadyRunsByPremiumMatchmaking)
         {

@@ -16,7 +16,7 @@ public static class DependencyInjection
         Mode mode, IHostEnvironment env)
     {
         services.AddAcl().AddApplication().AddCommanding().AddMappers().AddStorages(config)
-            .AddUtilities().AddBot().AddJson().AddTelemetry(config, env);
+            .AddUtilities().AddBot().AddJson().AddTelemetry(config, env).AddSecurity(config);
         services.AddMemoryCache();
 
         switch (mode)

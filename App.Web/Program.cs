@@ -199,15 +199,9 @@ app.Use(async (context, next) =>
 });
 
 app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
-        async (Guid matchmakingId, Guid? playerId, HttpContext ctx, ISseHub hub, ICommandBus commandBus,
-            IMyLogger logger) =>
+        async (Guid matchmakingId, Guid? playerId, string? sig, HttpContext ctx, ISseHub hub, ICommandBus commandBus,
+            IMyLogger logger, App.Web.Security.IPlayerTokenService tokenService) =>
         {
-            ctx.Response.ContentType = "text/event-stream; charset=utf-8";
-            ctx.Response.Headers["Cache-Control"] = "no-store, no-transform";
-            ctx.Response.Headers["X-Accel-Buffering"] = "no"; // disable buffering for some proxies
-            ctx.Response.Headers["Content-Encoding"] = "identity"; // prevent proxy compression of SSE
-            ctx.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
-
             // Resolve effective playerId: prefer query, fallback to cookie set on join
             Guid effectivePlayerId = playerId ?? Guid.Empty;
             if (effectivePlayerId == Guid.Empty)
@@ -229,6 +223,26 @@ app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
                 }
             }
 
+            // Verify token before subscribing
+            var token = sig;
+            if (string.IsNullOrWhiteSpace(token) && ctx.Request.Cookies.TryGetValue("mm_token", out var cookieSig))
+            {
+                token = cookieSig;
+            }
+            if (effectivePlayerId == Guid.Empty || string.IsNullOrWhiteSpace(token) ||
+                !tokenService.VerifyMatchmaking(matchmakingId, effectivePlayerId, token))
+            {
+                ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
+
+            // authorized: set SSE headers and subscribe
+            ctx.Response.ContentType = "text/event-stream; charset=utf-8";
+            ctx.Response.Headers["Cache-Control"] = "no-store, no-transform";
+            ctx.Response.Headers["X-Accel-Buffering"] = "no"; // disable buffering for some proxies
+            ctx.Response.Headers["Content-Encoding"] = "identity"; // prevent proxy compression of SSE
+            ctx.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
+
             hub.Subscribe(matchmakingId, ctx.Response, ctx.RequestAborted);
 
             // When the SSE connection is aborted (client disconnects), auto-leave the matchmaking
@@ -236,20 +250,6 @@ app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
             {
                 try
                 {
-                    if (effectivePlayerId == Guid.Empty)
-                    {
-                        try
-                        {
-                            logger.Warn($"Auto-leave skipped: missing playerId (matchmakingId: {matchmakingId
-                            }). Provide ?playerId=... or ensure join cookie is present.");
-                        }
-                        catch
-                        {
-                        }
-
-                        return;
-                    }
-
                     var cmd = new App.Application.UseCase.Matchmaking.LeaveMatchmaking.Command(matchmakingId,
                         effectivePlayerId);
                     commandBus.SendAsync(cmd, CancellationToken.None).FireAndForget(logger);
@@ -277,6 +277,7 @@ app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
 app.MapPost("/matchmaking/join",
         async (string nick, HttpContext ctx, [FromServices] ICommandBus commandBus,
             [FromServices] App.Application.Utility.IMyLogger myLogger,
+            [FromServices] App.Web.Security.IPlayerTokenService tokenService,
             CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(nick) || nick.Length > 64)
@@ -304,9 +305,11 @@ app.MapPost("/matchmaking/join",
                     Path = "/"
                 };
                 ctx.Response.Cookies.Append("mm_player", $"{matchmakingId}:{playerId}", cookieOptions);
+                var mmToken = tokenService.SignMatchmaking(matchmakingId, playerId);
+                ctx.Response.Cookies.Append("mm_token", mmToken, cookieOptions);
 
                 return Results.Ok(new
-                    { MatchmakingId = matchmakingId, CorrectedNick = correctedNick, PlayerId = playerId });
+                    { MatchmakingId = matchmakingId, CorrectedNick = correctedNick, PlayerId = playerId, AuthToken = mmToken });
             }
             catch (App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.MultipleGamesNotSupportedException)
             {
@@ -338,6 +341,7 @@ app.MapPost("/matchmaking/join",
 app.MapPost("/matchmaking/joinPremium",
         async (string nick, string password, HttpContext ctx, [FromServices] ICommandBus commandBus,
             [FromServices] App.Application.Utility.IMyLogger myLogger,
+            [FromServices] App.Web.Security.IPlayerTokenService tokenService,
             CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(nick) || nick.Length > 64)
@@ -373,9 +377,11 @@ app.MapPost("/matchmaking/joinPremium",
                     Path = "/"
                 };
                 ctx.Response.Cookies.Append("mm_player", $"{matchmakingId}:{playerId}", cookieOptions);
+                var mmToken = tokenService.SignMatchmaking(matchmakingId, playerId);
+                ctx.Response.Cookies.Append("mm_token", mmToken, cookieOptions);
 
                 return Results.Ok(new
-                    { MatchmakingId = matchmakingId, CorrectedNick = correctedNick, PlayerId = playerId });
+                    { MatchmakingId = matchmakingId, CorrectedNick = correctedNick, PlayerId = playerId, AuthToken = mmToken });
             }
             catch (App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.InvalidPasswordException)
             {
@@ -410,11 +416,17 @@ app.MapPost("/matchmaking/joinPremium",
     .WithRequestTimeout(TimeSpan.FromSeconds(8));
 
 app.MapDelete("/matchmaking/leave",
-    async (Guid matchmakingId, Guid playerId, [FromServices] ICommandBus commandBus, [FromServices] IMyLogger logger,
-        CancellationToken ct) =>
+    async (Guid matchmakingId, Guid playerId, HttpContext ctx, [FromServices] ICommandBus commandBus, [FromServices] IMyLogger logger,
+        [FromServices] App.Web.Security.IPlayerTokenService tokenService, CancellationToken ct) =>
     {
         try
         {
+            var token = ctx.Request.Headers["X-Player-Auth"].ToString();
+            if (string.IsNullOrWhiteSpace(token) || !tokenService.VerifyMatchmaking(matchmakingId, playerId, token))
+            {
+                return Results.Unauthorized();
+            }
+
             var command = new App.Application.UseCase.Matchmaking.LeaveMatchmaking.Command(matchmakingId, playerId);
             await commandBus
                 .SendAsync(command, ct);
@@ -423,8 +435,7 @@ app.MapDelete("/matchmaking/leave",
         catch (Exception e)
         {
             logger.Error(
-                $"Error during leaving a matchmaking: {e.Message} (matchmakingId: {matchmakingId}, playerId: {playerId
-                }");
+                $"Error during leaving a matchmaking: {e.Message} (matchmakingId: {matchmakingId}, playerId: {playerId}");
             return Results.Problem("Could not leave");
         }
     });
@@ -451,10 +462,32 @@ app.MapGet("/matchmaking",
     });
 
 app.MapPost("/game/{gameId:guid}/pick",
-        async (Guid gameId, Guid playerId, Guid jumperId, [FromServices] ICommandBus commandBus,
+        async (Guid gameId, Guid playerId, Guid jumperId, HttpContext ctx, [FromServices] ICommandBus commandBus,
             [FromServices] App.Domain.Game.IGames repo, [FromServices] App.Application.Utility.IMyLogger myLogger,
+            [FromServices] App.Web.Security.IPlayerTokenService tokenService,
+            [FromServices] App.Web.Security.IGamePlayerMappingStore mappingStore,
             CancellationToken ct) =>
         {
+            // Auth: require token bound to matchmakingId/playerId. Accept either a valid game token or a matchmaking token where mapping[playerId_mm] == playerId_game
+            var token = ctx.Request.Headers["X-Player-Auth"].ToString();
+            if (string.IsNullOrWhiteSpace(token)) return Results.Unauthorized();
+
+            // try game token first
+            var authorized = tokenService.VerifyGame(gameId, playerId, token);
+            if (!authorized)
+            {
+                // try matchmaking token using mapping
+                if (mappingStore.TryGetByGame(gameId, out var mmId, out var map))
+                {
+                    var mmPlayer = map.FirstOrDefault(kv => kv.Value == playerId).Key;
+                    if (mmPlayer != Guid.Empty)
+                    {
+                        authorized = tokenService.VerifyMatchmaking(mmId, mmPlayer, token);
+                    }
+                }
+            }
+            if (!authorized) return Results.Unauthorized();
+
             var command = new App.Application.UseCase.Game.PickJumper.Command(gameId, playerId, jumperId);
             try
             {

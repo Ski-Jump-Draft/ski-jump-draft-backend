@@ -114,10 +114,8 @@ public class Handler(
             };
             if (belongsToPremiumMatchmaking)
             {
-                var premiumMatchmakingPassword = await premiumMatchmakingGames.GetPassword(command.MatchmakingId);
-                if (premiumMatchmakingPassword is null)
-                    throw new Exception("Password is null. Some conflict. It should not be reached.");
-                telemetryData.Add("PremiumMatchmakingPassword", premiumMatchmakingPassword);
+                // Do not log or store premium matchmaking password in telemetry
+                telemetryData.Add("PremiumMatchmaking", true);
             }
 
             await telemetry.Record(new GameTelemetryEvent("GameStarted", gameGuid, command.MatchmakingId, null,

@@ -19,7 +19,7 @@ public static class Notifiers
         {
             var logger = sp.GetRequiredService<IMyLogger>();
             IGameNotifier signalRNotifier =
-                new Web.Notifiers.Game.SignalRGameNotifier(sp.GetRequiredService<IHubContext<GameHub>>(), logger);
+                new Web.Notifiers.Game.SignalRGameNotifier(sp.GetRequiredService<IHubContext<GameHub>>(), logger, sp.GetRequiredService<App.Web.Security.IGamePlayerMappingStore>());
 
             return new ComposeGameNotifier([signalRNotifier]);
         });
