@@ -34,7 +34,10 @@ public static class Archives
                     App.Infrastructure.Archive.DraftTurnIndexes.InMemoryDraftTurnIndexesArchive>();
         }
 
-        services.AddSingleton<App.Application.Game.GameWind.IGameWind, App.Infrastructure.GameWind.InMemory>();
+        services.AddSingleton<App.Application.Game.GameWind.IGameWind, Infrastructure.GameWind.InMemory>();
+        services
+            .AddSingleton<App.Application.Game.PassPicksCount.IDraftPassPicksCountArchive,
+                Infrastructure.Archive.DraftPassPicksCount.InMemory>();
 
         return services;
     }

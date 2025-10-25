@@ -44,8 +44,7 @@ public class Handler(
 
         var game = await games.GetById(GameId.NewGameId(command.GameId), ct)
             .AwaitOrWrap(_ => new IdNotFoundException(command.GameId));
-
-
+        
         var isAppropriateTurn = game.CurrentTurnInDraft.IsSome() &&
                                 (DraftModule.TurnIndexModule.value(game.CurrentTurnInDraft.Value.Index) ==
                                  command.TurnIndex);

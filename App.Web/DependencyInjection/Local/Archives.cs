@@ -15,6 +15,9 @@ public static class Archives
         services
             .AddSingleton<App.Application.Game.DraftTurnIndexes.IDraftTurnIndexesArchive,
                 App.Infrastructure.Archive.DraftTurnIndexes.InMemoryDraftTurnIndexesArchive>();
+        services
+            .AddSingleton<App.Application.Game.PassPicksCount.IDraftPassPicksCountArchive,
+                Infrastructure.Archive.DraftPassPicksCount.InMemory>();
         return services;
     }
 }

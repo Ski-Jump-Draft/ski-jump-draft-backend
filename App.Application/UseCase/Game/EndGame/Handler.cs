@@ -3,6 +3,7 @@ using App.Application.Commanding;
 using App.Application.Exceptions;
 using App.Application.Extensions;
 using App.Application.Game.DraftTurnIndexes;
+using App.Application.Game.PassPicksCount;
 using App.Application.Game.Ranking;
 using App.Application.Matchmaking;
 using App.Application.Messaging.Notifiers;
@@ -30,7 +31,8 @@ public class Handler(
     IPremiumMatchmakingGames premiumMatchmakingGames,
     ITelemetry telemetry,
     IClock clock,
-    IDraftTurnIndexesArchive draftTurnIndexesArchive)
+    IDraftTurnIndexesArchive draftTurnIndexesArchive,
+    IDraftPassPicksCountArchive draftPassPicksCountArchive)
     : ICommandHandler<Command, Result>
 {
     public async Task<Result> HandleAsync(Command command, CancellationToken ct)
@@ -78,6 +80,7 @@ public class Handler(
     private async Task<List<TelemetryEndedGamePlayerDto>> CreateEndedGamePlayersForTelemetry(Guid gameId,
         Domain.Game.Ranking ranking)
     {
+        var passPicksCountByPlayer = await draftPassPicksCountArchive.GetDictionary(gameId);
         var turnIndexesDtos = await draftTurnIndexesArchive.GetAsync(gameId);
         var dtoByPlayerId = turnIndexesDtos.ToDictionary(dto => dto.gamePlayerId, dto => dto);
 
@@ -87,10 +90,11 @@ public class Handler(
             var (position, points) = keyValuePair.Value;
 
             var turnIndexesDto = dtoByPlayerId[playerId.Item];
+            var passPicksCount = passPicksCountByPlayer[playerId.Item];
 
             return new TelemetryEndedGamePlayerDto(playerId.Item, RankingModule.PointsModule.value(points),
                 RankingModule.PositionModule.value(position), turnIndexesDto.FixedTurnIndex,
-                turnIndexesDto.RandomTurnIndexes);
+                turnIndexesDto.RandomTurnIndexes, passPicksCount);
         }).ToList();
 
         return dtosList;
@@ -101,6 +105,7 @@ public class Handler(
         int Points,
         int Position,
         int? DraftFixedTurnIndex, // If the draft order policy is not random
-        List<int>? DraftRandomTurnIndexes // If the draft order policy is random
+        List<int>? DraftRandomTurnIndexes, // If the draft order policy is random
+        int PassPicksCount
     );
 }
