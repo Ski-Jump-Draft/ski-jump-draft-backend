@@ -114,7 +114,7 @@ public class Handler(
             };
             if (belongsToPremiumMatchmaking)
             {
-                var premiumMatchmakingPassword = premiumMatchmakingGames.GetPassword(command.MatchmakingId);
+                var premiumMatchmakingPassword = await premiumMatchmakingGames.GetPassword(command.MatchmakingId);
                 if (premiumMatchmakingPassword is null)
                     throw new Exception("Password is null. Some conflict. It should not be reached.");
                 telemetryData.Add("PremiumMatchmakingPassword", premiumMatchmakingPassword);
