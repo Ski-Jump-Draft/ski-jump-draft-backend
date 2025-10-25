@@ -1,30 +1,24 @@
 using System.Security.Cryptography;
 using System.Text;
+using App.Application.Utility;
+using Convert = System.Convert;
 
 namespace App.Web.Security;
 
-public class HmacPlayerTokenService : IPlayerTokenService
+public class HmacPlayerTokenService(string secret, IMyLogger logger) : IPlayerTokenService
 {
-    private readonly byte[] _key;
-
-    public HmacPlayerTokenService(string secret)
-    {
-        if (string.IsNullOrWhiteSpace(secret))
-        {
-            // In absence of configured secret, generate ephemeral key
-            _key = RandomNumberGenerator.GetBytes(32);
-        }
-        else
-        {
-            _key = Encoding.UTF8.GetBytes(secret);
-        }
-    }
+    private readonly byte[] _key = string.IsNullOrWhiteSpace(secret)
+        ? RandomNumberGenerator.GetBytes(32)
+        : Encoding.UTF8.GetBytes(secret);
 
     public string SignMatchmaking(Guid matchmakingId, Guid playerId)
         => Sign("mm", matchmakingId, playerId);
 
     public bool VerifyMatchmaking(Guid matchmakingId, Guid playerId, string token)
-        => Verify("mm", matchmakingId, playerId, token);
+    {
+        logger.Info($"Verifying {matchmakingId}/{playerId}: token prefix {token[..10]}...");
+        return Verify("mm", matchmakingId, playerId, token);
+    }
 
     public string SignGame(Guid gameId, Guid playerId)
         => Sign("game", gameId, playerId);
@@ -69,6 +63,7 @@ public class HmacPlayerTokenService : IPlayerTokenService
             case 2: s += "=="; break;
             case 3: s += "="; break;
         }
+
         return Convert.FromBase64String(s);
     }
 }
