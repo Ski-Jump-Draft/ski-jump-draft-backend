@@ -90,7 +90,7 @@ public class Handler(
             var (position, points) = keyValuePair.Value;
 
             var turnIndexesDto = dtoByPlayerId[playerId.Item];
-            var passPicksCount = passPicksCountByPlayer[playerId.Item];
+            passPicksCountByPlayer.TryGetValue(playerId.Item, out var passPicksCount);
 
             return new TelemetryEndedGamePlayerDto(playerId.Item, RankingModule.PointsModule.value(points),
                 RankingModule.PositionModule.value(position), turnIndexesDto.FixedTurnIndex,

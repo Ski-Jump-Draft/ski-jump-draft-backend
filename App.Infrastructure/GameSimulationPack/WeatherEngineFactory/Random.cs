@@ -11,11 +11,11 @@ public class Random(IRandom random, IMyLogger logger) : IWeatherEngineFactory
     {
         var startingWind = SampleStartingWind(random);
 
-        var stableWindChangeStdDev = SampleStableStdDevTargeted(random);      // mean ~ 0.05
-        var windAdditionStdDev     = SampleWindAdditionStdDev_Mixture(random); // częściej duże, ale nadal spoko
+        var stableWindChangeStdDev = SampleStableStdDevTargeted(random); // mean ~ 0.05
+        var windAdditionStdDev = SampleWindAdditionStdDev_Mixture(random); // częściej duże, ale nadal spoko
 
         stableWindChangeStdDev = Math.Max(stableWindChangeStdDev, 1e-6);
-        windAdditionStdDev     = Math.Max(windAdditionStdDev, 1e-6);
+        windAdditionStdDev = Math.Max(windAdditionStdDev, 1e-6);
 
         var configuration = new Configuration(startingWind, stableWindChangeStdDev, windAdditionStdDev);
         logger.Info($"Creating a weather engine with configuration: {configuration}");
@@ -32,20 +32,27 @@ public class Random(IRandom random, IMyLogger logger) : IWeatherEngineFactory
             // high
             return random.Gaussian(0, 1.25);
         }
+
         u -= 0.18;
         if (u < 0.29)
         {
             // mid2 (σ=0.95) - truncation |w| <= 1.9 (akceptacja ~97–98%, więc pętla szybka)
             double x;
-            do { x = random.Gaussian(0, 0.95); } while (Math.Abs(x) > 1.9);
+            do
+            {
+                x = random.Gaussian(0, 0.95);
+            } while (Math.Abs(x) > 1.9);
+
             return x;
         }
+
         u -= 0.29;
         if (u < 0.285)
         {
             // mid1
             return random.Gaussian(0, 0.80);
         }
+
         // low
         return random.Gaussian(0, 0.65);
     }
@@ -61,8 +68,9 @@ public class Random(IRandom random, IMyLogger logger) : IWeatherEngineFactory
     private static double SampleWindAdditionStdDev_Mixture(IRandom random)
     {
         var heavy = random.NextDouble() < 0.15;
-        var x = heavy ? SampleBetaInt(random, 2, 4)
-                      : SampleBetaInt(random, 2, 10);
+        var x = heavy
+            ? SampleBetaInt(random, 2, 4)
+            : SampleBetaInt(random, 2, 10);
         return 1.2 * x;
     }
 
@@ -78,7 +86,8 @@ public class Random(IRandom random, IMyLogger logger) : IWeatherEngineFactory
     private static double SampleExp1(IRandom random)
     {
         double u;
-        do u = random.NextDouble(); while (u <= 0.0);
+        do u = random.NextDouble();
+        while (u <= 0.0);
         return -Math.Log(u);
     }
 }
