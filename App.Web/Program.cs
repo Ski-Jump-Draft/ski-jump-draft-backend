@@ -226,18 +226,35 @@ app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
 
             // Verify token before subscribing
             var token = sig;
+            var tokenSource = "query";
             if (string.IsNullOrWhiteSpace(token) && ctx.Request.Cookies.TryGetValue("mm_token", out var cookieSig))
             {
                 token = cookieSig;
+                tokenSource = "cookie";
             }
 
-            if (effectivePlayerId == Guid.Empty || string.IsNullOrWhiteSpace(token) ||
-                !tokenService.VerifyMatchmaking(matchmakingId, effectivePlayerId, token))
+            var tokenPrefix = string.IsNullOrWhiteSpace(token) ? "<none>" : (token!.Length <= 12 ? token : token[..12] + "…");
+            if (effectivePlayerId == Guid.Empty)
             {
+                logger.Warn($"SSE auth failed: missing playerId (mmId={matchmakingId}), tokenSrc={tokenSource}, tokenPrefix={tokenPrefix}");
+                ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                logger.Warn($"SSE auth failed: missing token (mmId={matchmakingId}, playerId={effectivePlayerId})");
+                ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return;
+            }
+            var ok = tokenService.VerifyMatchmaking(matchmakingId, effectivePlayerId, token!);
+            if (!ok)
+            {
+                logger.Warn($"SSE auth failed: token verification failed (mmId={matchmakingId}, playerId={effectivePlayerId}, src={tokenSource}, prefix={tokenPrefix})");
                 ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 return;
             }
 
+            logger.Info($"SSE auth OK: subscribing (mmId={matchmakingId}, playerId={effectivePlayerId}, src={tokenSource})");
             // authorized: set SSE headers and subscribe
             ctx.Response.ContentType = "text/event-stream; charset=utf-8";
             ctx.Response.Headers["Cache-Control"] = "no-store, no-transform";
@@ -309,6 +326,9 @@ app.MapPost("/matchmaking/join",
                 ctx.Response.Cookies.Append("mm_player", $"{matchmakingId}:{playerId}", cookieOptions);
                 var mmToken = tokenService.SignMatchmaking(matchmakingId, playerId);
                 ctx.Response.Cookies.Append("mm_token", mmToken, cookieOptions);
+
+                var tp = mmToken.Length <= 12 ? mmToken : mmToken[..12] + "…";
+                myLogger.Info($"Join OK: mmId={matchmakingId}, playerId={playerId}, nick='{correctedNick}', tokenPrefix={tp}, https={isHttps}, sameSite={cookieOptions.SameSite}");
 
                 return Results.Ok(new
                 {
@@ -384,6 +404,9 @@ app.MapPost("/matchmaking/joinPremium",
                 ctx.Response.Cookies.Append("mm_player", $"{matchmakingId}:{playerId}", cookieOptions);
                 var mmToken = tokenService.SignMatchmaking(matchmakingId, playerId);
                 ctx.Response.Cookies.Append("mm_token", mmToken, cookieOptions);
+
+                var tp = mmToken.Length <= 12 ? mmToken : mmToken[..12] + "…";
+                myLogger.Info($"JoinPremium OK: mmId={matchmakingId}, playerId={playerId}, nick='{correctedNick}', tokenPrefix={tp}, https={isHttps}, sameSite={cookieOptions.SameSite}");
 
                 return Results.Ok(new
                 {
