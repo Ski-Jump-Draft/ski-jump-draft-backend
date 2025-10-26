@@ -271,24 +271,38 @@ app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
             {
                 try
                 {
-                    var left = sseTracker.Decrement(matchmakingId, effectivePlayerId);
-                    if (left <= 0)
+                    var leftAfterDec = sseTracker.Decrement(matchmakingId, effectivePlayerId);
+                    var correlationId = Guid.NewGuid();
+                    logger.Info($"SSE disconnected: scheduling auto-leave check in 250ms (mmId={matchmakingId}, playerId={effectivePlayerId}, leftAfterDec={leftAfterDec}, corr={correlationId})");
+
+                    _ = Task.Run(async () =>
                     {
-                        var cmd = new App.Application.UseCase.Matchmaking.LeaveMatchmaking.Command(matchmakingId,
-                            effectivePlayerId);
-                        logger.Info($"SSE disconnected: issuing auto-leave (mmId={matchmakingId}, playerId={effectivePlayerId})");
-                        commandBus.SendAsync(cmd, CancellationToken.None).FireAndForget(logger);
-                    }
-                    else
-                    {
-                        logger.Info($"SSE disconnected: skipping auto-leave because {left} connection(s) remain for (mmId={matchmakingId}, playerId={effectivePlayerId})");
-                    }
+                        try
+                        {
+                            await Task.Delay(250);
+                            var current = sseTracker.GetCount(matchmakingId, effectivePlayerId);
+                            if (current <= 0)
+                            {
+                                var cmd = new App.Application.UseCase.Matchmaking.LeaveMatchmaking.Command(matchmakingId, effectivePlayerId);
+                                logger.Info($"SSE auto-leave confirmed (no active SSE). Issuing leave (mmId={matchmakingId}, playerId={effectivePlayerId}, corr={correlationId})");
+                                commandBus.SendAsync(cmd, CancellationToken.None).FireAndForget(logger);
+                            }
+                            else
+                            {
+                                logger.Info($"SSE auto-leave skipped: {current} connection(s) active (mmId={matchmakingId}, playerId={effectivePlayerId}, corr={correlationId})");
+                            }
+                        }
+                        catch (Exception delayedEx)
+                        {
+                            try { logger.Warn($"Auto-leave delayed check failed: {delayedEx.Message} (mmId={matchmakingId}, playerId={effectivePlayerId}, corr={correlationId})"); } catch { }
+                        }
+                    });
                 }
                 catch (Exception e)
                 {
                     try
                     {
-                        logger.Warn($"Auto-leave on SSE disconnect failed during scheduling: {e.Message} (matchmakingId: {matchmakingId}, playerId: {effectivePlayerId})");
+                        logger.Warn($"Auto-leave on SSE disconnect failed during scheduling: {e.Message} (matchmakingId: {matchmakingId}, playerId={effectivePlayerId})");
                     }
                     catch
                     {

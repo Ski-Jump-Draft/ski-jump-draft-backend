@@ -8,6 +8,8 @@ public interface ISseConnectionTracker
     int Increment(Guid matchmakingId, Guid playerId);
     // Decrement active connections for (mmId, playerId) and return new count (never below 0)
     int Decrement(Guid matchmakingId, Guid playerId);
+    // Get current active connections count for (mmId, playerId)
+    int GetCount(Guid matchmakingId, Guid playerId);
 }
 
 public class InMemorySseConnectionTracker : ISseConnectionTracker
@@ -43,5 +45,12 @@ public class InMemorySseConnectionTracker : ISseConnectionTracker
             }
             return 0;
         }
+    }
+
+    public int GetCount(Guid matchmakingId, Guid playerId)
+    {
+        if (_counts.TryGetValue((matchmakingId, playerId), out var val))
+            return val;
+        return 0;
     }
 }
