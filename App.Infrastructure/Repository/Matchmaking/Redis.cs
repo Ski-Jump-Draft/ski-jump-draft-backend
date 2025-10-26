@@ -131,6 +131,7 @@ public class Redis(IConnectionMultiplexer redis, IMyLogger logger) : IMatchmakin
         TimeSpan ttl,
         CancellationToken ct)
     {
+        logger.Debug($"Redis MM:GetMatchmakingsFromSetOptimized start cacheKey={cacheKey} setKey={setKey}");
         if (_cache.TryGetValue(cacheKey, out IEnumerable<Domain.Matchmaking.Matchmaking>? cached))
             return cached!;
 
@@ -244,9 +245,12 @@ public class Redis(IConnectionMultiplexer redis, IMyLogger logger) : IMatchmakin
             var dto = MatchmakingDtoMapper.ToRedis(matchmaking);
             var json = JsonSerializer.Serialize(dto);
             var idStr = dto.Id.ToString();
+            var playersCount = dto.Players.Count;
+            var status = dto.Status;
 
             if (matchmaking.Status_.IsRunning)
             {
+                logger.Debug($"Redis MM:Add live id={id} status={status} players={playersCount} key={LiveKey(id)} ttl=120s");
                 await Task.WhenAll(
                     _db.StringSetAsync(LiveKey(id), json, TimeSpan.FromSeconds(120)),
                     _db.SetAddAsync(LiveSetKey, idStr)
@@ -254,6 +258,7 @@ public class Redis(IConnectionMultiplexer redis, IMyLogger logger) : IMatchmakin
             }
             else
             {
+                logger.Debug($"Redis MM:Add archive id={id} status={status} players={playersCount} key={ArchiveKey(id)}");
                 var tran = _db.CreateTransaction();
                 tran.StringSetAsync(ArchiveKey(id), json);
                 tran.SetAddAsync(ArchiveSetKey, idStr);
@@ -266,6 +271,7 @@ public class Redis(IConnectionMultiplexer redis, IMyLogger logger) : IMatchmakin
             // czyścimy cache po zmianie
             _cache.Remove("GetInProgress");
             _cache.Remove("GetEnded");
+            _cache.Remove($"matchmaking:{id}");
         }
         catch (ObjectDisposedException ex)
         {
@@ -295,16 +301,20 @@ public class Redis(IConnectionMultiplexer redis, IMyLogger logger) : IMatchmakin
         if (_cache.TryGetValue(cacheKey, out FSharpOption<Domain.Matchmaking.Matchmaking>? cached))
             return cached!;
 
-        var values = await _db.StringGetAsync([LiveKey(id.Item), ArchiveKey(id.Item)]);
+        var liveKey = LiveKey(id.Item);
+        var archiveKey = ArchiveKey(id.Item);
+        var values = await _db.StringGetAsync([liveKey, archiveKey]);
         var json = values.FirstOrDefault(v => v.HasValue);
         if (!json.HasValue)
         {
+            logger.Debug($"Redis MM:GetById miss id={id.Item} keys=[{liveKey}|{archiveKey}] (cache miss)");
             _cache.Set(cacheKey, FSharpOption<Domain.Matchmaking.Matchmaking>.None, TimeSpan.FromSeconds(3));
             throw new KeyNotFoundException($"Matchmaking {id} not found");
         }
 
         var dto = JsonSerializer.Deserialize<MatchmakingDto>(json!) ?? throw new Exception("Failed to deserialize DTO");
         var domain = dto.ToDomain();
+        logger.Info($"Redis MM:GetById hit id={id.Item} status={dto.Status} players={dto.Players.Count}");
         _cache.Set(cacheKey, domain, TimeSpan.FromMilliseconds(100));
         return domain;
     }

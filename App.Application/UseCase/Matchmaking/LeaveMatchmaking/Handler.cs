@@ -64,7 +64,10 @@ public class Handler(
             var error = matchmakingAfterLeaveResult.ErrorValue;
             if (error.IsNotInMatchmaking)
             {
-                throw new IsNotInMatchmakingException(command.PlayerId, command.MatchmakingId);
+                // Make leave idempotent: if the player is already not in matchmaking, treat as success.
+                // This can happen when manual leave and auto-leave (SSE disconnect) race each other.
+                // We keep system robust and user-friendly by not failing in this expected case.
+                return;
             }
 
             throw new Exception($"Unknown error when leaving matchmaking ({command.MatchmakingId}) by a player({playerId
