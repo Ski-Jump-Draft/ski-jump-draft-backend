@@ -125,18 +125,26 @@ builder.Services.AddRateLimiter(options =>
         }
     }
 
-    // Global token bucket: ~60 requests/minute per IP, steady 1 rps
+    // Global limiter with SignalR hub exempted to avoid 429 during negotiate/reconnect bursts
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(ctx =>
-        RateLimitPartition.GetTokenBucketLimiter(
+    {
+        var path = ctx.Request.Path.Value ?? string.Empty;
+        if (path.StartsWith("/game/hub"))
+        {
+            // Do not apply global limiter to SignalR negotiate/connect endpoints
+            return RateLimitPartition.GetNoLimiter("signalr");
+        }
+        return RateLimitPartition.GetTokenBucketLimiter(
             GetIp(ctx), _ => new TokenBucketRateLimiterOptions
             {
-                TokenLimit = 60,
-                TokensPerPeriod = 1,
+                TokenLimit = 120,
+                TokensPerPeriod = 2,
                 ReplenishmentPeriod = TimeSpan.FromSeconds(1),
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = 0,
                 AutoReplenishment = true
-            }));
+            });
+    });
 
     // Tighter limits for join endpoints to avoid abuse
     options.AddPolicy("join", ctx => RateLimitPartition.GetFixedWindowLimiter(
@@ -161,7 +169,7 @@ builder.Services.AddRateLimiter(options =>
             QueueLimit = 0
         }));
 
-    // Concurrency limit for SSE/SignalR connections per IP
+    // Concurrency limit for SSE connections per IP
     options.AddPolicy("sse-connect", ctx => RateLimitPartition.GetConcurrencyLimiter(
         partitionKey: GetIp(ctx),
         factory: _ => new ConcurrencyLimiterOptions
@@ -169,6 +177,19 @@ builder.Services.AddRateLimiter(options =>
             PermitLimit = 3,
             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
             QueueLimit = 0
+        }));
+
+    // More generous limits for SignalR negotiate/connect bursts per IP
+    options.AddPolicy("signalr-connect", ctx => RateLimitPartition.GetTokenBucketLimiter(
+        partitionKey: GetIp(ctx),
+        factory: _ => new TokenBucketRateLimiterOptions
+        {
+            TokenLimit = 40,
+            TokensPerPeriod = 4,
+            ReplenishmentPeriod = TimeSpan.FromSeconds(1),
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 20,
+            AutoReplenishment = true
         }));
 });
 
@@ -574,7 +595,7 @@ app.MapPost("/game/{gameId:guid}/pick",
 
 app.MapHub<GameHub>("/game/hub")
     .DisableRequestTimeout()
-    .RequireRateLimiting("sse-connect");
+    .RequireRateLimiting("signalr-connect");
 
 app.MapGet("/rankings/weekly-top-jumps",
     async ([FromServices] App.Application.UseCase.Rankings.WeeklyTopJumps.IWeeklyTopJumpsQuery query,

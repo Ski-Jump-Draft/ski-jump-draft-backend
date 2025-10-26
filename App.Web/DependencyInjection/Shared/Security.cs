@@ -14,6 +14,8 @@ public static class Security
         services.AddSingleton<IGamePlayerMappingStore, InMemoryGamePlayerMappingStore>();
         // Track SSE connections per (matchmakingId, playerId) to avoid premature auto-leave on quick reconnects
         services.AddSingleton<App.Web.Sse.ISseConnectionTracker, App.Web.Sse.InMemorySseConnectionTracker>();
+        // Track SignalR connections per (matchmakingId, playerId) to avoid premature auto-leave and duplicated leaves
+        services.AddSingleton<App.Web.SignalR.ISignalRConnectionTracker, App.Web.SignalR.InMemorySignalRConnectionTracker>();
         return services;
     }
 }
