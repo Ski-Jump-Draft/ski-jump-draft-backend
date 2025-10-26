@@ -13,6 +13,7 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Http.Features;
 using Serilog;
 using Serilog.Formatting.Compact;
+using StackExchange.Redis;
 using Results = Microsoft.AspNetCore.Http.Results;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -229,6 +230,7 @@ app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
             {
                 token = cookieSig;
             }
+
             if (effectivePlayerId == Guid.Empty || string.IsNullOrWhiteSpace(token) ||
                 !tokenService.VerifyMatchmaking(matchmakingId, effectivePlayerId, token))
             {
@@ -309,7 +311,10 @@ app.MapPost("/matchmaking/join",
                 ctx.Response.Cookies.Append("mm_token", mmToken, cookieOptions);
 
                 return Results.Ok(new
-                    { MatchmakingId = matchmakingId, CorrectedNick = correctedNick, PlayerId = playerId, AuthToken = mmToken });
+                {
+                    MatchmakingId = matchmakingId, CorrectedNick = correctedNick, PlayerId = playerId,
+                    AuthToken = mmToken
+                });
             }
             catch (App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.MultipleGamesNotSupportedException)
             {
@@ -381,7 +386,10 @@ app.MapPost("/matchmaking/joinPremium",
                 ctx.Response.Cookies.Append("mm_token", mmToken, cookieOptions);
 
                 return Results.Ok(new
-                    { MatchmakingId = matchmakingId, CorrectedNick = correctedNick, PlayerId = playerId, AuthToken = mmToken });
+                {
+                    MatchmakingId = matchmakingId, CorrectedNick = correctedNick, PlayerId = playerId,
+                    AuthToken = mmToken
+                });
             }
             catch (App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.InvalidPasswordException)
             {
@@ -416,7 +424,8 @@ app.MapPost("/matchmaking/joinPremium",
     .WithRequestTimeout(TimeSpan.FromSeconds(8));
 
 app.MapDelete("/matchmaking/leave",
-    async (Guid matchmakingId, Guid playerId, HttpContext ctx, [FromServices] ICommandBus commandBus, [FromServices] IMyLogger logger,
+    async (Guid matchmakingId, Guid playerId, HttpContext ctx, [FromServices] ICommandBus commandBus,
+        [FromServices] IMyLogger logger,
         [FromServices] App.Web.Security.IPlayerTokenService tokenService, CancellationToken ct) =>
     {
         try
@@ -435,7 +444,8 @@ app.MapDelete("/matchmaking/leave",
         catch (Exception e)
         {
             logger.Error(
-                $"Error during leaving a matchmaking: {e.Message} (matchmakingId: {matchmakingId}, playerId: {playerId}");
+                $"Error during leaving a matchmaking: {e.Message} (matchmakingId: {matchmakingId}, playerId: {playerId
+                }");
             return Results.Problem("Could not leave");
         }
     });
@@ -486,6 +496,7 @@ app.MapPost("/game/{gameId:guid}/pick",
                     }
                 }
             }
+
             if (!authorized) return Results.Unauthorized();
 
             var command = new App.Application.UseCase.Game.PickJumper.Command(gameId, playerId, jumperId);
@@ -519,13 +530,20 @@ app.MapHub<GameHub>("/game/hub")
     .RequireRateLimiting("sse-connect");
 
 app.MapGet("/rankings/weekly-top-jumps",
-    async ([FromServices] App.Application.UseCase.Rankings.WeeklyTopJumps.IWeeklyTopJumpsQuery query, CancellationToken ct) =>
+    async ([FromServices] App.Application.UseCase.Rankings.WeeklyTopJumps.IWeeklyTopJumpsQuery query,
+        CancellationToken ct) =>
     {
         var data = await query.GetTop20Last7Days(ct);
         return Results.Ok(data);
     });
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapGet("/health/redis", async (IConnectionMultiplexer connectionMultiplexer) =>
+{
+    var ms = await connectionMultiplexer.GetDatabase().PingAsync();
+    return Results.Ok(new { pingMs = ms.TotalMilliseconds });
+});
+
 
 app.UseRouting();
 

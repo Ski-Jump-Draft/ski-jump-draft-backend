@@ -1,0 +1,25 @@
+# fly.redis.staging.toml
+app = "ski-jump-draft-redis-staging"
+primary_region = "fra"
+
+[build]
+image = "redis:7.4-alpine"
+
+[[mounts]]
+source = "redis_data_staging"
+destination = "/data"
+
+[env]
+REDIS_SAVE = "60 1"
+REDIS_APPENDONLY = "no"
+
+[[services]]
+internal_port = 6379
+protocol = "tcp"
+
+[[services.ports]]
+port = 6379
+
+auto_stop_machines = false
+auto_start_machines = true
+min_machines_running = 1

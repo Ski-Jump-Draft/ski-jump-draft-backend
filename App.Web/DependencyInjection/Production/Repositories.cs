@@ -31,13 +31,16 @@ public static class Repositories
                 var options = new ConfigurationOptions
                 {
                     EndPoints = { { uri.Host, uri.Port } },
-                    User = uri.UserInfo.Split(':')[0],
-                    Password = uri.UserInfo.Split(':')[1],
-                    Ssl = true,
+                    // User = uri.UserInfo.Split(':')[0],
+                    // Password = uri.UserInfo.Split(':')[1],
+                    Ssl = false,
                     AbortOnConnectFail = false,
-                    ConnectTimeout = 10000,
-                    SyncTimeout = 10000,
-                    KeepAlive = 60
+                    ClientName = "ski-jump-draft-backend",
+                    ConnectTimeout = 3000,
+                    SyncTimeout = 3000,
+                    KeepAlive = 15,
+                    ConnectRetry = 3,
+                    ReconnectRetryPolicy = new ExponentialRetry(1000)
                 };
                 
                 var connectionMultiplexer = ConnectionMultiplexer.Connect(options);

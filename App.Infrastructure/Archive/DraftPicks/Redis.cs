@@ -53,17 +53,28 @@ public class Redis(IConnectionMultiplexer redis, IMyLogger logger) : IDraftPicks
         {
             return null;
         }
+        catch (RedisTimeoutException ex)
+        {
+            logger.Warn($"Timeout while getting draft picks for game {gameId}: {ex.Message}");
+            return null;
+        }
+        catch (RedisConnectionException ex)
+        {
+            logger.Warn($"Redis connection issue while getting draft picks for game {gameId}: {ex.Message}");
+            return null;
+        }
     }
 
     private async Task<RedisRepository.GameDto> GetGameDto(Guid gameId, bool searchInArchive)
     {
-        var liveJson = await _db.StringGetAsync(LiveKey(gameId));
+        // Prefer replica for reads to reduce load; Upstash handles routing
+        var liveJson = await _db.StringGetAsync(LiveKey(gameId), CommandFlags.PreferReplica);
         if (liveJson.HasValue)
             return Deserialize(liveJson);
 
         if (!searchInArchive) throw new GameNotFoundException();
 
-        var archiveJson = await _db.StringGetAsync(ArchiveKey(gameId));
+        var archiveJson = await _db.StringGetAsync(ArchiveKey(gameId), CommandFlags.PreferReplica);
         if (archiveJson.HasValue)
             return Deserialize(archiveJson);
 
