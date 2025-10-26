@@ -20,14 +20,12 @@ public static class Repositories
             services.AddSingleton<IConnectionMultiplexer>(sp =>
             {
                 var logger = sp.GetRequiredService<IMyLogger>();
-                var redisConnectionString = configuration["Redis:ConnectionString"]
-                                            ?? throw new InvalidOperationException(
-                                                "Redis connection string not configured");
-                // Console.WriteLine("Redis connection string: " + redisConnectionString);
-
-                // logger.Info("Redis connection string: " + redisConnectionString);
+                var redisConnectionString = configuration["Redis:ConnectionString"];
+                if (!redisConnectionString!.Contains("://"))
+                    redisConnectionString = "redis://" + redisConnectionString;
 
                 var uri = new Uri(redisConnectionString);
+
                 var options = new ConfigurationOptions
                 {
                     EndPoints = { { uri.Host, uri.Port } },
