@@ -201,7 +201,7 @@ app.Use(async (context, next) =>
 
 app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
         async (Guid matchmakingId, Guid? playerId, string? sig, HttpContext ctx, ISseHub hub, ICommandBus commandBus,
-            IMyLogger logger, App.Web.Security.IPlayerTokenService tokenService) =>
+            IMyLogger logger, App.Web.Security.IPlayerTokenService tokenService, App.Web.Sse.ISseConnectionTracker sseTracker) =>
         {
             // Resolve effective playerId: prefer query, fallback to cookie set on join
             Guid effectivePlayerId = playerId ?? Guid.Empty;
@@ -255,6 +255,8 @@ app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
             }
 
             logger.Info($"SSE auth OK: subscribing (mmId={matchmakingId}, playerId={effectivePlayerId}, src={tokenSource})");
+            var afterInc = sseTracker.Increment(matchmakingId, effectivePlayerId);
+            logger.Info($"SSE connections: incremented count for (mmId={matchmakingId}, playerId={effectivePlayerId}) -> {afterInc}");
             // authorized: set SSE headers and subscribe
             ctx.Response.ContentType = "text/event-stream; charset=utf-8";
             ctx.Response.Headers["Cache-Control"] = "no-store, no-transform";
@@ -269,16 +271,24 @@ app.MapGet("/matchmaking/{matchmakingId:guid}/stream",
             {
                 try
                 {
-                    var cmd = new App.Application.UseCase.Matchmaking.LeaveMatchmaking.Command(matchmakingId,
-                        effectivePlayerId);
-                    commandBus.SendAsync(cmd, CancellationToken.None).FireAndForget(logger);
+                    var left = sseTracker.Decrement(matchmakingId, effectivePlayerId);
+                    if (left <= 0)
+                    {
+                        var cmd = new App.Application.UseCase.Matchmaking.LeaveMatchmaking.Command(matchmakingId,
+                            effectivePlayerId);
+                        logger.Info($"SSE disconnected: issuing auto-leave (mmId={matchmakingId}, playerId={effectivePlayerId})");
+                        commandBus.SendAsync(cmd, CancellationToken.None).FireAndForget(logger);
+                    }
+                    else
+                    {
+                        logger.Info($"SSE disconnected: skipping auto-leave because {left} connection(s) remain for (mmId={matchmakingId}, playerId={effectivePlayerId})");
+                    }
                 }
                 catch (Exception e)
                 {
                     try
                     {
-                        logger.Warn($"Auto-leave on SSE disconnect failed during scheduling: {e.Message
-                        } (matchmakingId: {matchmakingId}, playerId: {effectivePlayerId})");
+                        logger.Warn($"Auto-leave on SSE disconnect failed during scheduling: {e.Message} (matchmakingId: {matchmakingId}, playerId: {effectivePlayerId})");
                     }
                     catch
                     {

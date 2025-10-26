@@ -12,6 +12,8 @@ public static class Security
         services.AddSingleton<IPlayerTokenService>(sp =>
             new HmacPlayerTokenService(secret, sp.GetRequiredService<IMyLogger>()));
         services.AddSingleton<IGamePlayerMappingStore, InMemoryGamePlayerMappingStore>();
+        // Track SSE connections per (matchmakingId, playerId) to avoid premature auto-leave on quick reconnects
+        services.AddSingleton<App.Web.Sse.ISseConnectionTracker, App.Web.Sse.InMemorySseConnectionTracker>();
         return services;
     }
 }
