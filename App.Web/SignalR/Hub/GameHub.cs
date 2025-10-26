@@ -24,14 +24,24 @@ public class GameHub(IMyLogger logger,
         if (!tokenService.VerifyMatchmaking(matchmakingId, playerId, sig))
         {
             logger.Warn($"WS JoinMatchmaking unauthorized: mmId={matchmakingId}, playerId={playerId}, prefix={tp}");
-            throw new HubException("Unauthorized");
+            // Do not throw to avoid client treating this as a connection loss
+            await Clients.Caller.SendAsync("JoinMatchmakingUnauthorized", new { matchmakingId, playerId });
+            return;
         }
-        // track this connection as active for (mmId, playerId)
-        var afterInc = wsTracker.Increment(matchmakingId, playerId);
-        Context.Items["mmId"] = matchmakingId;
-        Context.Items["playerId"] = playerId;
-        logger.Info($"WS connections: incremented count for (mmId={matchmakingId}, playerId={playerId}) -> {afterInc}");
-        await Groups.AddToGroupAsync(Context.ConnectionId, GroupNameForMatchmaking(matchmakingId));
+        try
+        {
+            // track this connection as active for (mmId, playerId)
+            var afterInc = wsTracker.Increment(matchmakingId, playerId);
+            Context.Items["mmId"] = matchmakingId;
+            Context.Items["playerId"] = playerId;
+            logger.Info($"WS connections: incremented count for (mmId={matchmakingId}, playerId={playerId}) -> {afterInc}");
+            await Groups.AddToGroupAsync(Context.ConnectionId, GroupNameForMatchmaking(matchmakingId));
+        }
+        catch (Exception ex)
+        {
+            logger.Warn($"WS JoinMatchmaking group add failed: {ex.Message} (mmId={matchmakingId}, playerId={playerId})");
+            await Clients.Caller.SendAsync("JoinMatchmakingFailed", new { matchmakingId, playerId, reason = "GroupAddFailed" });
+        }
     }
 
     public async Task LeaveMatchmaking(Guid matchmakingId)
@@ -69,9 +79,18 @@ public class GameHub(IMyLogger logger,
         if (!ok)
         {
             logger.Warn($"WS JoinGame unauthorized: gameId={gameId}, playerId={playerId}, prefix={tp}");
-            throw new HubException("Unauthorized");
+            // Do not throw to avoid client treating this as a connection loss
+            return Clients.Caller.SendAsync("JoinGameUnauthorized", new { gameId, playerId });
         }
-        return Groups.AddToGroupAsync(Context.ConnectionId, GroupNameForGame(gameId));
+        try
+        {
+            return Groups.AddToGroupAsync(Context.ConnectionId, GroupNameForGame(gameId));
+        }
+        catch (Exception ex)
+        {
+            logger.Warn($"WS JoinGame group add failed: {ex.Message} (gameId={gameId}, playerId={playerId})");
+            return Clients.Caller.SendAsync("JoinGameFailed", new { gameId, playerId, reason = "GroupAddFailed" });
+        }
     }
 
     public Task LeaveGame(Guid gameId)
