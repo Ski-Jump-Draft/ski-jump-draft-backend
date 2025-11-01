@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Linq;
 using App.Application.Commanding;
 using App.Application.Extensions;
 using App.Application.Matchmaking;
@@ -61,7 +62,9 @@ public class BotJoiner(
         {
             var botsHaveNotJoined = !_botsJoined.ContainsKey(m.Id_.Item);
             var remainingSlotsExist = m.RemainingSlots > 0;
-            var remainingTimeIsEnough = m.RemainingToForceEnd(nowDateTime).TotalSeconds <= 15;
+            var remaining = m.RemainingTimeFrom(nowDateTime);
+            var remainingTimeIsSoon = remaining > TimeSpan.Zero && remaining.TotalSeconds <= 15;
+            var remainingTimeIsEnough = remainingTimeIsSoon;
             return botsHaveNotJoined && remainingSlotsExist
                                      && remainingTimeIsEnough;
         }
@@ -70,25 +73,22 @@ public class BotJoiner(
     private async Task JoinBotsToMatchmaking(Matchmaking m, CancellationToken ct)
     {
         var botsToJoin = Math.Max(1, (int)Math.Ceiling(m.RemainingSlots / 1.5));
-        var success = false;
 
         var tasks = Enumerable.Range(0, botsToJoin).Select(async i =>
         {
             await Task.Delay(350 * i, ct);
-            await JoinBotToMatchmaking(m.Id_.Item, m.IsPremium_, ct);
-            success = true;
-        });
+            return await JoinBotToMatchmaking(m.Id_.Item, m.IsPremium_, ct);
+        }).ToArray();
 
-        await Task.WhenAll(tasks);
-        if (success)
+        var results = await Task.WhenAll(tasks);
+        if (results.Any(r => r))
             _botsJoined[m.Id_.Item] = true;
     }
 
 
-    private async Task JoinBotToMatchmaking(Guid matchmakingId, bool isPremium, CancellationToken ct)
+    private async Task<bool> JoinBotToMatchmaking(Guid matchmakingId, bool isPremium, CancellationToken ct)
     {
         var nick = GenerateBotName(matchmakingId);
-
 
         if (isPremium)
         {
@@ -97,7 +97,7 @@ public class BotJoiner(
             if (string.IsNullOrEmpty(password))
             {
                 log.Warn($"Premium matchmaking {matchmakingId}: missing password, skipping bot join.");
-                return;
+                return false;
             }
 
             var cmd = new App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking.Command(nick, true, password);
@@ -111,6 +111,7 @@ public class BotJoiner(
 
                 _usedNicks.GetOrAdd(id, _ => []).Add(corrected);
                 log.Debug($"Bot {corrected} joined {id} (PREMIUM) (playerId={pid})");
+                return true;
             }
             catch (Exception ex) when (ex is
                                            App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking
@@ -118,10 +119,12 @@ public class BotJoiner(
                                            App.Application.UseCase.Matchmaking.JoinPremiumMatchmaking
                                                .PrivateServerInUse)
             {
+                return false;
             }
             catch (Exception ex)
             {
                 log.Error("Bot failed to join", ex);
+                return false;
             }
         }
         else
@@ -137,6 +140,7 @@ public class BotJoiner(
 
                 _usedNicks.GetOrAdd(id, _ => []).Add(corrected);
                 log.Debug($"Bot {corrected} joined {id} (playerId={pid})");
+                return true;
             }
             catch (Exception ex) when (ex is
                                            App.Application.UseCase.Matchmaking.JoinQuickMatchmaking.RoomIsFullException
@@ -144,10 +148,12 @@ public class BotJoiner(
                                            App.Application.UseCase.Matchmaking.JoinQuickMatchmaking
                                                .MultipleGamesNotSupportedException)
             {
+                return false;
             }
             catch (Exception ex)
             {
                 log.Error("Bot failed to join", ex);
+                return false;
             }
         }
     }
