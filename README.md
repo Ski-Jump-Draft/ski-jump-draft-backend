@@ -1,31 +1,68 @@
 # Ski Jump Draft
-This repository contains the server-side code for [Ski Jump Draft] online game for ski jumping enthusiasts. It's planned to be hosted on Fly.io platform.
 
-## Contribution
-🚧 The project is not yet open for feature contributions.  
-We accept only **code quality / documentation improvements** for now.  
-Bug reports and questions are welcome via GitHub Issues.  
-See [CONTRIBUTING.md](./CONTRIBUTING.md).
+Ski Jump Draft is an online game for ski jumping fans. This repository contains the server-side code.
+
+The project is currently **closed**.
+
+It was hosted in October 2025 (beta version) on Fly.io, with the frontend on Vercel. Around 10 players took part in tests.
+
+## Short technical summary
+- Backend: ASP.NET (C#) with elements of F#
+- Architecture: strong focus on **Dependency Inversion Principle (DIP)**  + Domain Driven Design (DDD)  
+- CQRS approach (partially applied)
+- Real-time communication using SignalR 
 
 ## Architectural overview
+
 Project is split into a few parts:
-- **Domain Layer** (F#) — contains the core logic which is totally independent of technical details, like where does the app run or which database system do we use. For example, it determines the order in Draft or which jumpers will advance to next competition's round.
-- **Application Layer** (C#) — as Uncle Bob said, this is an "automation" layer. For example, it schedules next phases in the game or draft pass after a timeout.
-- **Infrastructure Layer** (C#) — includes implementations of contracts contained in Domain and Application layers; it has the logic of persisting the data, ORM's, schedulers, buses and so on.
-- **Web Layer** (C#, ASP.NET) — includes a Web API, Dependency Injection and main Program.cs file. Most "dirty" part of the project.
-- **Ski Jumping Simulator Layer** — includes a jumps simulator written especially for SJ Draft, which is planned to become a web service.
+
+- **Domain Layer** (F#) — contains the core logic, fully independent from infrastructure.  
+  It defines rules like draft order or which jumpers advance to the next round.
+
+- **Application Layer** (C#) — orchestration layer.  
+  Handles workflows like scheduling phases or moving the draft forward after timeouts.
+
+- **Infrastructure Layer** (C#) — implementations of contracts from Domain and Application.  
+  Includes persistence, schedulers, messaging, etc.
+
+- **Web Layer** (C#, ASP.NET)** — API layer with Dependency Injection and entry point (Program.cs).  
+  This is the most framework-dependent part.
+
+- **Ski Jumping Simulator Layer** — custom jump simulation engine, based on probability and designed specifically for this game.  
+  Planned to be extracted into a separate web service.
+
 ## Architecture rules
-Ski Jump Draft heavily relies on:
-- SOLID principles, especially **Dependency Inversion Principle**
-- Uncle Bob's "Clean Architecture" book
-- Certain concepts from Domain Driven Design (entities, value objects, bounded contexts)
-## Domain components (aka Bounded Contexts)
-- Game (main axis of project, manages the transitions between phases, has settings, manages the draft logic and game ranking calculation policy)
-- Competition (for now, game "copies" the _Competition_ component logic without contexts separation — planned to refactor)
-- Matchmaking (logic for gathering players before the game)
-- Simulation (defines jump simulation, judge evaluation and weather engine interfaces used across the project, which are implemented in a separate project)
-- GameWorld (currently it holds global jumpers and hills "pack". It's planned to manage some records, stats and events which will spice up the game for all users)
+
+Ski Jump Draft is based on:
+
+- SOLID principles (especially Dependency Inversion Principle)  
+- Uncle Bob's Clean Architecture rules (e.g. use cases)
+- Selected Domain Driven Design concepts:
+  - entities  
+  - value objects  
+  - bounded contexts
+
+## Domain components (Bounded Contexts)
+
+- **Game** — main core of the system  
+  Handles game phases, draft logic, and ranking rules  
+
+- **Competition** — ski jumping competition logic  
+  Currently coupled with Game
+
+- **Matchmaking** — gathers players before the game starts  
+
+- **Simulation** — defines interfaces for jump simulation, judges, and weather  
+
+- **GameWorld** — global data (jumpers, hills), planned to include records and events  
 
 ## Quickstart
-1. Copy `.env.example` → `.env`
-2. Fill up the environment variables
+
+1. Copy `.env.example` → `.env`  
+2. Fill in environment variables
+
+## Screenshots
+<img width="1832" height="1028" alt="image" src="https://github.com/user-attachments/assets/97fd684e-99d6-49c9-b084-678398f26507" />
+<img width="2097" height="1062" alt="image" src="https://github.com/user-attachments/assets/83cab20b-5f3f-43c3-b1bd-0f434594a7d0" />
+<img width="2097" height="1113" alt="image" src="https://github.com/user-attachments/assets/11ef5bd3-6c52-43e0-88f4-3176ed48c1f3" />
+<img width="1835" height="1167" alt="image" src="https://github.com/user-attachments/assets/1f3eb7ac-73ba-453e-bf52-e80617b5b493" />
